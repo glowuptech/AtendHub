@@ -1,14 +1,22 @@
 :root {
-  --brand-primary: #513236;
-  --brand-on-primary: #f9f4ee;
-  --surface: #f9f4ee;
+  --brand-primary: #882e43;
+  --brand-on-primary: #ffffff;
+  --surface: #ffffff;
   --surface-raised: #ffffff;
+  --surface-muted: #f5f7fa;
+  --brand-soft: #faedf1;
+  --chart-blue: #477ec4;
+  --chart-teal: #278776;
+  --chart-amber: #c18a32;
+  --chart-purple: #8b68ba;
+  --chart-coral: #cb6c58;
+  --chart-blue-soft: #eff5fc;
   --accent-sage: #b5c1b3;
   --accent-rose: #c8aea1;
-  --text-primary: #333433;
-  --text-secondary: #6e6865;
-  --taupe: #aaa8a0;
-  --border-subtle: #dcd1ca;
+  --text-primary: #262b33;
+  --text-secondary: #59616d;
+  --taupe: #9099a5;
+  --border-subtle: #e1e5ea;
   --success: #326044;
   --success-bg: #edf4ec;
   --warning: #805119;
@@ -23,5 +31,5 @@
 }
 [data-clinic-theme="sage"] {
   --brand-primary: #385341;
-  --brand-on-primary: #f9f4ee;
+  --brand-on-primary: #ffffff;
 }

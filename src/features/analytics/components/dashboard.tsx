@@ -137,7 +137,7 @@ export function Dashboard() {
                 ["Em atendimento", leads.filter((l) => l.owner).length],
                 ["Agendados", scheduled],
               ].map(([label, count], i) => (
-                <div className="funnel-row" key={label}>
+                <div className="funnel-row" data-series={i % 5} key={label}>
                   <div>
                     <span>
                       0{i + 1} · {label}

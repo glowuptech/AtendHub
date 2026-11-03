@@ -12,3 +12,18 @@ export const verticalThemes: Record<Vertical, typeof prescritaTheme | null> = {
   legal: null,
 };
 export const clinicThemes = ["prescrita", "sage"] as const;
+
+/** Shared workspace colors are independent of each vertical's identity. */
+export const workspaceTheme = {
+  background: "var(--surface)",
+  muted: "var(--surface-muted)",
+  text: "var(--text-primary)",
+  border: "var(--border-subtle)",
+  chart: [
+    "var(--chart-blue)",
+    "var(--chart-teal)",
+    "var(--chart-amber)",
+    "var(--chart-purple)",
+    "var(--chart-coral)",
+  ],
+} as const;

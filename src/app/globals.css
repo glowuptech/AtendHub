@@ -100,7 +100,7 @@ h1 {
   line-height: 1.2;
   font-weight: 500;
   letter-spacing: -1.1px;
-  color: var(--brand-primary);
+  color: var(--text-primary);
 }
 h2 {
   font-size: 18px;
@@ -260,7 +260,7 @@ main:focus {
   font-weight: 600;
 }
 .avatar.soft {
-  background: var(--accent-rose);
+  background: var(--brand-soft);
   color: var(--brand-primary);
 }
 .nav-label,
@@ -293,8 +293,9 @@ nav > a:hover {
   text-decoration: none;
 }
 nav > a[aria-current="page"] {
-  background: var(--brand-primary);
-  color: var(--brand-on-primary);
+  background: var(--brand-soft);
+  color: var(--brand-primary);
+  box-shadow: inset 3px 0 var(--brand-primary);
 }
 .sidebar-bottom {
   margin-top: auto;
@@ -304,7 +305,7 @@ nav > a[aria-current="page"] {
   border: 1px solid var(--border-subtle);
   padding: 16px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--accent-sage) 22%, var(--surface));
+  background: var(--surface-muted);
   font-size: 12px;
 }
 .support-box strong {
@@ -373,7 +374,7 @@ nav > a[aria-current="page"] {
   font-size: 11px;
   color: var(--brand-primary);
   border-bottom: 1px solid var(--border-subtle);
-  background: color-mix(in srgb, var(--accent-rose) 16%, var(--surface));
+  background: var(--surface-muted);
 }
 .demo-tag {
   margin-left: auto;
@@ -479,7 +480,7 @@ nav > a[aria-current="page"] {
   font-weight: 500;
   letter-spacing: -1.5px;
   line-height: 1.2;
-  color: var(--brand-primary);
+  color: var(--text-primary);
   margin: 17px 0 12px;
 }
 .metric-foot {
@@ -547,46 +548,65 @@ nav > a[aria-current="page"] {
 .bar-track {
   height: 12px;
   border-radius: 4px;
-  background: var(--surface);
+  background: var(--surface-muted);
   overflow: hidden;
 }
+/* Chart colors belong to the shared workspace, independently of vertical branding. */
 .bar-track > span {
   display: block;
-  background: var(--brand-primary);
+  background: var(--chart-blue);
   height: 100%;
   border-radius: 4px;
 }
-.funnel-row:nth-of-type(3) .bar-track > span {
-  background: var(--accent-sage);
+.funnel-row[data-series="1"] .bar-track > span {
+  background: var(--chart-teal);
 }
-.funnel-row:nth-of-type(4) .bar-track > span {
-  background: var(--accent-rose);
+.funnel-row[data-series="2"] .bar-track > span {
+  background: var(--chart-amber);
+}
+.funnel-row[data-series="3"] .bar-track > span {
+  background: var(--chart-purple);
+}
+.funnel-row[data-series="4"] .bar-track > span {
+  background: var(--chart-coral);
+}
+.metrics .card:nth-child(1) .metric-top svg {
+  color: var(--chart-blue);
+}
+.metrics .card:nth-child(2) .metric-top svg {
+  color: var(--chart-amber);
+}
+.metrics .card:nth-child(3) .metric-top svg {
+  color: var(--chart-teal);
+}
+.metrics .card:nth-child(4) .metric-top svg {
+  color: var(--chart-purple);
 }
 .funnel-row small {
   margin-top: 6px;
   font-size: 11px;
 }
 .attention-card {
-  background: var(--brand-primary);
-  color: var(--brand-on-primary);
-  border-color: var(--brand-primary);
+  background: var(--chart-blue-soft);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
 }
 .attention-card h3 {
-  font-family: Georgia, serif;
-  font-size: 26px;
-  font-weight: 400;
+  font-family: inherit;
+  font-size: 25px;
+  font-weight: 500;
   line-height: 1.35;
   margin-top: 24px;
+  letter-spacing: -0.5px;
 }
 .attention-card p {
   font-size: 12px;
-  color: var(--brand-on-primary);
-  opacity: 0.85;
+  color: var(--text-secondary);
 }
 .attention-card .button {
-  background: transparent;
-  border-color: var(--accent-rose);
-  color: var(--brand-on-primary);
+  background: var(--surface-raised);
+  border-color: var(--border-subtle);
+  color: var(--brand-primary);
 }
 .table-scroll {
   overflow: auto;
@@ -836,7 +856,7 @@ tr:last-child td {
   margin: auto;
   border: 7px solid var(--brand-primary);
   border-radius: 34px;
-  background: var(--surface);
+  background: var(--surface-muted);
   overflow: hidden;
   box-shadow: 0 16px 40px
     color-mix(in srgb, var(--brand-primary) 12%, transparent);

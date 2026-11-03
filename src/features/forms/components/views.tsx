@@ -194,7 +194,7 @@ export function FormAnalytics({
           etapa 3 e 38 enviaram.
         </p>
         {a.steps.map((s, i) => (
-          <div className="funnel-row" key={s.stepId}>
+          <div className="funnel-row" data-series={i % 5} key={s.stepId}>
             <div>
               <strong>
                 {i + 1}. {version.steps[i].title}
