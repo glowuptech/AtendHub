@@ -20,7 +20,7 @@ export function ClientProfile({ id }: { id: string }) {
       <Heading
         eyebrow="CLÍNICAS / PERFIL OPERACIONAL"
         title={c.name}
-        description="Informações administrativas de demonstração · sem dados clínicos."
+        description="Informações administrativas  · sem dados clínicos."
       />
       <div className="tabs" aria-label="Seções da clínica">
         {[
@@ -64,7 +64,7 @@ export function ClientProfile({ id }: { id: string }) {
         <Card title="A agenda oficial é externa">
           <p>
             Este link abre apenas example.com, um endereço seguro de
-            demonstração. Não representa a agenda de uma médica.
+            prévia. Não representa a agenda de uma médica.
           </p>
           <a
             className="button button-primary"
@@ -72,7 +72,7 @@ export function ClientProfile({ id }: { id: string }) {
             target="_blank"
             rel="noopener noreferrer"
           >
-            Abrir sistema de agenda · DEMO
+            Abrir sistema de agenda
           </a>
         </Card>
       ) : tab === "Base de conhecimento" ? (

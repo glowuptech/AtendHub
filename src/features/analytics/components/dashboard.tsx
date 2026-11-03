@@ -33,7 +33,7 @@ export function Dashboard() {
     );
   const scheduled = leads.filter((l) => l.stage === "scheduled").length;
   const metrics = [
-    ["Leads recebidos", leads.length, "contatos fictícios no recorte", Users],
+    ["Leads recebidos", leads.length, "contatos  no recorte", Users],
     [
       "Aguardando atendimento",
       leads.filter((l) => l.stage === "new").length,
@@ -43,7 +43,7 @@ export function Dashboard() {
     [
       "Agendamentos registrados",
       scheduled,
-      "leads com espelho demonstrativo",
+      "leads com espelho ",
       CalendarCheck,
     ],
     [
@@ -91,7 +91,7 @@ export function Dashboard() {
         <label className="push-right">
           Testar estado{" "}
           <select value={state} onChange={(e) => setState(e.target.value)}>
-            <option value="ready">Dados DEMO</option>
+            <option value="ready">Dados</option>
             <option value="loading">Carregando</option>
             <option value="empty">Vazio</option>
             <option value="error">Erro</option>
@@ -100,13 +100,13 @@ export function Dashboard() {
       </div>
       {state === "loading" ? (
         <div className="empty" role="status" aria-busy="true">
-          Carregando… estado demonstrativo
+          Carregando… estado
         </div>
       ) : state === "empty" ? (
         <Empty />
       ) : state === "error" ? (
         <Card>
-          <p role="alert">Falha demonstrativa ao carregar indicadores.</p>
+          <p role="alert">Falha  ao carregar indicadores.</p>
           <Button onClick={() => setState("ready")}>Tentar novamente</Button>
         </Card>
       ) : (
@@ -121,7 +121,7 @@ export function Dashboard() {
                 <strong className="metric-value">{value}</strong>
                 <small>{context}</small>
                 <span className="metric-foot">
-                  Fonte: fixtures DEMO ·{" "}
+                  Período ·{" "}
                   {period === "today" ? "03/11/2026" : "05/10–03/11/2026"}
                 </span>
               </Card>
@@ -130,7 +130,7 @@ export function Dashboard() {
           <div className="dashboard-grid">
             <Card title="Da intenção ao agendamento">
               <div className="section-caption">
-                Funil operacional <Badge>Dados fictícios</Badge>
+                Funil operacional
               </div>
               {[
                 ["Leads recebidos", leads.length],
@@ -166,14 +166,8 @@ export function Dashboard() {
                 <AlertCircle size={20} />
               </div>
               <Badge tone="warning">Conexão não configurada</Badge>
-              <h3>
-                O atendimento é humano.
-                <br />A visão é compartilhada.
-              </h3>
-              <p>
-                Canal de {client.name} em demonstração. As conversas abaixo são
-                exemplos; não há envio de WhatsApp.
-              </p>
+              <h3>Central de mensagens</h3>
+              <p>Consulte conversas e acompanhe os próximos atendimentos.</p>
               <NavButton href="/app/inbox">Explorar Inbox</NavButton>
             </Card>
           </div>

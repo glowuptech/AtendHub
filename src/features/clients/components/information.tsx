@@ -78,7 +78,7 @@ export function ClientInformation({ client }: { client: Client }) {
           setEditing(false);
           setError("");
           setMessage(
-            "Informações atualizadas nesta demonstração. Recarregar a página restaura os dados iniciais.",
+            "Informações atualizadas nesta sessão. Recarregar a página restaura os dados iniciais.",
           );
         } catch (err) {
           setError(
@@ -113,12 +113,12 @@ export function ClientInformation({ client }: { client: Client }) {
             Editar informações
           </Button>
         ) : (
-          <Badge>Modo de edição · DEMO</Badge>
+          <Badge>Modo de edição</Badge>
         )}
       </div>
       {editing && (
         <div className="profile-edit-notice">
-          Use apenas informações fictícias. As alterações ficam em memória;
+          Use apenas informações . As alterações ficam em memória;
           nenhum contrato é assinado, renovado ou enviado por esta tela.
         </div>
       )}
@@ -128,7 +128,7 @@ export function ClientInformation({ client }: { client: Client }) {
             <ClinicLogo client={c} />
             <div>
               <strong>{client.name}</strong>
-              <small>Logotipo cadastrado · demonstração</small>
+              <small>Logotipo cadastrado</small>
             </div>
           </div>
           <Field
@@ -189,7 +189,7 @@ export function ClientInformation({ client }: { client: Client }) {
             )}
           </div>
           <Field
-            label="CNPJ demonstrativo"
+            label="CNPJ "
             value={c.cnpj ?? ""}
             editing={editing}
             onChange={(cnpj) =>
@@ -467,7 +467,7 @@ export function ClientInformation({ client }: { client: Client }) {
       <p role="status">{message}</p>
       {editing && (
         <div className="profile-save-bar">
-          <span>Alterações demonstrativas · sem persistência no servidor</span>
+
           <div className="actions">
             <Button
               type="button"

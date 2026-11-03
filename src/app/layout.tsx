@@ -3,10 +3,10 @@ import { DemoProvider } from "@/components/layout/demo-context";
 import "./globals.css";
 export const metadata: Metadata = {
   title: {
-    default: "Prescrita · Operação de saúde",
-    template: "%s · Prescrita",
+    default: "Atend Hub · Gestão de atendimento",
+    template: "%s · Atend Hub",
   },
-  description: "MVP visual com dados fictícios. Integrações não conectadas.",
+  description: "Gestão de atendimento e relacionamento.",
   robots: { index: false, follow: false },
 };
 export default function RootLayout({

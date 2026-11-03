@@ -45,7 +45,7 @@ export function LeadTable({ leads }: { leads: Lead[] }) {
               </td>
               <td>{l.owner ?? "Não atribuído"}</td>
               <td>
-                {l.minutesSinceContact} min <small>tempo fictício</small>
+                {l.minutesSinceContact} min <small>tempo </small>
               </td>
               <td>{l.nextAction}</td>
             </tr>

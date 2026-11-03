@@ -146,13 +146,13 @@ export function Clients() {
       />
       <div className="clinic-directory-summary">
         <span>
-          <strong>{clients.length}</strong> cadastros demonstrativos
+          <strong>{clients.length}</strong> cadastros
         </span>
         <span>
           <span className="status-dot" />{" "}
           {clients.filter((c) => c.status === "active").length} ativos
         </span>
-        <span>Dados e registros profissionais inteiramente fictícios</span>
+
       </div>
       <div className="clinic-filters">
         <div className="clinic-search">
@@ -256,7 +256,7 @@ export function Clients() {
             </div>
             <div className="clinic-cnpj">
               <div>
-                <small>CNPJ · demonstração</small>
+                <small>CNPJ</small>
                 <strong>{c.cnpj ? formatCnpj(c.cnpj) : "Não informado"}</strong>
               </div>
               <CopyButton
@@ -364,7 +364,7 @@ export function Clients() {
             setStatus("all");
             setCategory("all");
             setSpecialty("all");
-            setNotice(`${name} criada em modo demonstração.`);
+            setNotice(`${name} criada.`);
           }}
         />
       </dialog>
@@ -467,11 +467,7 @@ function CreateClinic({
           <X size={20} />
         </Button>
       </header>
-      <p className="clinic-demo-warning">
-        Demonstração: use apenas dados fictícios. O cadastro fica em memória e é
-        descartado ao recarregar. CNPJ e CRM não são verificados em órgãos
-        oficiais.
-      </p>
+
       <div className="clinic-upload">
         <ClinicLogo client={{ name: name || "Novo cadastro", logo }} />
         <label>
@@ -559,7 +555,7 @@ function CreateClinic({
         </label>
       </div>
       <label>
-        CNPJ demonstrativo (opcional)
+        CNPJ (opcional)
         <input
           inputMode="numeric"
           placeholder="00.000.000/0000-00"
@@ -688,7 +684,7 @@ function CreateClinic({
         <Button type="button" variant="outline" onClick={onClose}>
           Cancelar
         </Button>
-        <Button type="submit">Criar clínica · DEMO</Button>
+        <Button type="submit">Criar clínica</Button>
       </footer>
     </form>
   );

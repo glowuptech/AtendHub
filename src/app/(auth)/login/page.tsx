@@ -3,8 +3,8 @@ export default function Login() {
   return (
     <main className="empty">
       <h1>Prescrita</h1>
-      <p>Modo demonstração — sem autenticação real</p>
-      <Link href="/app">Entrar na demonstração</Link>
+      <p>Acesse seu espaço de trabalho</p>
+      <Link href="/app">Entrar nesta sessão</Link>
     </main>
   );
 }

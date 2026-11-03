@@ -30,13 +30,13 @@ export function Leads() {
     <>
       <Heading
         title="Cada oportunidade, uma história."
-        description={`${c.name} · CRM administrativo de demonstração.`}
+        description={`${c.name} · CRM administrativo .`}
       />
       <div className="toolbar">
         <label>
           Buscar lead
           <input
-            placeholder="Nome fictício"
+            placeholder="Nome "
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -73,7 +73,7 @@ export function LeadDetail({ id }: { id: string }) {
       <Heading
         eyebrow={c.name}
         title={lead.name}
-        description="Contato inteiramente fictício · finalidade administrativa"
+        description="Contato inteiramente  · finalidade administrativa"
         action={<NavButton href="/app/inbox">Abrir Inbox</NavButton>}
       />
       <div className="cards-grid">
@@ -81,7 +81,7 @@ export function LeadDetail({ id }: { id: string }) {
           <Badge>{stageLabels[lead.stage]}</Badge>
           <p>Responsável: {lead.owner ?? "Não atribuído"}</p>
           <p>Próxima ação: {lead.nextAction}</p>
-          <p>Contato: telefone fictício, sem possibilidade de envio</p>
+          <p>Contato: telefone , sem possibilidade de envio</p>
           <NavButton href="/app/agendamentos">Agendamento espelhado</NavButton>
         </Card>
         <Card title="Origens">
@@ -165,7 +165,7 @@ export function LeadDetail({ id }: { id: string }) {
                       setValue(v.value);
                     }}
                   >
-                    Editar · DEMO
+                    Editar
                   </Button>
                 </div>
               )}

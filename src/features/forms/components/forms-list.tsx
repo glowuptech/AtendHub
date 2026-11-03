@@ -58,7 +58,7 @@ export function FormsList({ id }: { id: string }) {
                 </span>
                 <Badge>
                   {f.status === "archived"
-                    ? "Arquivado · DEMO"
+                    ? "Arquivado"
                     : f.status === "draft"
                       ? "Rascunho"
                       : "Prévia / não publicado"}
@@ -71,7 +71,7 @@ export function FormsList({ id }: { id: string }) {
               </p>
               <div className="mini-stats">
                 <span>
-                  <strong>{a.views}</strong> sessões fictícias
+                  <strong>{a.views}</strong> sessões
                 </span>
                 <span>
                   <strong>
@@ -101,7 +101,7 @@ export function FormsList({ id }: { id: string }) {
                   }}
                 >
                   <Copy size={14} />
-                  Duplicar DEMO
+                  Duplicar
                 </Button>
                 <Button
                   variant="ghost"
@@ -111,12 +111,12 @@ export function FormsList({ id }: { id: string }) {
                     repositories.forms.archive(id, f.id);
                     refresh();
                     setNotice(
-                      "Formulário arquivado apenas nesta demonstração.",
+                      "Formulário arquivado apenas nesta sessão.",
                     );
                   }}
                 >
                   <Archive size={14} />
-                  Arquivar DEMO
+                  Arquivar
                 </Button>
               </div>
             </Card>

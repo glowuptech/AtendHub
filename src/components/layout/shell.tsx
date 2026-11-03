@@ -11,7 +11,6 @@ import {
   FileText,
   Settings,
   ArrowUpRight,
-  Activity,
   PanelLeftClose,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -51,23 +50,19 @@ export function Shell({
         Pular para o conteúdo
       </a>
       <aside className={`sidebar ${open ? "is-open" : ""}`}>
-        <Link href={portal ? "/portal" : "/app"} className="brand">
-          <span className="brand-symbol">
-            p<span>✦</span>
-          </span>
-          <span>
-            prescrita<small>INTELIGÊNCIA NO CUIDAR</small>
-          </span>
+        <Link href={portal ? "/portal" : "/app"} className="brand hub-brand">
+          <span className="hub-symbol" aria-hidden="true">a<span>h</span></span>
+          <span className="hub-wordmark">Atend Hub</span>
         </Link>
         <div className="workspace-pill">
           <span className="avatar">G</span>
           <span>
             GlowUp
-            <small>{portal ? "Portal da clínica" : "Operação de saúde"}</small>
+            <small>{portal ? "Portal da clínica" : "Gestão de atendimento"}</small>
           </span>
         </div>
         <p className="nav-label">
-          {portal ? "PORTAL DEMONSTRATIVO" : "WORKSPACE"}
+          {portal ? "PORTAL" : "WORKSPACE"}
         </p>
         <nav aria-label="Navegação principal">
           {links.map(([href, label, Icon]) => (
@@ -91,20 +86,12 @@ export function Shell({
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="support-box">
-            <Activity size={18} />
-            <strong>Operação humana</strong>
-            <p>Contexto, cuidado e continuidade em cada atendimento.</p>
-          </div>
+
           <Link href={portal ? "/app" : "/portal"}>
-            {portal ? "Voltar à operação DEMO" : "Conhecer portal DEMO"}
+            {portal ? "Voltar à operação" : "Conhecer portal"}
             <ArrowUpRight size={15} />
           </Link>
-          <small>
-            Prescrita · por GlowUp
-            <br />
-            Ambiente demonstrativo · v0.1
-          </small>
+
         </div>
       </aside>
       <div className="workspace">
@@ -148,7 +135,7 @@ export function Shell({
             </label>
             <select id="vertical" defaultValue="healthcare">
               <option value="healthcare">Saúde · Prescrita</option>
-              <option disabled>Jurídico · futuro</option>
+              <option disabled>Jurídico · Veredite</option>
             </select>
             <span className="avatar">OD</span>
           </div>
@@ -157,10 +144,7 @@ export function Shell({
         <main id="main" tabIndex={-1}>
           {children}
         </main>
-        <footer>
-          Prescrita · Atendimento humano, com contexto.
-          <span>Simulação em memória · sem autenticação real</span>
-        </footer>
+
       </div>
     </div>
   );

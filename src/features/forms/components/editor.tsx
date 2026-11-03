@@ -37,7 +37,7 @@ function newStep(fieldId: string, label: string, order: number): FormStep {
     id: crypto.randomUUID(),
     order,
     title: label,
-    description: "Utilize apenas informações administrativas fictícias.",
+    description: "Utilize apenas informações administrativas .",
     buttonLabel: "Continuar",
     actionId: crypto.randomUUID(),
     backActionId: crypto.randomUUID(),
@@ -162,7 +162,7 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
       setSaved(true);
       setNotice(
         snapshot
-          ? "Versão demonstrativa congelada. Prévia / não publicado. Reabra Editar para criar novo rascunho."
+          ? "Versão  congelada. Prévia / não publicado. Reabra Editar para criar novo rascunho."
           : "Rascunho salvo em memória. Recarregar o navegador descarta a simulação.",
       );
     } catch (e) {
@@ -180,7 +180,7 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
       <Heading
         eyebrow={client.name}
         title={source ? "Editor de formulário" : "Novo formulário"}
-        description="Catálogo por clínica · prévia / não publicado · sem captação real"
+        description="Catálogo por clínica / não publicado · sem captação real"
         action={
           <NavButton href={`/app/clientes/${clientId}/formularios`}>
             Voltar aos formulários
@@ -202,7 +202,7 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
               />
             </label>
             <label>
-              Slug demonstrativo
+              Slug
               <input
                 disabled={frozen}
                 value={draft.slug}
@@ -234,7 +234,7 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
             <label>
               Destino
               <select disabled>
-                <option>Conclusão demonstrativa, sem redirecionamento</option>
+                <option>Conclusão , sem redirecionamento</option>
               </select>
             </label>
             <label>
@@ -249,7 +249,7 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
             </label>
             <Badge>
               Versão {version.number} ·{" "}
-              {frozen ? "snapshot DEMO imutável" : "rascunho"}
+              {frozen ? "snapshot imutável" : "rascunho"}
             </Badge>
           </Card>
           <Card title="Etapas e perguntas">
@@ -512,14 +512,14 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
           </Card>
           <div className="actions">
             <Button disabled={frozen} onClick={() => save()}>
-              Salvar rascunho DEMO
+              Salvar rascunho
             </Button>
             <Button
               variant="outline"
               disabled={frozen}
               onClick={() => save(true)}
             >
-              Congelar versão DEMO
+              Congelar versão
             </Button>
           </div>
           <p role="status" className="notice">

@@ -259,7 +259,7 @@ export const AppointmentSchema = z.object({
   leadId: Id,
   name: z.string(),
   scheduledAt: z.string().datetime(),
-  source: z.literal("Registro manual DEMO"),
+  source: z.literal("Registro manual"),
   attendance: z.enum(["unknown", "present", "absent"]),
 });
 export const ConversationSchema = z.object({

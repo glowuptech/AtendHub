@@ -21,7 +21,7 @@ import {
 } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
 import {
-  DEMO_TODAY,
+ DEMO_TODAY,
   shiftDay,
   partnershipSummary,
   ratio,
@@ -114,7 +114,7 @@ export function Partnership({
           </Badge>
         )}
         <small>
-          Responsável: {p.manager || "Não informado"} · Referência fixa DEMO:{" "}
+          Responsável: {p.manager || "Não informado"} · Referência fixa:{" "}
           {dateLabel(DEMO_TODAY)}. Contrato não acompanha o filtro de métricas.
         </small>
       </div>
@@ -131,7 +131,7 @@ export function ClientOverview({
   const { repositories } = useDemo();
   const [range, setRange] = useState({
       from: shiftDay(DEMO_TODAY, -29),
-      to: DEMO_TODAY,
+      to:DEMO_TODAY,
     }),
     [draftRange, setDraftRange] = useState(range),
     [doctor, setDoctor] = useState("all"),
@@ -163,13 +163,13 @@ export function ClientOverview({
     {
       title: "Conversão dos formulários",
       value: ratio(data.submitted, data.views),
-      detail: `${data.submitted} envios / ${data.views} sessões fictícias`,
+      detail: `${data.submitted} envios / ${data.views} sessões `,
       icon: ClipboardCheck,
     },
     {
       title: "Agendamentos no período",
       value: String(data.appointments.length),
-      detail: "Data da consulta no período · espelhos DEMO",
+      detail: "Data da consulta no período · espelhos",
       icon: CalendarDays,
     },
     {
@@ -201,7 +201,7 @@ export function ClientOverview({
             Aquisição, atendimento e agendamento no mesmo recorte.
           </p>
         </div>
-        <Badge>Dados fictícios</Badge>
+
       </div>
       <form
         className="profile-period"
@@ -223,7 +223,7 @@ export function ClientOverview({
               type="button"
               variant={
                 range.from === shiftDay(DEMO_TODAY, 1 - days) &&
-                range.to === DEMO_TODAY
+                range.to ===DEMO_TODAY
                   ? "default"
                   : "outline"
               }
@@ -231,7 +231,7 @@ export function ClientOverview({
               onClick={() => {
                 const next = {
                   from: shiftDay(DEMO_TODAY, 1 - days),
-                  to: DEMO_TODAY,
+                  to:DEMO_TODAY,
                 };
                 setRange(next);
                 setDraftRange(next);
@@ -286,7 +286,7 @@ export function ClientOverview({
         )}
         <small>
           Período aplicado: {dateLabel(range.from)} a {dateLabel(range.to)} ·
-          America/Sao_Paulo · Fonte: fixtures internas. Presets relativos a{" "}
+          America/Sao_Paulo · Período internas. Presets relativos a{" "}
           {dateLabel(DEMO_TODAY)}.
         </small>
       </form>
@@ -451,11 +451,7 @@ export function ClientOverview({
         {!data.forms.length && (
           <Empty title="Nenhum formulário neste recorte" />
         )}
-        <small>
-          Agregados anônimos fictícios de 01–03/11/2026; filtros usam a data da
-          sessão. Envios não equivalem a leads únicos e não são gerados pela
-          prévia.
-        </small>
+
       </Card>
       <div className="profile-dashboard-grid">
         <Card title="Leads por estágio">
@@ -485,7 +481,7 @@ export function ClientOverview({
             <div className="profile-stat-row" key={a.id}>
               <span>
                 {a.name}
-                <small>{dateTime(a.scheduledAt)} · espelho DEMO</small>
+                <small>{dateTime(a.scheduledAt)} · espelho</small>
               </span>
               <Badge>
                 {a.attendance === "unknown"
@@ -499,7 +495,7 @@ export function ClientOverview({
           {!data.appointments.length &&
             !data.leads.some((l) => !l.firstResponseAt) && (
               <p className="muted">
-                Nenhuma pendência demonstrativa neste recorte.
+                Nenhuma pendência neste recorte.
               </p>
             )}
           <NavButton href="/app/agendamentos">Ver agendamentos</NavButton>

@@ -34,7 +34,7 @@ export function Inbox() {
           Responsável
           <select value={owner} onChange={(e) => setOwner(e.target.value)}>
             <option value="all">Todos</option>
-            <option value="assigned">Operadora DEMO</option>
+            <option value="assigned">Operadora</option>
             <option value="unassigned">Não atribuído</option>
           </select>
         </label>
@@ -66,7 +66,7 @@ export function Inbox() {
           <section className="thread">
             <header>
               <strong>{conversation.name}</strong>
-              <small>{client.name} · mensagens fictícias</small>
+              <small>{client.name} · mensagens </small>
             </header>
             <div className="messages">
               {conversation.messages.map((m) => (
@@ -93,7 +93,7 @@ export function Inbox() {
           <aside className="conversation-context">
             <span className="eyebrow">CONTEXTO DA CLÍNICA</span>
             <h2>{client.name}</h2>
-            <Badge>Saúde · DEMO</Badge>
+            <Badge>Saúde</Badge>
             <p>Responsável: {conversation.owner ?? "Não atribuído"}</p>
             <NavButton href={`/app/leads/${conversation.leadId}`}>
               Abrir lead e campos
@@ -102,14 +102,14 @@ export function Inbox() {
             <h3>Agendamento externo</h3>
             <p>
               A agenda da clínica é a fonte oficial. Este link é somente uma
-              demonstração.
+              prévia.
             </p>
             <a
               href={client.externalSchedulingUrl}
               target="_blank"
               rel="noopener noreferrer"
             >
-              Abrir agenda DEMO ↗
+              Abrir agenda ↗
             </a>
           </aside>
         </div>
@@ -134,7 +134,7 @@ export function Queue() {
               <strong>{l.name}</strong>
               <small>
                 {l.owner ?? "Aguardando responsável"} · {l.minutesSinceContact}{" "}
-                minutos fictícios
+                minutos
               </small>
             </div>
             <Button
@@ -144,7 +144,7 @@ export function Queue() {
                   repositories.leads.claim(clientId, l.id);
                   refresh();
                   setNotice(
-                    "Responsabilidade atribuída em memória à Operadora DEMO.",
+                    "Responsabilidade atribuída em memória à Operadora.",
                   );
                 } catch {
                   setNotice("Este lead já possui responsável.");

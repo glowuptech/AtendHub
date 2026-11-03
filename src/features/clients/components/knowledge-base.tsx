@@ -40,7 +40,7 @@ export function KnowledgeBase({ client }: { client: Client }) {
       <p>Processos, serviços e respostas para apoiar o atendimento desta clínica.</p>
       <p>{entries.filter(e => e.status === "approved").length} aprovadas · {entries.filter(e => !e.answer).length} sem resposta · {entries.filter(e => e.status === "pending").length} pendentes</p>
       <div className="tabs"><Button onClick={() => edit(empty(crypto.randomUUID(), "Personalizadas", ""))}>Adicionar pergunta</Button><Button variant="outline" onClick={() => edit(empty(crypto.randomUUID(), "Serviços e valores", ""))}>Adicionar serviço e valor</Button></div>
-      <small>Modelo de perguntas inspirado no manual da Dra. Ana Luiza. Preencha com as informações de cada cliente. DEMO: alterações em memória; ainda sem consulta por IA.</small>
+
     </Card>
     {draft && <Card title={draft.id.startsWith("standard-") ? "Editar resposta padrão" : "Editar pergunta ou serviço"}>
       <form onSubmit={e => { e.preventDefault(); try {

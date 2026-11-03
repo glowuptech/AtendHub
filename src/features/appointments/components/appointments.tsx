@@ -54,7 +54,7 @@ export function Appointments({ portal = false }: { portal?: boolean }) {
                     "present",
                   );
                   refresh();
-                  setNotice("Presença confirmada apenas na demonstração.");
+                  setNotice("Presença confirmada apenas nesta sessão.");
                 }}
               >
                 Compareceu
@@ -69,7 +69,7 @@ export function Appointments({ portal = false }: { portal?: boolean }) {
                     "absent",
                   );
                   refresh();
-                  setNotice("Ausência informada apenas na demonstração.");
+                  setNotice("Ausência informada apenas nesta sessão.");
                 }}
               >
                 Não compareceu
@@ -112,18 +112,18 @@ export function Portal() {
   return (
     <>
       <Heading
-        eyebrow="PORTAL DEMONSTRATIVO"
+        eyebrow="PORTALNSTRATIVO"
         title={repositories.clients.get(clientId).name}
         description="Aquisição, marcações e comparecimento informado. Sem acesso às conversas internas."
       />
       <div className="metrics">
-        <Card title="Leads fictícios">
+        <Card title="Leads ">
           <strong className="metric-value">{leads.length}</strong>
-          <small>Fonte: fixtures · outubro/novembro de 2026</small>
+          <small>Período · outubro/novembro de 2026</small>
         </Card>
         <Card title="Espelhos registrados">
           <strong className="metric-value">{appointments.length}</strong>
-          <small>Registros fictícios · sem sincronização externa</small>
+          <small>Registros  · sem sincronização externa</small>
         </Card>
         <Card title="Comparecimento">
           <strong className="metric-value">
@@ -140,7 +140,7 @@ export function Portal() {
               : "N/D"}
           </strong>
           <small>
-            {known} informados / {appointments.length} espelhos DEMO
+            {known} informados / {appointments.length} espelhos
           </small>
         </Card>
       </div>

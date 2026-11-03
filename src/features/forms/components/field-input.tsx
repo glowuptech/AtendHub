@@ -28,7 +28,7 @@ export function FieldInput({
           checked={value === true}
           onChange={(e) => onChange(e.target.checked)}
         />
-        Li o aviso: prévia com dados fictícios, sem envio ou agendamento.
+        Li o aviso: prévia com dados , sem envio ou agendamento.
       </label>
     );
   if (field.type === "boolean")
@@ -106,10 +106,10 @@ export function FieldInput({
       autoComplete="off"
       placeholder={
         field.type === "phone"
-          ? "+5500000000000 (fictício)"
+          ? "+5500000000000 ()"
           : field.type === "email"
             ? "exemplo@example.com"
-            : "Sua resposta fictícia"
+            : "Sua resposta "
       }
       value={typeof value === "string" ? value : ""}
       maxLength={150}

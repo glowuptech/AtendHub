@@ -124,7 +124,7 @@ export function FormWizard({
       {done ? (
         <div className="wizard-success" role="status">
           <Check size={44} />
-          <h2>Pronto, demonstração concluída.</h2>
+          <h2>Pronto, prévia concluída.</h2>
           <p>{version.successMessage}</p>
           <Button onClick={restart}>
             <RotateCcw size={16} />
@@ -234,7 +234,7 @@ export function FormWizard({
         </>
       )}
       <div className="wizard-footer">
-        Dados fictícios · nada é enviado
+        Dados  · nada é enviado
         <br />
         Respostas somente em memória nesta prévia.
       </div>

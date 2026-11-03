@@ -40,7 +40,7 @@ export function FormPreview({
         />
       </div>
       <div className="preview-center">
-        <NavButton href={`/f/${form.slug}`}>Abrir rota pública DEMO</NavButton>
+        <NavButton href={`/f/${form.slug}`}>Abrir rota pública</NavButton>
       </div>
     </>
   );
@@ -97,7 +97,7 @@ export function FormAnalytics({
         <Heading
           eyebrow={repositories.clients.get(id).name}
           title="Mensuração com responsabilidade."
-          description={`${form.name} · configuração demonstrativa`}
+          description={`${form.name} · configuração `}
         />
         <Card title="Meta Pixel e CAPI">
           <Badge tone="warning">Desativados por padrão</Badge>
@@ -130,7 +130,7 @@ export function FormAnalytics({
             significa abandono confirmado.
           </p>
           <NavButton href={`${base}/analytics`}>
-            Ver funil demonstrativo
+            Ver funil
           </NavButton>
         </Card>
       </>
@@ -140,7 +140,7 @@ export function FormAnalytics({
       <Heading
         eyebrow={repositories.clients.get(id).name}
         title="Do primeiro olhar ao envio."
-        description={`${form.name} · analytics internos fictícios, independentes da prévia.`}
+        description={`${form.name} · analytics internos , independentes da prévia.`}
         action={<NavButton href={`${base}/tracking`}>Mensuração</NavButton>}
       />
       <div className="toolbar">

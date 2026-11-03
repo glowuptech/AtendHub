@@ -111,7 +111,7 @@ export function getClientOverview(
       return {
         id: f.id,
         name: f.name,
-        version: "v1 · histórico DEMO",
+        version: "v1",
         views: daily.reduce((s, d) => s + d.views, 0),
         submitted: daily.reduce((s, d) => s + d.submitted, 0),
         daily,

@@ -19,7 +19,7 @@ export const clients = [
   ClientSchema.parse({
     id: clientA,
     organizationId,
-    name: "Clínica Ana Luiza — DEMO",
+    name: "Clínica Ana Luiza",
     vertical: "healthcare",
     status: "active",
     branding: "prescrita",
@@ -27,14 +27,14 @@ export const clients = [
     description: "Atendimento administrativo • Unidade Jardim",
     category: "clinic",
     cnpj: "00000000000000",
-    contactName: "Recepção DEMO",
+    contactName: "Recepção",
     contactEmail: "recepcao@example.com",
     contactPhone: "+5500000000000",
     address: {
       postalCode: "00000000",
       street: "Rua Exemplo",
       number: "100",
-      complement: "Sala DEMO",
+      complement: "Sala",
       neighborhood: "Jardim",
       city: "Cidade Exemplo",
       state: "SP",
@@ -44,22 +44,22 @@ export const clients = [
       signedOn: "2026-09-28",
       signatureDueOn: "2026-09-30",
       renewsOn: "2026-11-28",
-      manager: "Equipe GlowUp DEMO",
-      notes: "Datas fictícias para acompanhamento da parceria.",
+      manager: "Equipe GlowUp",
+      notes: "",
     },
     logo: "/logos/ana-demo.svg",
     specialties: ["Ginecologia", "Obstetrícia"],
     doctors: [
       {
         id: uid(41),
-        name: "Dra. Exemplo Alfa — DEMO",
+        name: "Dra. Exemplo Alfa",
         crm: "000000",
         uf: "SP",
         specialties: ["Ginecologia"],
       },
       {
         id: uid(42),
-        name: "Dr. Exemplo Beta — DEMO",
+        name: "Dr. Exemplo Beta",
         crm: "000001",
         uf: "SP",
         specialties: ["Obstetrícia"],
@@ -69,7 +69,7 @@ export const clients = [
   ClientSchema.parse({
     id: clientB,
     organizationId,
-    name: "Clínica Horizonte — DEMO",
+    name: "Clínica Horizonte",
     vertical: "healthcare",
     status: "paused",
     branding: "sage",
@@ -82,14 +82,14 @@ export const clients = [
       signedOn: null,
       signatureDueOn: "2026-11-08",
       renewsOn: null,
-      manager: "Equipe GlowUp DEMO",
+      manager: "Equipe GlowUp",
     },
     logo: "/logos/horizonte-demo.svg",
     specialties: ["Clínica médica"],
     doctors: [
       {
         id: uid(43),
-        name: "Dra. Exemplo Gama — DEMO",
+        name: "Dra. Exemplo Gama",
         crm: null,
         uf: "SP",
         specialties: ["Clínica médica"],
@@ -116,8 +116,8 @@ const field = (
     options,
   });
 export const fields = [
-  field(101, clientA, "nome", "Nome de demonstração", "short_text"),
-  field(102, clientA, "telefone", "Telefone fictício", "phone"),
+  field(101, clientA, "nome", "Nome completo", "short_text"),
+  field(102, clientA, "telefone", "Telefone", "phone"),
   field(103, clientA, "periodo", "Período desejado", "single_select", [
     { id: "morning", label: "Manhã" },
     { id: "afternoon", label: "Tarde" },
@@ -126,16 +126,16 @@ export const fields = [
     104,
     clientA,
     "ciencia_valor",
-    "Ciência do valor demonstrativo",
+    "Ciência do valor",
     "boolean",
   ),
-  field(105, clientA, "aviso", "Li o aviso de demonstração", "consent"),
+  field(105, clientA, "aviso", "Li as informações do formulário", "consent"),
   field(106, clientA, "retorno", "Preferência de retorno", "single_select", [
     { id: "message", label: "Mensagem" },
     { id: "call", label: "Ligação" },
   ]),
-  field(201, clientB, "nome_horizonte", "Nome de demonstração", "short_text"),
-  field(202, clientB, "telefone_horizonte", "Telefone fictício", "phone"),
+  field(201, clientB, "nome_horizonte", "Nome completo", "short_text"),
+  field(202, clientB, "telefone_horizonte", "Telefone", "phone"),
   field(203, clientB, "unidade", "Unidade de preferência", "single_select", [
     { id: "center", label: "Centro" },
     { id: "north", label: "Norte" },
@@ -145,7 +145,7 @@ export const fields = [
     205,
     clientB,
     "aviso_horizonte",
-    "Li o aviso de demonstração",
+    "Li as informações do formulário",
     "consent",
   ),
 ];
@@ -185,9 +185,9 @@ function form(
           title: fields.find((x) => x.id === uid(f))!.label,
           description:
             i === 0
-              ? "Utilize apenas dados fictícios nesta prévia."
-              : "Informação administrativa • demonstração",
-          buttonLabel: i === 4 ? "Concluir demonstração" : "Continuar",
+              ? "Confira suas informações antes de continuar."
+              : "Informação administrativa",
+          buttonLabel: i === 4 ? "Concluir" : "Continuar",
           actionId: uid(n * 100 + i + 10),
           backActionId: uid(n * 100 + i + 20),
           question: {
@@ -242,7 +242,7 @@ export const leads = [0, 1, 2, 3].map((i) => {
     handlingMinutes: i === 0 ? null : i === 1 ? 18 : 10,
     name: `Pessoa Exemplo ${["Alfa", "Beta", "Gama", "Delta"][i]}`,
     stage: ["new", "in_progress", "scheduled", "scheduled"][i],
-    owner: i === 0 ? null : "Operadora DEMO",
+    owner: i === 0 ? null : "Operadora",
     formId: f.id,
     versionId: v.id,
     createdAt: i === 1 ? "2026-10-30T13:00:00.000Z" : demoNow,
@@ -253,7 +253,7 @@ export const leads = [0, 1, 2, 3].map((i) => {
       "Aguardar presença informada",
       "Aguardar presença informada",
     ][i],
-    source: "Formulário nativo • campanha DEMO",
+    source: "Formulário nativo • campanha",
     fields: v.steps.map((s, j) => ({
       fieldDefinitionId: s.question.fieldDefinitionId,
       questionId: s.question.id,
@@ -271,12 +271,12 @@ export const leads = [0, 1, 2, 3].map((i) => {
                 ? null
                 : true,
       capturedAt: demoNow,
-      actor: "Formulário DEMO · v1",
+      actor: "Formulário · v1",
     })),
     history: [
       {
         id: uid(900 + i),
-        label: "Submissão fictícia recebida · versão 1",
+        label: "Resposta recebida · versão 1",
         at: demoNow,
       },
     ],
@@ -290,7 +290,7 @@ export const appointments = [
     leadId: uid(602),
     name: "Pessoa Exemplo Gama",
     scheduledAt: "2026-11-03T14:00:00.000Z",
-    source: "Registro manual DEMO",
+    source: "Registro manual",
     attendance: "unknown",
   }),
   AppointmentSchema.parse({
@@ -300,7 +300,7 @@ export const appointments = [
     leadId: uid(603),
     name: "Pessoa Exemplo Delta",
     scheduledAt: "2026-11-04T17:00:00.000Z",
-    source: "Registro manual DEMO",
+    source: "Registro manual",
     attendance: "unknown",
   }),
 ];
@@ -317,7 +317,7 @@ export const conversations = leads.map((l, i) =>
       {
         id: uid(1200 + i),
         direction: "inbound",
-        body: "Olá! Gostaria de informações sobre o agendamento. [Mensagem fictícia]",
+        body: "Olá! Gostaria de informações sobre o agendamento.",
         at: demoNow,
         status: "simulated",
       },

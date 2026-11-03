@@ -1,18 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowUpRight, FlaskConical } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 export function DemoNotice() {
-  return (
-    <div className="demo-notice">
-      <FlaskConical size={15} />
-      <span>
-        Dados fictícios — MVP visual — integrações ainda não conectadas
-      </span>
-      <span className="demo-tag">C0 + C1</span>
-    </div>
-  );
+  return null;
 }
+
 export function Heading({
   eyebrow = "CENTRAL DE OPERAÇÃO",
   title,
@@ -79,7 +72,7 @@ export function NavButton({
 }
 export function Empty({
   title = "Nenhum registro neste recorte",
-  description = "Ajuste os filtros para consultar outros dados fictícios.",
+  description = "Ajuste os filtros para consultar outros dados .",
 }: {
   title?: string;
   description?: string;
