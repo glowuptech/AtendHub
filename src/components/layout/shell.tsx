@@ -39,7 +39,6 @@ export function Shell({
         ["/app/clientes", "Clínicas", Building2],
         ["/app/leads", "Leads e CRM", Users],
         ["/app/inbox", "Inbox", MessagesSquare],
-        ["/app/fila", "Fila de atendimento", ListTodo],
         ["/app/agendamentos", "Agendamentos", CalendarDays],
         [`/app/clientes/${clientId}/formularios`, "Formulários", FileText],
         ["/app/configuracoes", "Configurações", Settings],
@@ -51,19 +50,36 @@ export function Shell({
       </a>
       <aside className={`sidebar ${open ? "is-open" : ""}`}>
         <Link href={portal ? "/portal" : "/app"} className="brand hub-brand">
-          <span className="hub-symbol" aria-hidden="true">a<span>h</span></span>
+          <span className="hub-symbol" aria-hidden="true">
+            a<span>h</span>
+          </span>
           <span className="hub-wordmark">Atend Hub</span>
         </Link>
         <div className="workspace-pill">
           <span className="avatar">G</span>
           <span>
             GlowUp
-            <small>{portal ? "Portal da clínica" : "Gestão de atendimento"}</small>
+            <small>
+              {portal ? "Portal da clínica" : "Gestão de atendimento"}
+            </small>
           </span>
         </div>
-        <p className="nav-label">
-          {portal ? "PORTAL" : "WORKSPACE"}
-        </p>
+        {!portal && (
+          <>
+            <p className="nav-label">SISTEMA</p>
+            <nav aria-label="Sistema">
+              <Link
+                href="/app/fila"
+                aria-current={pathname === "/app/fila" ? "page" : undefined}
+                onClick={() => setOpen(false)}
+              >
+                <ListTodo size={18} />
+                Fila de atendimento
+              </Link>
+            </nav>
+          </>
+        )}
+        <p className="nav-label">{portal ? "PORTAL" : "WORKSPACE"}</p>
         <nav aria-label="Navegação principal">
           {links.map(([href, label, Icon]) => (
             <Link
@@ -86,12 +102,10 @@ export function Shell({
           ))}
         </nav>
         <div className="sidebar-bottom">
-
           <Link href={portal ? "/app" : "/portal"}>
             {portal ? "Voltar à operação" : "Conhecer portal"}
             <ArrowUpRight size={15} />
           </Link>
-
         </div>
       </aside>
       <div className="workspace">
@@ -144,7 +158,6 @@ export function Shell({
         <main id="main" tabIndex={-1}>
           {children}
         </main>
-
       </div>
     </div>
   );

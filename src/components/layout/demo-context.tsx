@@ -9,7 +9,13 @@ import {
 } from "react";
 import { createMockRepositories } from "@/lib/mocks/repositories";
 import { clientA, demoScope } from "@/lib/mocks/fixtures";
+import {
+  defaultCalendar,
+  type BusinessCalendar,
+} from "@/features/queue/calendar";
 interface Context {
+  calendar: BusinessCalendar;
+  setCalendar: (value: BusinessCalendar) => void;
   repositories: RepositoryRegistry;
   scope: ClientScope;
   clientId: string;
@@ -19,6 +25,7 @@ interface Context {
 }
 const DemoContext = createContext<Context | null>(null);
 export function DemoProvider({ children }: { children: ReactNode }) {
+  const [calendar, setCalendar] = useState<BusinessCalendar>(defaultCalendar);
   const [scope] = useState<ClientScope>(() => structuredClone(demoScope));
   const [repositories] = useState(() => createMockRepositories(scope));
   const [clientId, setClientId] = useState(clientA);
@@ -33,6 +40,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   return (
     <DemoContext.Provider
       value={{
+        calendar,
+        setCalendar,
         repositories,
         scope,
         clientId,

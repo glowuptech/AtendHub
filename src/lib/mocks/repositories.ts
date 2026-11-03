@@ -1,3 +1,8 @@
+import {
+  claimSla,
+  defaultCalendar,
+  type BusinessCalendar,
+} from "@/features/queue/calendar";
 import { MemoryCaptureRepository } from "@/features/forms/services/capture";
 import type {
   ClientScope,
@@ -143,10 +148,39 @@ export class MockLeadRepository
   ) {
     super(rows, scope);
   }
-  claim(clientId: string, id: string) {
+  setStage(clientId: string, id: string, stage: Lead["stage"]) {
     const r = this.row(clientId, id);
-    if (r.owner) throw Error("Lead já possui responsável");
-    r.owner = "Operadora DEMO";
+    if (
+      !r.owner ||
+      stage === "new" ||
+      !["in_progress", "waiting", "scheduled", "lost"].includes(stage)
+    )
+      throw Error("Assuma o lead antes de mover.");
+    r.stage = stage;
+    r.history.push({
+      id: crypto.randomUUID(),
+      label: `Estágio alterado para ${stage}`,
+      at: new Date().toISOString(),
+    });
+  }
+  claim(
+    clientId: string,
+    id: string,
+    calendar: BusinessCalendar = defaultCalendar,
+  ) {
+    const r = this.row(clientId, id);
+    if (r.owner || r.stage !== "new")
+      throw Error("Lead já possui responsável ou não está disponível");
+    const at = new Date().toISOString(),
+      sla = claimSla(r.createdAt, Date.parse(at), calendar);
+    r.claimedAt = at;
+    r.claimAudit = {
+      elapsedBusinessMs: sla.elapsedMs,
+      late: sla.overdue,
+      targetMinutes: 10,
+      calendar: structuredClone(calendar),
+    };
+    r.owner = "Operadora";
     r.stage = "in_progress";
     r.history.push({
       id: crypto.randomUUID(),

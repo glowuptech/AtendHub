@@ -135,7 +135,12 @@ export interface ClientRepository {
   get(clientId: string): Client;
 }
 export interface LeadRepository extends ScopedRepository<Lead> {
-  claim(clientId: string, id: string): void;
+  claim(
+    clientId: string,
+    id: string,
+    calendar?: import("@/features/queue/calendar").BusinessCalendar,
+  ): void;
+  setStage(clientId: string, id: string, stage: Lead["stage"]): void;
   editField(
     clientId: string,
     id: string,

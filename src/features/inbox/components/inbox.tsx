@@ -3,7 +3,6 @@ import { useState } from "react";
 import { useDemo } from "@/components/layout/demo-context";
 import {
   Heading,
-  Card,
   Badge,
   NavButton,
   Empty,
@@ -117,46 +116,4 @@ export function Inbox() {
     </>
   );
 }
-export function Queue() {
-  const { repositories, clientId, refresh } = useDemo();
-  const [notice, setNotice] = useState("");
-  const leads = repositories.leads.list(clientId);
-  return (
-    <>
-      <Heading
-        title="Fila de atendimento"
-        description={`${repositories.clients.get(clientId).name} · atribuição simulada, sem roleta concorrente real.`}
-      />
-      <Card>
-        {leads.map((l) => (
-          <div className="field-row" key={l.id}>
-            <div>
-              <strong>{l.name}</strong>
-              <small>
-                {l.owner ?? "Aguardando responsável"} · {l.minutesSinceContact}{" "}
-                minutos
-              </small>
-            </div>
-            <Button
-              disabled={!!l.owner}
-              onClick={() => {
-                try {
-                  repositories.leads.claim(clientId, l.id);
-                  refresh();
-                  setNotice(
-                    "Responsabilidade atribuída em memória à Operadora.",
-                  );
-                } catch {
-                  setNotice("Este lead já possui responsável.");
-                }
-              }}
-            >
-              {l.owner ? "Já atribuído" : "Assumir · simulação"}
-            </Button>
-          </div>
-        ))}
-        <p role="status">{notice}</p>
-      </Card>
-    </>
-  );
-}
+export { Queue } from "@/features/queue/queue";

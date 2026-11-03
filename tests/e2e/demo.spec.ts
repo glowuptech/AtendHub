@@ -110,7 +110,10 @@ test("fila, inbox, portal e mensuração são honestamente demonstrativos", asyn
   page,
 }) => {
   await page.goto("/app/fila");
-  await page.getByRole("button", { name: "Assumir · simulação" }).click();
+  await page
+    .getByRole("button", { name: "Assumir atendimento" })
+    .first()
+    .click();
   await expect(page.getByRole("status")).toContainText("em memória");
   await page.getByRole("link", { name: "Inbox", exact: true }).click();
   await page.getByRole("button", { name: "Demonstrar resposta" }).click();

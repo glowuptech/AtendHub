@@ -237,6 +237,20 @@ export const StageSchema = z.enum([
   "lost",
 ]);
 export const LeadSchema = z.object({
+  claimedAt: z.string().datetime().optional(),
+  claimAudit: z
+    .object({
+      elapsedBusinessMs: z.number(),
+      late: z.boolean(),
+      targetMinutes: z.literal(10),
+      calendar: z.object({
+        start: z.string(),
+        end: z.string(),
+        days: z.array(z.number()),
+        holidays: z.array(z.string()),
+      }),
+    })
+    .optional(),
   captureStatus: z.enum(["in_progress", "incomplete", "completed"]).optional(),
   contact: z
     .object({ name: z.string(), phone: z.string(), email: z.string() })
