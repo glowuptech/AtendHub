@@ -3,10 +3,48 @@ z.config(z.locales.pt());
 export const Id = z.string().uuid();
 export const scoped = { id: Id, organizationId: Id, clientId: Id };
 export const RoleSchema = z.enum(["admin", "attendant", "clinic_user"]);
+export const DoctorSchema = z.object({
+  id: Id,
+  name: z.string().trim().min(2).max(120),
+  crm: z
+    .string()
+    .regex(/^\d{1,8}$/, "CRM deve conter de 1 a 8 dígitos")
+    .nullable(),
+  uf: z.enum([
+    "AC",
+    "AL",
+    "AP",
+    "AM",
+    "BA",
+    "CE",
+    "DF",
+    "ES",
+    "GO",
+    "MA",
+    "MT",
+    "MS",
+    "MG",
+    "PA",
+    "PB",
+    "PR",
+    "PE",
+    "PI",
+    "RJ",
+    "RN",
+    "RS",
+    "RO",
+    "RR",
+    "SC",
+    "SP",
+    "SE",
+    "TO",
+  ]),
+  specialties: z.array(z.string().trim().min(2).max(80)).max(20),
+});
 export const ClientSchema = z.object({
   id: Id,
   organizationId: Id,
-  name: z.string().min(1),
+  name: z.string().trim().min(2).max(120),
   vertical: z.enum(["healthcare", "legal"]),
   status: z.enum(["active", "paused"]),
   branding: z.enum(["prescrita", "sage"]),
@@ -15,6 +53,27 @@ export const ClientSchema = z.object({
     .url()
     .refine((v) => new URL(v).hostname === "example.com"),
   description: z.string(),
+  category: z
+    .enum(["clinic", "doctor_male", "doctor_female"])
+    .default("clinic"),
+  cnpj: z
+    .string()
+    .regex(/^\d{14}$/, "Informe os 14 dígitos do CNPJ demonstrativo")
+    .nullable()
+    .default(null),
+  logo: z
+    .string()
+    .max(1500000)
+    .refine(
+      (v) =>
+        /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(v) ||
+        ["/logos/ana-demo.svg", "/logos/horizonte-demo.svg"].includes(v),
+      "Formato de logotipo inválido",
+    )
+    .nullable()
+    .default(null),
+  specialties: z.array(z.string().trim().min(2).max(80)).max(20).default([]),
+  doctors: z.array(DoctorSchema).max(20).default([]),
 });
 export const FieldTypeSchema = z.enum([
   "short_text",

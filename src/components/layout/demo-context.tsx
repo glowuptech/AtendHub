@@ -1,10 +1,11 @@
 "use client";
-import type { RepositoryRegistry } from "@/domain/contracts";
+import type { RepositoryRegistry, ClientScope } from "@/domain/contracts";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { createMockRepositories } from "@/lib/mocks/repositories";
-import { clientA } from "@/lib/mocks/fixtures";
+import { clientA, demoScope } from "@/lib/mocks/fixtures";
 interface Context {
   repositories: RepositoryRegistry;
+  scope: ClientScope;
   clientId: string;
   setClientId: (id: string) => void;
   revision: number;
@@ -12,13 +13,15 @@ interface Context {
 }
 const DemoContext = createContext<Context | null>(null);
 export function DemoProvider({ children }: { children: ReactNode }) {
-  const [repositories] = useState(() => createMockRepositories());
+  const [scope] = useState<ClientScope>(() => structuredClone(demoScope));
+  const [repositories] = useState(() => createMockRepositories(scope));
   const [clientId, setClientId] = useState(clientA);
   const [revision, setRevision] = useState(0);
   return (
     <DemoContext.Provider
       value={{
         repositories,
+        scope,
         clientId,
         setClientId,
         revision,

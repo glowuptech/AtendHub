@@ -1,88 +1,18 @@
 "use client";
 import { useState } from "react";
-import { Building2 } from "lucide-react";
+
 import { useDemo } from "@/components/layout/demo-context";
-import { demoScope } from "@/lib/mocks/fixtures";
+
 import {
   Heading,
   Card,
   Badge,
   NavButton,
-  Empty,
   Denied,
 } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
 import { LeadTable } from "@/features/leads/components/lead-table";
-export function Clients() {
-  const { repositories, setClientId } = useDemo();
-  const [search, setSearch] = useState(""),
-    [status, setStatus] = useState("all");
-  const list = repositories.clients
-    .list(demoScope)
-    .filter(
-      (c) =>
-        c.name.toLowerCase().includes(search.toLowerCase()) &&
-        (status === "all" || c.status === status),
-    );
-  return (
-    <>
-      <Heading
-        title="Clínicas, com contexto."
-        description="Duas operações fictícias. Cada clínica tem seu próprio catálogo e seus próprios dados."
-      />
-      <div className="toolbar">
-        <label>
-          Buscar clínica
-          <input
-            value={search}
-            placeholder="Nome da clínica"
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </label>
-        <label>
-          Status
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="all">Todos</option>
-            <option value="active">Ativa</option>
-            <option value="paused">Pausada</option>
-          </select>
-        </label>
-      </div>
-      <div className="cards-grid">
-        {list.map((c) => (
-          <Card key={c.id}>
-            <div className="section-caption">
-              <span className="large-icon">
-                <Building2 />
-              </span>
-              <Badge tone={c.status === "active" ? "success" : "warning"}>
-                {c.status === "active" ? "Ativa · DEMO" : "Pausada · DEMO"}
-              </Badge>
-            </div>
-            <h2>{c.name}</h2>
-            <p>{c.description}</p>
-            <div className="mini-stats">
-              <span>
-                <strong>{repositories.leads.list(c.id).length}</strong> leads
-                fictícios
-              </span>
-              <span>
-                <strong>{repositories.forms.list(c.id).length}</strong>{" "}
-                formulários
-              </span>
-            </div>
-            <div onClick={() => setClientId(c.id)}>
-              <NavButton href={`/app/clientes/${c.id}`}>
-                Abrir clínica
-              </NavButton>
-            </div>
-          </Card>
-        ))}
-      </div>
-      {!list.length && <Empty />}
-    </>
-  );
-}
+export { Clients } from "./directory";
 export function ClientProfile({ id }: { id: string }) {
   const { repositories, clientId } = useDemo();
   const [tab, setTab] = useState("Visão geral");

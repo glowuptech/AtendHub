@@ -10,6 +10,7 @@ import type {
   AnalyticsRepository,
 } from "@/domain/contracts";
 import {
+  ClientSchema,
   FieldSchema,
   FormSchema,
   validateAnswer,
@@ -57,7 +58,18 @@ export class ScopedMockRepository<
   }
 }
 export class MockClientRepository implements ClientRepository {
+  private rows = structuredClone(fixture.clients);
   constructor(private scope: ClientScope) {}
+  create(input: import("@/domain/schemas").Client) {
+    const client = ClientSchema.parse(input);
+    if (client.organizationId !== this.scope.organizationId)
+      throw new ScopeError();
+    if (this.rows.some((c) => c.id === client.id))
+      throw Error("Cadastro já existe");
+    this.rows.push(structuredClone(client));
+    // Demo admin only. Production permission/membership must be enforced server-side in C2.
+    this.scope.clientIds = [...this.scope.clientIds, client.id];
+  }
   list(scope: ClientScope) {
     if (
       scope.organizationId !== this.scope.organizationId ||
@@ -65,7 +77,7 @@ export class MockClientRepository implements ClientRepository {
     )
       throw new ScopeError();
     return structuredClone(
-      fixture.clients.filter(
+      this.rows.filter(
         (c) =>
           c.organizationId === scope.organizationId &&
           scope.clientIds.includes(c.id),
@@ -272,7 +284,9 @@ export class MockAnalyticsRepository implements AnalyticsRepository {
     };
   }
 }
-export function createMockRepositories(scope: ClientScope = fixture.demoScope) {
+export function createMockRepositories(
+  scope: ClientScope = structuredClone(fixture.demoScope),
+) {
   const fields = new MockFieldRepository(
       structuredClone(fixture.fields),
       scope,

@@ -138,3 +138,27 @@ describe("Eventos e métricas", () => {
     expect(a.steps.reduce((sum, s) => sum + s.abandoned, 0)).toBe(a.abandoned);
   });
 });
+
+describe("Cadastro demonstrativo de clínicas", () => {
+  it("cria cadastro no escopo local sem alterar fixtures ou outra sessão", () => {
+    const scope = { organizationId, clientIds: [clientA, clientB] };
+    const r = createMockRepositories(scope);
+    const input = {
+      ...r.clients.get(clientA),
+      id: uid(9000),
+      name: "Nova clínica DEMO",
+      doctors: [],
+    };
+    r.clients.create(input);
+    expect(r.clients.list(scope).some((c) => c.id === input.id)).toBe(true);
+    expect(r.leads.list(input.id)).toEqual([]);
+    expect(r.forms.list(input.id)).toEqual([]);
+    expect(() => createMockRepositories().clients.get(input.id)).toThrow(
+      ScopeError,
+    );
+    expect(() => r.clients.create(input)).toThrow("já existe");
+    expect(() =>
+      r.clients.create({ ...input, id: uid(9001), organizationId: uid(999) }),
+    ).toThrow(ScopeError);
+  });
+});

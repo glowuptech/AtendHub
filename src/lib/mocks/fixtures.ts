@@ -25,6 +25,26 @@ export const clients = [
     branding: "prescrita",
     externalSchedulingUrl: "https://example.com/agenda-demo",
     description: "Atendimento administrativo • Unidade Jardim",
+    category: "clinic",
+    cnpj: "00000000000000",
+    logo: "/logos/ana-demo.svg",
+    specialties: ["Ginecologia", "Obstetrícia"],
+    doctors: [
+      {
+        id: uid(41),
+        name: "Dra. Exemplo Alfa — DEMO",
+        crm: "000000",
+        uf: "SP",
+        specialties: ["Ginecologia"],
+      },
+      {
+        id: uid(42),
+        name: "Dr. Exemplo Beta — DEMO",
+        crm: "000001",
+        uf: "SP",
+        specialties: ["Obstetrícia"],
+      },
+    ],
   }),
   ClientSchema.parse({
     id: clientB,
@@ -35,6 +55,19 @@ export const clients = [
     branding: "sage",
     externalSchedulingUrl: "https://example.com/agenda-horizonte-demo",
     description: "Atendimento administrativo • Unidade Centro",
+    category: "doctor_female",
+    cnpj: null,
+    logo: "/logos/horizonte-demo.svg",
+    specialties: ["Clínica médica"],
+    doctors: [
+      {
+        id: uid(43),
+        name: "Dra. Exemplo Gama — DEMO",
+        crm: null,
+        uf: "SP",
+        specialties: ["Clínica médica"],
+      },
+    ],
   }),
 ];
 const field = (

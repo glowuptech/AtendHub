@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useDemo } from "./demo-context";
-import { demoScope } from "@/lib/mocks/fixtures";
+
 import { DemoNotice } from "./shared";
 export function Shell({
   children,
@@ -25,11 +25,11 @@ export function Shell({
   children: ReactNode;
   portal?: boolean;
 }) {
-  const { repositories, clientId, setClientId } = useDemo();
+  const { scope, repositories, clientId, setClientId } = useDemo();
   const pathname = usePathname(),
     router = useRouter();
   const [open, setOpen] = useState(false);
-  const clinics = repositories.clients.list(demoScope);
+  const clinics = repositories.clients.list(scope);
   const links = portal
     ? ([
         ["/portal", "Visão geral", LayoutDashboard],

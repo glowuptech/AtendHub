@@ -10,7 +10,7 @@ import {
   DemoNotice,
 } from "@/components/layout/shared";
 import { FormWizard } from "./wizard";
-import { demoScope } from "@/lib/mocks/fixtures";
+
 export function FormPreview({
   clientId: id,
   formId,
@@ -46,9 +46,9 @@ export function FormPreview({
   );
 }
 export function PublicForm({ slug }: { slug: string }) {
-  const { repositories } = useDemo();
+  const { scope, repositories } = useDemo();
   const form = repositories.clients
-    .list(demoScope)
+    .list(scope)
     .flatMap((c) => repositories.forms.list(c.id))
     .find((f) => f.slug === slug && f.status !== "archived");
   if (!form)
