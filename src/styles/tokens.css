@@ -1,0 +1,27 @@
+:root {
+  --brand-primary: #513236;
+  --brand-on-primary: #f9f4ee;
+  --surface: #f9f4ee;
+  --surface-raised: #ffffff;
+  --accent-sage: #b5c1b3;
+  --accent-rose: #c8aea1;
+  --text-primary: #333433;
+  --text-secondary: #6e6865;
+  --taupe: #aaa8a0;
+  --border-subtle: #dcd1ca;
+  --success: #326044;
+  --success-bg: #edf4ec;
+  --warning: #805119;
+  --warning-bg: #fcf1db;
+  --error: #a02935;
+  --error-bg: #fcecee;
+  --primary: var(--brand-primary);
+  --primary-foreground: var(--brand-on-primary);
+  --background: var(--surface);
+  --foreground: var(--text-primary);
+  --radius: 0.75rem;
+}
+[data-clinic-theme="sage"] {
+  --brand-primary: #385341;
+  --brand-on-primary: #f9f4ee;
+}
