@@ -27,6 +27,13 @@ export function LeadTable({ leads }: { leads: Lead[] }) {
                   <span>
                     {l.name}
                     <small>{l.source}</small>
+                    {l.captureStatus && l.captureStatus !== "completed" && (
+                      <small>
+                        {l.captureStatus === "incomplete"
+                          ? "Cadastro incompleto"
+                          : "Cadastro em andamento"}
+                      </small>
+                    )}
                   </span>
                 </Link>
               </td>

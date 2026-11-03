@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FormSettingsSchema } from "@/features/forms/services/settings";
 z.config(z.locales.pt());
 export const Id = z.string().uuid();
 export const scoped = { id: Id, organizationId: Id, clientId: Id };
@@ -75,21 +76,26 @@ export const AddressSchema = z.object({
   city: z.string().max(100).default(""),
   state: z.union([DoctorSchema.shape.uf, z.literal("")]).default(""),
 });
-export const KnowledgeEntrySchema = z.object({
-  id: z.string().min(1),
-  category: z.string().trim().min(1).max(100),
-  question: z.string().trim().min(3).max(300),
-  answer: z.string().trim().max(6000),
-  source: z.string().trim().max(500),
-  status: z.enum(["draft", "pending", "approved"]),
-  updatedAt: z.string().datetime().nullable(),
-  priceCents: z.number().int().nonnegative().nullable(),
-  currency: z.literal("BRL"),
-  conditions: z.string().max(2000),
-}).superRefine((v, ctx) => {
-  if (v.status === "approved" && (!v.answer || !v.source))
-    ctx.addIssue({ code: "custom", message: "Para aprovar, preencha resposta e fonte." });
-});
+export const KnowledgeEntrySchema = z
+  .object({
+    id: z.string().min(1),
+    category: z.string().trim().min(1).max(100),
+    question: z.string().trim().min(3).max(300),
+    answer: z.string().trim().max(6000),
+    source: z.string().trim().max(500),
+    status: z.enum(["draft", "pending", "approved"]),
+    updatedAt: z.string().datetime().nullable(),
+    priceCents: z.number().int().nonnegative().nullable(),
+    currency: z.literal("BRL"),
+    conditions: z.string().max(2000),
+  })
+  .superRefine((v, ctx) => {
+    if (v.status === "approved" && (!v.answer || !v.source))
+      ctx.addIssue({
+        code: "custom",
+        message: "Para aprovar, preencha resposta e fonte.",
+      });
+  });
 export type KnowledgeEntry = z.infer<typeof KnowledgeEntrySchema>;
 export const ClientSchema = z.object({
   knowledge: z.array(KnowledgeEntrySchema).default([]),
@@ -184,6 +190,10 @@ export const QuestionSchema = z.object({
   required: z.boolean(),
 });
 export const StepSchema = z.object({
+  metaEvent: z
+    .string()
+    .regex(/^[A-Za-z][A-Za-z0-9_]{0,39}$|^$/)
+    .optional(),
   id: Id,
   order: z.number().int().nonnegative(),
   title: z.string().min(2),
@@ -194,6 +204,7 @@ export const StepSchema = z.object({
   question: QuestionSchema,
 });
 export const VersionSchema = z.object({
+  settings: FormSettingsSchema.optional(),
   ...scoped,
   formId: Id,
   number: z.number().int().positive(),
@@ -226,6 +237,10 @@ export const StageSchema = z.enum([
   "lost",
 ]);
 export const LeadSchema = z.object({
+  captureStatus: z.enum(["in_progress", "incomplete", "completed"]).optional(),
+  contact: z
+    .object({ name: z.string(), phone: z.string(), email: z.string() })
+    .optional(),
   doctorId: Id.nullable().default(null),
   firstResponseAt: z.string().datetime().nullable().default(null),
   handlingMinutes: z.number().nonnegative().nullable().default(null),

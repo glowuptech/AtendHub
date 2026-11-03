@@ -8,7 +8,7 @@ test("diretório: copiar dados, filtrar, criar e abrir perfil", async ({
   await page.goto("/app/clientes");
   await page
     .getByRole("button", {
-      name: "Copiar CNPJ de Clínica Ana Luiza — DEMO",
+      name: "Copiar CNPJ de Clínica Ana Luiza",
       exact: true,
     })
     .click();
@@ -17,7 +17,7 @@ test("diretório: copiar dados, filtrar, criar e abrir perfil", async ({
   );
   await page
     .getByRole("button", {
-      name: "Copiar CRM de Dra. Exemplo Alfa — DEMO",
+      name: "Copiar CRM de Dra. Exemplo Alfa",
       exact: true,
     })
     .click();
@@ -26,14 +26,14 @@ test("diretório: copiar dados, filtrar, criar e abrir perfil", async ({
   );
   await expect(
     page.getByRole("button", {
-      name: "Copiar CRM de Dra. Exemplo Gama — DEMO",
+      name: "Copiar CRM de Dra. Exemplo Gama",
       exact: true,
     }),
   ).toBeDisabled();
   await page.getByLabel("Buscar clínica ou profissional").fill("obstetricia");
   await expect(
     page.getByRole("heading", {
-      name: "Clínica Horizonte — DEMO",
+      name: "Clínica Horizonte",
       exact: true,
     }),
   ).toHaveCount(0);
@@ -45,7 +45,7 @@ test("diretório: copiar dados, filtrar, criar e abrir perfil", async ({
     .selectOption("doctor_female");
   await expect(
     page.getByRole("heading", {
-      name: "Clínica Ana Luiza — DEMO",
+      name: "Clínica Ana Luiza",
       exact: true,
     }),
   ).toHaveCount(0);
@@ -66,7 +66,7 @@ test("diretório: copiar dados, filtrar, criar e abrir perfil", async ({
     .getByRole("button", { name: "Criar clínica", exact: true })
     .click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("button", { name: "Criar clínica · DEMO" }).click();
+  await dialog.getByRole("button", { name: "Criar clínica" }).click();
   await expect(dialog.getByRole("alert")).toBeVisible();
   await dialog
     .getByLabel("Nome da clínica ou profissional")
@@ -90,7 +90,7 @@ test("diretório: copiar dados, filtrar, criar e abrir perfil", async ({
   await expect(
     dialog.getByRole("button", { name: "Remover", exact: true }),
   ).toBeVisible();
-  await dialog.getByRole("button", { name: "Criar clínica · DEMO" }).click();
+  await dialog.getByRole("button", { name: "Criar clínica" }).click();
   await expect(dialog).not.toBeVisible();
   const card = page.locator(".clinic-directory-card").filter({
     has: page.getByRole("heading", {

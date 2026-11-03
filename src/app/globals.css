@@ -1947,3 +1947,44 @@ input:focus, textarea:focus, select:focus { outline: 2px solid #2459d3; outline-
 .hub-symbol { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 12px; background: #2459d3; color: white; font: 750 22px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: -2px; }
 .hub-symbol span { color: #b8d4ff; }
 .hub-wordmark { font: 750 25px/1.2 ui-sans-serif, system-ui, sans-serif; letter-spacing: -1px; color: #172237; }
+/* Form identity is isolated from the workspace theme. */
+.contact-config { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border-subtle); }
+.form-experience { background-color: var(--form-bg); background-size: cover; background-position: center; color: var(--form-text); width: 100%; min-height: 100dvh; display: flex; justify-content: center; padding: 24px; }
+.form-experience.compact { min-height: 600px; padding: 12px; }
+.form-sheet { width: min(100%, 700px); align-self: center; background: var(--form-bg); border-radius: 20px; overflow: hidden; }
+.form-content { padding: clamp(20px, 4vw, 48px); }
+.form-content header { margin-bottom: 30px; }
+.form-content header h1 { font-size: clamp(20px, 3vw, 28px); margin: 8px 0; }
+.form-content h2 { font-size: clamp(21px, 3vw, 28px); margin: 24px 0; }
+.form-content p { margin: 12px 0; }
+.form-content label { font-family: inherit; }
+.form-cover { width: 100%; height: clamp(100px, 20vh, 190px); object-fit: cover; }
+.form-progress { display: flex; justify-content: space-between; font-size: 12px; }
+.form-content progress { width: 100%; height: 5px; accent-color: var(--form-primary); }
+.form-content input:not([type=checkbox]):not([type=radio]), .form-content textarea, .form-content select { background: var(--form-bg); color: var(--form-text); border-color: var(--form-border); font-family: inherit; font-size: 16px; }
+.form-content .check-option { background: var(--form-bg); color: var(--form-text); border-color: var(--form-border); min-height: 44px; padding: 10px 12px; }
+.form-content input[type=radio], .form-content input[type=checkbox] { accent-color: var(--form-primary); }
+.form-navigation { display: flex; justify-content: space-between; gap: 16px; margin-top: 28px; }
+.form-navigation button[type=submit] { background: var(--form-button); color: var(--form-button-text); border-radius: var(--form-radius); border-color: var(--form-button); }
+.form-navigation button[type=button] { color: var(--form-text); }
+.form-privacy { font-size: 12px; line-height: 1.5; }
+.form-preview-label { display: inline-block; margin-top: 8px; font-size: 12px; }
+.form-success { text-align: center; padding: 40px 0; }
+.public-page:has(.form-experience) { padding: 0; background: transparent; }
+.public-caption { text-align: center; font-size: 11px; padding: 8px; }
+@media (max-width: 600px) {
+ .form-experience { padding: 0; min-height: 100dvh; }
+ .form-sheet { border-radius: 0; align-self: flex-start; }
+ .form-content { padding: 20px; }
+ .form-content header { margin-bottom: 18px; }
+ .form-content h2 { margin: 18px 0; }
+ .form-navigation { margin-top: 20px; padding-bottom: env(safe-area-inset-bottom); }
+ .contact-config { grid-template-columns: 1fr; gap: 4px; }
+}
+.form-content .check-option { display:flex; align-items:center; justify-content:flex-start; gap:12px; border:1px solid var(--form-border); border-radius:10px; margin:10px 0; font-size:16px; font-weight:500; }
+.form-content .check-option:has(input:checked) { border-color:var(--form-primary); box-shadow:0 0 0 1px var(--form-primary); }
+.form-content .check-option input[type=radio], .form-content .check-option input[type=checkbox] { display:inline-block; flex:0 0 18px; width:18px; height:18px; min-width:18px; margin:0; padding:0; }
+.form-content progress { appearance:none; border:none; border-radius:4px; overflow:hidden; }
+.form-content progress::-webkit-progress-bar { background:var(--form-border); }
+.form-content progress::-webkit-progress-value { background:var(--form-primary); }
+.form-content progress::-moz-progress-bar { background:var(--form-primary); }

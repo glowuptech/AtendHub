@@ -20,6 +20,9 @@ import {
   type FormVersion,
   type FormStep,
 } from "@/domain/schemas";
+import { QuestionOptions } from "./question-options";
+import { SettingsEditor } from "./settings-editor";
+import { settingsOf } from "../services/settings";
 import { FormWizard } from "./wizard";
 const typeLabels: Record<FieldType, string> = {
   short_text: "Texto curto",
@@ -37,7 +40,7 @@ function newStep(fieldId: string, label: string, order: number): FormStep {
     id: crypto.randomUUID(),
     order,
     title: label,
-    description: "Utilize apenas informações administrativas .",
+    description: "",
     buttonLabel: "Continuar",
     actionId: crypto.randomUUID(),
     backActionId: crypto.randomUUID(),
@@ -105,7 +108,7 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
       clientId,
       doctorId: null,
       name: "Novo formulário",
-      slug: `demo-${formId}`,
+      slug: `formulario-${formId.slice(0, 8)}`,
       status: "draft",
       activeVersionId: versionId,
       versions: [
@@ -119,12 +122,13 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
           steps: [],
           theme: client.branding,
           destination: "demo_success",
-          successMessage: "Demonstração concluída. Nenhum dado foi enviado.",
+          settings: settingsOf(),
+          successMessage: "Cadastro recebido! Em breve entraremos em contato.",
         },
       ],
     };
   });
-  const [mode, setMode] = useState("reuse"),
+  const [mode, setMode] = useState("new"),
     [selected, setSelected] = useState(""),
     [label, setLabel] = useState(""),
     [stableKey, setStableKey] = useState(""),
@@ -162,8 +166,8 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
       setSaved(true);
       setNotice(
         snapshot
-          ? "Versão  congelada. Prévia / não publicado. Reabra Editar para criar novo rascunho."
-          : "Rascunho salvo em memória. Recarregar o navegador descarta a simulação.",
+          ? "Formulário ativado nesta sessão. Abra o formulário para testar o cadastro."
+          : "Formulário salvo.",
       );
     } catch (e) {
       setNotice(
@@ -180,7 +184,7 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
       <Heading
         eyebrow={client.name}
         title={source ? "Editor de formulário" : "Novo formulário"}
-        description="Catálogo por clínica / não publicado · sem captação real"
+        description="Perguntas e respostas conectadas ao cadastro do cliente."
         action={
           <NavButton href={`/app/clientes/${clientId}/formularios`}>
             Voltar aos formulários
@@ -190,6 +194,24 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
       <div className="editor-grid">
         <div>
           <Card title="Identidade e destino">
+            <label>
+              Profissional vinculado
+              <select
+                disabled={frozen}
+                value={draft.doctorId ?? ""}
+                onChange={(e) => {
+                  setSaved(false);
+                  setDraft({ ...draft, doctorId: e.target.value || null });
+                }}
+              >
+                <option value="">Todos / sem profissional específico</option>
+                {client.doctors.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label>
               Nome do formulário
               <input
@@ -213,31 +235,6 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
               />
             </label>
             <label>
-              Tema da clínica
-              <select
-                disabled={frozen}
-                value={version.theme}
-                onChange={(e) =>
-                  updateVersion({
-                    theme: e.target.value as FormVersion["theme"],
-                  })
-                }
-              >
-                <option value="prescrita">Bordô e marfim · Prescrita</option>
-                <option value="sage">Verde profundo · Horizonte</option>
-              </select>
-            </label>
-            <small>
-              Paletas predefinidas com contraste de texto validado. Tema afeta
-              apenas a prévia.
-            </small>
-            <label>
-              Destino
-              <select disabled>
-                <option>Conclusão , sem redirecionamento</option>
-              </select>
-            </label>
-            <label>
               Mensagem de conclusão
               <input
                 disabled={frozen}
@@ -248,10 +245,14 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
               />
             </label>
             <Badge>
-              Versão {version.number} ·{" "}
-              {frozen ? "snapshot imutável" : "rascunho"}
+              Versão {version.number} · {frozen ? "ativa" : "rascunho"}
             </Badge>
           </Card>
+          <SettingsEditor
+            value={version.settings}
+            onChange={(settings) => updateVersion({ settings })}
+            disabled={frozen}
+          />
           <Card title="Etapas e perguntas">
             {!version.steps.length && (
               <p>Adicione a primeira pergunta abaixo.</p>
@@ -262,7 +263,7 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
                   Etapa {i + 1} · {s.id.slice(-8)}
                 </legend>
                 <label>
-                  Título
+                  Título interno da etapa
                   <input
                     value={s.title}
                     onChange={(e) =>
@@ -296,6 +297,34 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
                     value={s.buttonLabel}
                     onChange={(e) =>
                       updateStep(s.id, { buttonLabel: e.target.value })
+                    }
+                  />
+                </label>
+                {fields.find((f) => f.id === s.question.fieldDefinitionId) && (
+                  <QuestionOptions
+                    key={s.question.fieldDefinitionId}
+                    field={fields.find(
+                      (f) => f.id === s.question.fieldDefinitionId,
+                    )!}
+                    onSave={(field) => {
+                      repositories.fields.create(clientId, field);
+                      updateStep(s.id, {
+                        question: {
+                          ...s.question,
+                          fieldDefinitionId: field.id,
+                        },
+                      });
+                      refresh();
+                    }}
+                  />
+                )}
+                <label>
+                  Evento Meta desta etapa (opcional)
+                  <input
+                    placeholder="Ex.: EtapaCincoConcluida"
+                    value={s.metaEvent ?? ""}
+                    onChange={(e) =>
+                      updateStep(s.id, { metaEvent: e.target.value })
                     }
                   />
                 </label>
@@ -465,7 +494,9 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
                         id: crypto.randomUUID(),
                         organizationId: client.organizationId,
                         clientId,
-                        stableKey,
+                        stableKey:
+                          stableKey ||
+                          `campo_${crypto.randomUUID().replaceAll("-", "")}`,
                         label,
                         type,
                         sensitivity: "ordinary",
@@ -519,12 +550,17 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
               disabled={frozen}
               onClick={() => save(true)}
             >
-              Congelar versão
+              Ativar formulário
             </Button>
           </div>
           <p role="status" className="notice">
             {notice}
           </p>
+          {saved && frozen && (
+            <NavButton href={`/f/${draft.slug}`}>
+              Abrir formulário ativo
+            </NavButton>
+          )}
           {saved && (
             <NavButton
               href={`/app/clientes/${clientId}/formularios/${draft.id}/preview`}

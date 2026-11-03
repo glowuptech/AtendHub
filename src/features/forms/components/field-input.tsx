@@ -6,12 +6,14 @@ export function FieldInput({
   onChange,
   id = field.id,
   errorId,
+  choiceCards = false,
 }: {
   field: CustomFieldDefinition;
   value: FieldValue | undefined;
   onChange: (v: FieldValue) => void;
   id?: string;
   errorId?: string;
+  choiceCards?: boolean;
 }) {
   const common = {
     id,
@@ -28,7 +30,7 @@ export function FieldInput({
           checked={value === true}
           onChange={(e) => onChange(e.target.checked)}
         />
-        Li o aviso: prévia com dados , sem envio ou agendamento.
+        {field.label}
       </label>
     );
   if (field.type === "boolean")
@@ -44,6 +46,23 @@ export function FieldInput({
         <option value="yes">Sim</option>
         <option value="no">Não</option>
       </select>
+    );
+  if (field.type === "single_select" && choiceCards)
+    return (
+      <fieldset aria-label={field.label} aria-describedby={errorId}>
+        {field.options.map((o) => (
+          <label className="check-option" key={o.id}>
+            <input
+              type="radio"
+              name={id}
+              value={o.id}
+              checked={value === o.id}
+              onChange={() => onChange(o.id)}
+            />
+            {o.label}
+          </label>
+        ))}
+      </fieldset>
     );
   if (field.type === "single_select")
     return (

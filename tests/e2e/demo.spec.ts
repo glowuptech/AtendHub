@@ -43,22 +43,21 @@ test("wizard mobile valida, navega e termina sem rede ou armazenamento", async (
   await page.getByRole("button", { name: "Continuar", exact: true }).click();
   await expect(page.locator("p[role=alert]")).toBeVisible();
   await page
-    .getByRole("textbox", { name: "Nome de demonstração" })
+    .getByRole("textbox", { name: "Nome completo" })
     .fill("Pessoa Teste DEMO");
   await page.getByRole("button", { name: "Continuar", exact: true }).click();
-  await page
-    .getByRole("textbox", { name: "Telefone fictício" })
-    .fill("+5500000000000");
+  await page.getByRole("textbox", { name: "Telefone" }).fill("+5500000000000");
   await page.getByRole("button", { name: "Continuar", exact: true }).click();
-  await page
-    .getByRole("combobox", { name: "Período desejado" })
-    .selectOption("morning");
+  await page.getByRole("radio", { name: "Manhã" }).check();
   await page.getByRole("button", { name: "Continuar", exact: true }).click();
   await page.getByRole("button", { name: "Continuar", exact: true }).click();
   await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "Concluir demonstração" }).click();
+  await page.getByRole("button", { name: "Concluir" }).click();
+  await page.getByLabel("Nome *", { exact: true }).fill("Pessoa Teste");
+  await page.getByLabel("WhatsApp *", { exact: true }).fill("11999998888");
+  await page.getByRole("button", { name: "Enviar cadastro" }).click();
   await expect(
-    page.getByRole("heading", { name: "Pronto, demonstração concluída." }),
+    page.getByRole("heading", { name: "Cadastro concluído" }),
   ).toBeVisible();
   expect(outbound).toEqual([]);
   expect(
@@ -80,13 +79,14 @@ test("editor reutiliza explicitamente, cria campo, salva e conserva versão ante
   await page
     .getByLabel("Nome do formulário", { exact: true })
     .fill("Formulário revisado DEMO");
-  await page.getByRole("button", { name: "Salvar rascunho DEMO" }).click();
-  await expect(page.getByRole("status")).toContainText("Rascunho salvo");
+  await page.getByRole("button", { name: "Salvar rascunho" }).click();
+  await expect(page.getByRole("status")).toContainText("Formulário salvo");
   await page.getByRole("link", { name: "Voltar aos formulários" }).click();
   await expect(
     page.getByRole("heading", { name: "Formulário revisado DEMO" }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Novo formulário" }).click();
+  await page.getByLabel("Vínculo com o catálogo").selectOption("reuse");
   await page
     .getByLabel("Campo desta clínica")
     .selectOption("00000000-0000-4000-8000-000000000101");
@@ -101,10 +101,10 @@ test("editor reutiliza explicitamente, cria campo, salva e conserva versão ante
     .fill("Canal administrativo");
   await page.getByLabel("Chave estável").fill("canal_admin");
   await page.getByRole("button", { name: "Adicionar pergunta" }).click();
-  await page.getByRole("button", { name: "Salvar rascunho DEMO" }).click();
-  await expect(page.getByRole("status")).toContainText("Rascunho salvo");
+  await page.getByRole("button", { name: "Salvar rascunho" }).click();
+  await expect(page.getByRole("status")).toContainText("Formulário salvo");
   await page.getByRole("link", { name: "Abrir prévia salva" }).click();
-  await expect(page.getByText("Etapa 1 de 2")).toBeVisible();
+  await expect(page.getByText("Etapa 1 de 3")).toBeVisible();
 });
 test("fila, inbox, portal e mensuração são honestamente demonstrativos", async ({
   page,
@@ -118,7 +118,9 @@ test("fila, inbox, portal e mensuração são honestamente demonstrativos", asyn
     "Nenhuma mensagem foi enviada",
   );
   await page.goto(`/app/clientes/${a}/formularios/${f}/tracking`);
-  await expect(page.getByRole("checkbox")).toBeDisabled();
+  await expect(
+    page.getByText("Nenhum envio externo nesta fase."),
+  ).toBeVisible();
   await page.goto("/portal/agendamentos");
   await page.getByRole("button", { name: "Compareceu", exact: true }).click();
   await expect(
@@ -131,9 +133,7 @@ test("fila, inbox, portal e mensuração são honestamente demonstrativos", asyn
 test("estados e acessibilidade desktop/mobile", async ({ page }) => {
   await page.goto("/app");
   await page.getByLabel("Testar estado").selectOption("error");
-  await expect(page.locator("p[role=alert]")).toContainText(
-    "Falha demonstrativa",
-  );
+  await expect(page.locator("p[role=alert]")).toContainText("Falha");
   await page.getByRole("button", { name: "Tentar novamente" }).click();
   await page.getByLabel("Testar estado").selectOption("empty");
   await expect(

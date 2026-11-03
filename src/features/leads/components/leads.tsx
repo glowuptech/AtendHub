@@ -73,7 +73,7 @@ export function LeadDetail({ id }: { id: string }) {
       <Heading
         eyebrow={c.name}
         title={lead.name}
-        description="Contato inteiramente  · finalidade administrativa"
+        description="Contato e respostas do formulário"
         action={<NavButton href="/app/inbox">Abrir Inbox</NavButton>}
       />
       <div className="cards-grid">
@@ -81,16 +81,25 @@ export function LeadDetail({ id }: { id: string }) {
           <Badge>{stageLabels[lead.stage]}</Badge>
           <p>Responsável: {lead.owner ?? "Não atribuído"}</p>
           <p>Próxima ação: {lead.nextAction}</p>
-          <p>Contato: telefone , sem possibilidade de envio</p>
+          <p>Telefone: {lead.contact?.phone || "Não informado"}</p>
+          <p>E-mail: {lead.contact?.email || "Não informado"}</p>
+          <Badge>
+            {lead.captureStatus === "incomplete"
+              ? "Cadastro incompleto"
+              : lead.captureStatus === "in_progress"
+                ? "Cadastro em andamento"
+                : "Cadastro concluído"}
+          </Badge>
           <NavButton href="/app/agendamentos">Agendamento espelhado</NavButton>
         </Card>
         <Card title="Origens">
           <h3>{form.name}</h3>
-          <p>Versão 1 · {dateTime(lead.createdAt)}</p>
+          <p>
+            Versão {form.versions.find((v) => v.id === lead.versionId)?.number}{" "}
+            · {dateTime(lead.createdAt)}
+          </p>
           <p>{lead.source}</p>
-          <small>
-            Submissão de fixture. Navegar pela prévia não cria leads.
-          </small>
+
           <p>
             <NavButton
               href={`/app/clientes/${clientId}/formularios/${form.id}/preview`}
@@ -122,7 +131,12 @@ export function LeadDetail({ id }: { id: string }) {
           return (
             <div className="field-row" key={f.id}>
               <div>
-                <strong>{f.label}</strong>
+                <strong>
+                  {form.versions
+                    .find((version) => version.id === lead.versionId)
+                    ?.steps.find((step) => step.question.id === v.questionId)
+                    ?.question.label ?? f.label}
+                </strong>
                 <small>
                   {v.actor} · {dateTime(v.capturedAt)}
                   <br />

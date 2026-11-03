@@ -1,3 +1,4 @@
+import { MemoryCaptureRepository } from "@/features/forms/services/capture";
 import type {
   ClientScope,
   ScopedRepository,
@@ -314,15 +315,13 @@ export function createMockRepositories(
       scope,
       fields,
     );
+  const leadRows = structuredClone(fixture.leads);
   return {
+    capture: new MemoryCaptureRepository(scope, forms, fields, leadRows),
     clients: new MockClientRepository(scope),
     fields,
     forms,
-    leads: new MockLeadRepository(
-      structuredClone(fixture.leads),
-      scope,
-      fields,
-    ),
+    leads: new MockLeadRepository(leadRows, scope, fields),
     inbox: new MockInboxRepository(
       structuredClone(fixture.conversations),
       scope,

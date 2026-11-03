@@ -4,11 +4,11 @@ import { useDemo } from "@/components/layout/demo-context";
 import {
   Heading,
   Card,
-  Badge,
   NavButton,
   Denied,
   DemoNotice,
 } from "@/components/layout/shared";
+import { settingsOf } from "../services/settings";
 import { FormWizard } from "./wizard";
 
 export function FormPreview({
@@ -50,7 +50,15 @@ export function PublicForm({ slug }: { slug: string }) {
   const form = repositories.clients
     .list(scope)
     .flatMap((c) => repositories.forms.list(c.id))
-    .find((f) => f.slug === slug && f.status !== "archived");
+    .find(
+      (f) =>
+        f.slug === slug &&
+        f.status !== "archived" &&
+        f.versions.find((v) => v.id === f.activeVersionId)?.state ===
+          "snapshot" &&
+        settingsOf(f.versions.find((v) => v.id === f.activeVersionId)?.settings)
+          .enabled,
+    );
   if (!form)
     return (
       <main>
@@ -61,14 +69,12 @@ export function PublicForm({ slug }: { slug: string }) {
     <main className="public-page">
       <DemoNotice />
       <FormWizard
+        live
         form={form}
         version={form.versions.find((v) => v.id === form.activeVersionId)!}
         fields={repositories.fields.list(form.clientId)}
         clinicName={repositories.clients.get(form.clientId).name}
       />
-      <p className="public-caption">
-        Prescrita · Tecnologia para um atendimento mais humano.
-      </p>
     </main>
   );
 }
@@ -89,159 +95,126 @@ export function FormAnalytics({
   const version =
     form.versions.find((v) => v.id === selected) ??
     form.versions.find((v) => v.id === form.activeVersionId)!;
-  const a = repositories.analytics.get(id, form.id, version.id);
+  const a = repositories.capture.stats(id, form.id, version.id);
   const base = `/app/clientes/${id}/formularios/${form.id}`;
   if (tracking)
     return (
       <>
-        <Heading
-          eyebrow={repositories.clients.get(id).name}
-          title="Mensuração com responsabilidade."
-          description={`${form.name} · configuração `}
-        />
-        <Card title="Meta Pixel e CAPI">
-          <Badge tone="warning">Desativados por padrão</Badge>
+        <Heading title="Eventos e notificações" description={form.name} />
+        <Card title="Configuração de mensuração">
           <p>
-            Nenhum script, token ou evento de publicidade é carregado nesta
-            entrega.
-          </p>
-          <label className="check-option">
-            <input type="checkbox" disabled checked={false} readOnly />
-            Ativar Meta · indisponível em C1
-          </label>
-          <p>
-            PageView padrão não é visita qualificada. engaged_10s é uma métrica
-            interna de dez segundos cumulativos de página visível e ativa.
+            PageView após {settingsOf(version.settings).tracking.viewSeconds}{" "}
+            segundos visíveis. Abandono após{" "}
+            {settingsOf(version.settings).tracking.abandonMinutes} minutos sem
+            avanço.
           </p>
           <p>
-            Ativação futura depende de finalidade, consentimento aplicável e
-            revisão das políticas de saúde. Respostas, especialidades e
-            identificadores de pacientes nunca compõem eventos de marketing.
+            Meta Pixel:{" "}
+            {settingsOf(version.settings).tracking.pixelId || "Não configurado"}
           </p>
+          <NavButton href={`${base}/editar`}>Editar configurações</NavButton>
         </Card>
-        <Card title="Analytics internos">
+        <Card title="Eventos de etapas">
           <p>
-            Eventos estritamente tipados e sem respostas, nome, telefone ou
-            texto livre. O recorder da prévia fica somente em memória; os totais
-            de analytics são fixtures independentes.
+            {
+              repositories.capture
+                .listActions(id)
+                .filter((e) => e.formId === formId).length
+            }{" "}
+            avanços registrados
           </p>
-          <p>
-            Abandono será estimado após timeout de sessão. Fechar uma aba não
-            significa abandono confirmado.
-          </p>
-          <NavButton href={`${base}/analytics`}>
-            Ver funil
-          </NavButton>
+          {repositories.capture
+            .listActions(id)
+            .filter((e) => e.formId === formId)
+            .map((e) => (
+              <p key={e.eventId}>
+                {e.eventName} · ação {e.actionId.slice(-8)}
+              </p>
+            ))}
+        </Card>
+        <Card title="Fila de notificações">
+          <p>Eventos locais aguardando a futura conexão ao n8n.</p>
+          {repositories.capture
+            .listEvents(id)
+            .filter((e) => e.formId === formId)
+            .map((e) => (
+              <p key={e.id}>
+                {e.eventType} · {new Date(e.occurredAt).toLocaleString("pt-BR")}{" "}
+                · pendente
+              </p>
+            ))}
+        </Card>
+        <Card title="Eventos preparados para Meta">
+          <p>Nenhum envio externo nesta fase.</p>
+          {repositories.capture
+            .listMarketing(id)
+            .filter((e) => e.formId === formId)
+            .map((e) => (
+              <p key={e.eventId}>
+                {e.eventName} · {e.eventId.slice(-8)}
+              </p>
+            ))}
         </Card>
       </>
     );
   return (
     <>
-      <Heading
-        eyebrow={repositories.clients.get(id).name}
-        title="Do primeiro olhar ao envio."
-        description={`${form.name} · analytics internos , independentes da prévia.`}
-        action={<NavButton href={`${base}/tracking`}>Mensuração</NavButton>}
-      />
-      <div className="toolbar">
-        <Badge>Simulação · 01–03/11/2026 · America/Sao_Paulo</Badge>
-        <label className="push-right">
-          Versão
-          <select
-            value={version.id}
-            onChange={(e) => setSelected(e.target.value)}
-          >
-            {form.versions.map((v) => (
-              <option key={v.id} value={v.id}>
-                Versão {v.number}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <Heading title="Resultados do formulário" description={form.name} />
+      <label>
+        Versão
+        <select
+          value={version.id}
+          onChange={(e) => setSelected(e.target.value)}
+        >
+          {form.versions.map((v) => (
+            <option key={v.id} value={v.id}>
+              Versão {v.number}
+            </option>
+          ))}
+        </select>
+      </label>
       <div className="metrics">
         {[
+          ["Visualizações válidas", a.views],
+          ["Cadastros concluídos", a.completed],
+          ["Cadastros incompletos", a.incomplete],
           [
-            "Sessões abertas",
-            a.views,
-            `${a.views} sessões elegíveis · form_view`,
+            "Conversão das visitas válidas",
+            a.views
+              ? `${Math.round((a.qualifiedCompleted / a.views) * 100)}%`
+              : "—",
           ],
-          [
-            "Engajamento 10 s",
-            a.views ? `${Math.round((a.engaged / a.views) * 100)}%` : "N/D",
-            `${a.engaged} / ${a.views} sessões · engaged_10s`,
-          ],
-          [
-            "Submissões",
-            a.views ? `${Math.round((a.submissions / a.views) * 100)}%` : "N/D",
-            `${a.submissions} / ${a.views} sessões · form_submitted`,
-          ],
-          [
-            "Abandono estimado",
-            a.views ? `${a.abandoned}%` : "N/D",
-            `${a.abandoned} / ${a.views} sessões expiradas sem envio`,
-          ],
-        ].map(([label, value, context]) => (
+        ].map(([label, value]) => (
           <Card key={label} title={String(label)}>
             <strong className="metric-value">{value}</strong>
-            <small>{context}</small>
           </Card>
         ))}
       </div>
-      <Card title="Alcance e conclusão por etapa">
-        <p className="muted">
-          Sessões únicas por versão. No exemplo, 100 abriram, 55 chegaram à
-          etapa 3 e 38 enviaram.
-        </p>
-        {a.steps.map((s, i) => (
-          <div className="funnel-row" data-series={i % 5} key={s.stepId}>
-            <div>
-              <strong>
-                {i + 1}. {version.steps[i].title}
-              </strong>
+      <Card title="Conclusão por pergunta">
+        {version.steps.map((step, i) => {
+          const total = repositories.capture
+            .listActions(id)
+            .filter(
+              (e) => e.formId === formId && e.actionId === step.actionId,
+            ).length;
+          return (
+            <div className="profile-stat-row" key={step.id}>
               <span>
-                {s.viewed} / {a.views} sessões alcançaram
+                {i + 1}. {step.question.label}
               </span>
+              <strong>{total} avanços</strong>
             </div>
-            <div className="bar-track">
-              <span
-                style={{
-                  width: `${a.views ? (s.viewed / a.views) * 100 : 0}%`,
-                }}
-              />
-            </div>
-            <small>
-              step_completed: {s.completed}/{s.viewed} · abandono estimado:{" "}
-              {s.abandoned}/{s.viewed} · step_view: {s.viewed} sessões
-            </small>
-          </div>
-        ))}
+          );
+        })}
       </Card>
-      <div className="cards-grid">
-        <Card title="Interações e validação">
-          <p>
-            action_clicked: {a.actions} eventos / {a.views} sessões.
-          </p>
-          <p>
-            form_validation_failed: {a.validationErrors} eventos / {a.views}{" "}
-            sessões.
-          </p>
-          <small>
-            Eventos podem ocorrer várias vezes por sessão. Não equivalem a
-            pessoas identificadas.
-          </small>
-        </Card>
-        <Card title="Limites da mensuração">
-          <p>
-            form_abandoned: estimativa após 30 minutos de timeout ilustrativo.
-            Não é disparado ao fechar a aba.
-          </p>
-          <p>
-            Bloqueadores, consentimento e falhas de conectividade podem limitar
-            cobertura futura. Não há tráfego real aqui.
-          </p>
-        </Card>
-      </div>
+      <p>
+        Visualizações exigem {settingsOf(version.settings).tracking.viewSeconds}{" "}
+        segundos visíveis. Cadastros concluídos antes desse prazo são
+        preservados, mas não entram na conversão das visitas válidas.
+      </p>
+      <NavButton href={`${base}/tracking`}>
+        Ver eventos e notificações
+      </NavButton>
     </>
   );
 }

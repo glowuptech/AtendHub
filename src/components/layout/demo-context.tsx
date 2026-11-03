@@ -1,6 +1,12 @@
 "use client";
 import type { RepositoryRegistry, ClientScope } from "@/domain/contracts";
-import { createContext, useContext, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  type ReactNode,
+} from "react";
 import { createMockRepositories } from "@/lib/mocks/repositories";
 import { clientA, demoScope } from "@/lib/mocks/fixtures";
 interface Context {
@@ -17,6 +23,13 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   const [repositories] = useState(() => createMockRepositories(scope));
   const [clientId, setClientId] = useState(clientA);
   const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      repositories.capture.sweep();
+      setRevision((v) => v + 1);
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [repositories]);
   return (
     <DemoContext.Provider
       value={{

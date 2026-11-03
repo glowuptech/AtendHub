@@ -14,12 +14,12 @@ test("perfil: indicadores, datas, edição, contrato e cancelamento", async ({
     .getByRole("combobox", { name: /^Profissional/ })
     .selectOption("00000000-0000-4000-8000-000000000041");
   await expect(
-    page.getByText("38 envios / 100 sessões fictícias", { exact: true }),
+    page.getByText("38 envios / 100 sessões", { exact: true }),
   ).toBeVisible();
   await page.getByLabel("De", { exact: true }).fill("2026-11-03");
   await page.getByRole("button", { name: "Aplicar período" }).click();
   await expect(
-    page.getByText("17 envios / 40 sessões fictícias", { exact: true }),
+    page.getByText("17 envios / 40 sessões", { exact: true }),
   ).toBeVisible();
   await page.getByLabel("De", { exact: true }).fill("2026-11-04");
   await page.getByRole("button", { name: "Aplicar período" }).click();

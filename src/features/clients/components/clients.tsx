@@ -3,11 +3,12 @@ import { useState } from "react";
 
 import { useDemo } from "@/components/layout/demo-context";
 
-import { Heading, Card, NavButton, Denied } from "@/components/layout/shared";
+import { Heading, Card, Denied } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
 import { LeadTable } from "@/features/leads/components/lead-table";
 import { ClientOverview } from "./overview";
 import { ClientInformation } from "./information";
+import { FormsList } from "@/features/forms/components/forms-list";
 import { KnowledgeBase } from "./knowledge-base";
 export { Clients } from "./directory";
 export function ClientProfile({ id }: { id: string }) {
@@ -54,17 +55,12 @@ export function ClientProfile({ id }: { id: string }) {
           <LeadTable leads={repositories.leads.list(id)} />
         </Card>
       ) : tab === "Formulários" ? (
-        <Card title="Formulários nativos">
-          <p>Campos reutilizáveis exclusivamente no catálogo desta clínica.</p>
-          <NavButton href={`/app/clientes/${id}/formularios`}>
-            Gerenciar formulários
-          </NavButton>
-        </Card>
+        <FormsList id={id} />
       ) : tab === "Agendamento externo" ? (
         <Card title="A agenda oficial é externa">
           <p>
-            Este link abre apenas example.com, um endereço seguro de
-            prévia. Não representa a agenda de uma médica.
+            Este link abre apenas example.com, um endereço seguro de prévia. Não
+            representa a agenda de uma médica.
           </p>
           <a
             className="button button-primary"

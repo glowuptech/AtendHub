@@ -25,7 +25,7 @@ export function FormsList({ id }: { id: string }) {
     <>
       <Heading
         eyebrow={repositories.clients.get(id).name}
-        title="Um primeiro contato mais acolhedor."
+        title="Formulários"
         description="Formulários nativos com a identidade da clínica e campos conectados ao CRM."
         action={
           <NavButton href={`${base}/novo`}>
@@ -35,12 +35,11 @@ export function FormsList({ id }: { id: string }) {
         }
       />
       <div className="toolbar">
-        <Badge>Somente simulação em memória</Badge>
         <label className="push-right">
           Status
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="all">Todos</option>
-            <option value="demo">Prévia</option>
+            <option value="demo">Ativo</option>
             <option value="draft">Rascunho</option>
             <option value="archived">Arquivado</option>
           </select>
@@ -49,7 +48,7 @@ export function FormsList({ id }: { id: string }) {
       <div className="cards-grid">
         {forms.map((f) => {
           const v = f.versions.find((v) => v.id === f.activeVersionId)!;
-          const a = repositories.analytics.get(id, f.id, v.id);
+          const live = repositories.capture.stats(id, f.id);
           return (
             <Card key={f.id}>
               <div className="section-caption">
@@ -61,7 +60,7 @@ export function FormsList({ id }: { id: string }) {
                     ? "Arquivado"
                     : f.status === "draft"
                       ? "Rascunho"
-                      : "Prévia / não publicado"}
+                      : "Ativo"}
                 </Badge>
               </div>
               <h2>{f.name}</h2>
@@ -71,20 +70,24 @@ export function FormsList({ id }: { id: string }) {
               </p>
               <div className="mini-stats">
                 <span>
-                  <strong>{a.views}</strong> sessões
+                  <strong>{live.views}</strong> visualizações válidas
                 </span>
                 <span>
                   <strong>
-                    {a.views
-                      ? `${Math.round((a.submissions / a.views) * 100)}%`
+                    {live.views
+                      ? `${Math.round((live.qualifiedCompleted / live.views) * 100)}%`
                       : "N/D"}
                   </strong>{" "}
-                  {a.submissions} / {a.views} concluídas
+                  {live.completed} concluídos · {live.incomplete} incompletos
                 </span>
               </div>
               <div className="actions">
                 <NavButton href={`${base}/${f.id}/editar`}>Editar</NavButton>
                 <NavButton href={`${base}/${f.id}/preview`}>Prévia</NavButton>
+                {f.status !== "draft" && f.status !== "archived" && (
+                  <NavButton href={`/f/${f.slug}`}>Abrir formulário</NavButton>
+                )}
+                <NavButton href="/app/leads">Respostas no CRM</NavButton>
                 <Link href={`${base}/${f.id}/analytics`}>Analytics</Link>
                 <Link href={`${base}/${f.id}/tracking`}>Mensuração</Link>
               </div>
@@ -110,9 +113,7 @@ export function FormsList({ id }: { id: string }) {
                   onClick={() => {
                     repositories.forms.archive(id, f.id);
                     refresh();
-                    setNotice(
-                      "Formulário arquivado apenas nesta sessão.",
-                    );
+                    setNotice("Formulário arquivado apenas nesta sessão.");
                   }}
                 >
                   <Archive size={14} />
