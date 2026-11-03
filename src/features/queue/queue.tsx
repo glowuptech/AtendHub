@@ -1,15 +1,44 @@
 "use client";
 import { useEffect, useState } from "react";
+import { LeadModal } from "./lead-modal";
 import { useRouter } from "next/navigation";
 import { useDemo } from "@/components/layout/demo-context";
 import { Heading, Badge, stageLabels } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
 import { CalendarSchema, claimSla, clock, inBusinessTime } from "./calendar";
-const stages = ["new", "in_progress", "waiting", "scheduled", "lost"] as const;
+const stages = [
+  "new",
+  "in_progress",
+  "waiting",
+  "awaiting_scheduling",
+  "scheduled",
+  "confirmed",
+  "rescheduling",
+  "recovery",
+  "lost",
+] as const;
 export function Queue() {
-  const { scope, repositories, refresh, setClientId, calendar, setCalendar } =
-      useDemo(),
+  const {
+      scope,
+      repositories,
+      refresh,
+      setClientId,
+      setInboxLeadId,
+      calendar,
+      setCalendar,
+    } = useDemo(),
     router = useRouter();
+  const [opened, setOpened] = useState<{ clientId: string; id: string } | null>(
+    null,
+  );
+  function converse(clientId: string, id: string) {
+    const lead = repositories.leads.get(clientId, id);
+    repositories.inbox.ensure(clientId, lead);
+    setClientId(clientId);
+    setInboxLeadId(id);
+    refresh();
+    router.push("/app/inbox");
+  }
   const [now, setNow] = useState<number | null>(null),
     [message, setMessage] = useState(""),
     [search, setSearch] = useState(""),
@@ -155,6 +184,7 @@ export function Queue() {
         {stages.map((stage) => (
           <section
             className="queue-column"
+            data-stage={stage}
             key={stage}
             aria-label={
               stage === "new" ? "Sem atendimento" : stageLabels[stage]
@@ -271,11 +301,16 @@ export function Queue() {
                     <Button
                       variant="ghost"
                       onClick={() => {
-                        setClientId(l.clientId);
-                        router.push(`/app/leads/${l.id}`);
+                        setOpened({ clientId: l.clientId, id: l.id });
                       }}
                     >
                       Abrir lead
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => converse(l.clientId, l.id)}
+                    >
+                      Conversar
                     </Button>
                   </article>
                 );
@@ -286,6 +321,14 @@ export function Queue() {
           </section>
         ))}
       </div>
+      {opened && (
+        <LeadModal
+          clientId={opened.clientId}
+          id={opened.id}
+          onClose={() => setOpened(null)}
+          onConverse={() => converse(opened.clientId, opened.id)}
+        />
+      )}
     </>
   );
 }

@@ -234,9 +234,24 @@ export const StageSchema = z.enum([
   "in_progress",
   "waiting",
   "scheduled",
+  "awaiting_scheduling",
+  "confirmed",
+  "rescheduling",
+  "recovery",
   "lost",
 ]);
 export const LeadSchema = z.object({
+  tasks: z
+    .array(
+      z.object({
+        id: Id,
+        title: z.string().trim().min(2).max(200),
+        dueOn: z.iso.date().nullable(),
+        completed: z.boolean(),
+        createdAt: z.string().datetime(),
+      }),
+    )
+    .optional(),
   claimedAt: z.string().datetime().optional(),
   claimAudit: z
     .object({

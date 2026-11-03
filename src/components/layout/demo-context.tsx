@@ -14,6 +14,8 @@ import {
   type BusinessCalendar,
 } from "@/features/queue/calendar";
 interface Context {
+  inboxLeadId: string;
+  setInboxLeadId: (id: string) => void;
   calendar: BusinessCalendar;
   setCalendar: (value: BusinessCalendar) => void;
   repositories: RepositoryRegistry;
@@ -25,6 +27,7 @@ interface Context {
 }
 const DemoContext = createContext<Context | null>(null);
 export function DemoProvider({ children }: { children: ReactNode }) {
+  const [inboxLeadId, setInboxLeadId] = useState("");
   const [calendar, setCalendar] = useState<BusinessCalendar>(defaultCalendar);
   const [scope] = useState<ClientScope>(() => structuredClone(demoScope));
   const [repositories] = useState(() => createMockRepositories(scope));
@@ -40,6 +43,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   return (
     <DemoContext.Provider
       value={{
+        inboxLeadId,
+        setInboxLeadId,
         calendar,
         setCalendar,
         repositories,

@@ -1,16 +1,12 @@
 "use client";
+import { LeadModal } from "@/features/queue/lead-modal";
 import { useState } from "react";
 import { useDemo } from "@/components/layout/demo-context";
-import {
-  Heading,
-  Badge,
-  NavButton,
-  Empty,
-  dateTime,
-} from "@/components/layout/shared";
+import { Heading, Badge, Empty, dateTime } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
 export function Inbox() {
-  const { repositories, clientId } = useDemo();
+  const { repositories, clientId, inboxLeadId } = useDemo();
+  const [openedLead, setOpenedLead] = useState<string | null>(null);
   const [selected, setSelected] = useState(""),
     [owner, setOwner] = useState("all"),
     [notice, setNotice] = useState("");
@@ -20,7 +16,9 @@ export function Inbox() {
       (c) => owner === "all" || (owner === "unassigned" ? !c.owner : !!c.owner),
     );
   const conversation =
-    conversations.find((c) => c.id === selected) ?? conversations[0];
+    conversations.find((c) => c.id === selected) ??
+    conversations.find((c) => c.leadId === inboxLeadId) ??
+    conversations[0];
   const client = repositories.clients.get(clientId);
   return (
     <>
@@ -57,7 +55,9 @@ export function Inbox() {
                 }}
               >
                 <strong>{c.name}</strong>
-                <small>Olá! Gostaria de informações…</small>
+                <small>
+                  {c.messages.at(-1)?.body || "Sem mensagens ainda"}
+                </small>
                 <span>{c.owner ?? "Sem responsável"}</span>
               </button>
             ))}
@@ -68,6 +68,9 @@ export function Inbox() {
               <small>{client.name} · mensagens </small>
             </header>
             <div className="messages">
+              {!conversation.messages.length && (
+                <p>Nenhuma mensagem registrada para este contato.</p>
+              )}
               {conversation.messages.map((m) => (
                 <div key={m.id} className={`bubble ${m.direction}`}>
                   <p>{m.body}</p>
@@ -94,9 +97,12 @@ export function Inbox() {
             <h2>{client.name}</h2>
             <Badge>Saúde</Badge>
             <p>Responsável: {conversation.owner ?? "Não atribuído"}</p>
-            <NavButton href={`/app/leads/${conversation.leadId}`}>
+            <Button
+              variant="outline"
+              onClick={() => setOpenedLead(conversation.leadId)}
+            >
               Abrir lead e campos
-            </NavButton>
+            </Button>
             <hr />
             <h3>Agendamento externo</h3>
             <p>
@@ -112,6 +118,14 @@ export function Inbox() {
             </a>
           </aside>
         </div>
+      )}
+      {openedLead && (
+        <LeadModal
+          clientId={clientId}
+          id={openedLead}
+          onClose={() => setOpenedLead(null)}
+          onConverse={() => setOpenedLead(null)}
+        />
       )}
     </>
   );

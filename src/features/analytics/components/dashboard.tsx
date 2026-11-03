@@ -31,7 +31,7 @@ export function Dashboard() {
         (period !== "today" || l.createdAt.startsWith("2026-11-03")) &&
         (stage === "all" || l.stage === stage),
     );
-  const scheduled = leads.filter((l) => l.stage === "scheduled").length;
+  const scheduled = leads.filter((l) => ["scheduled","confirmed"].includes(l.stage)).length;
   const metrics = [
     ["Leads recebidos", leads.length, "contatos  no recorte", Users],
     [

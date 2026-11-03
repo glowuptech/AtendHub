@@ -17,6 +17,8 @@ import type {
 } from "@/domain/contracts";
 import {
   ClientSchema,
+  LeadSchema,
+  StageSchema,
   FieldSchema,
   FormSchema,
   validateAnswer,
@@ -148,13 +150,41 @@ export class MockLeadRepository
   ) {
     super(rows, scope);
   }
+  addTask(clientId: string, id: string, title: string, dueOn: string | null) {
+    const r = this.row(clientId, id);
+    const task = {
+      id: crypto.randomUUID(),
+      title: title.trim(),
+      dueOn,
+      completed: false,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = LeadSchema.parse({
+      ...r,
+      tasks: [...(r.tasks ?? []), task],
+    });
+    r.tasks = updated.tasks;
+    r.history.push({
+      id: crypto.randomUUID(),
+      label: `Tarefa criada: ${task.title}`,
+      at: task.createdAt,
+    });
+  }
+  toggleTask(clientId: string, id: string, taskId: string) {
+    const r = this.row(clientId, id),
+      task = r.tasks?.find((t) => t.id === taskId);
+    if (!task) throw new ScopeError();
+    task.completed = !task.completed;
+    r.history.push({
+      id: crypto.randomUUID(),
+      label: `Tarefa ${task.completed ? "concluída" : "reaberta"}: ${task.title}`,
+      at: new Date().toISOString(),
+    });
+  }
   setStage(clientId: string, id: string, stage: Lead["stage"]) {
     const r = this.row(clientId, id);
-    if (
-      !r.owner ||
-      stage === "new" ||
-      !["in_progress", "waiting", "scheduled", "lost"].includes(stage)
-    )
+    StageSchema.parse(stage);
+    if (!r.owner || stage === "new")
       throw Error("Assuma o lead antes de mover.");
     r.stage = stage;
     r.history.push({
@@ -298,7 +328,31 @@ export class MockFormRepository
 }
 export class MockInboxRepository
   extends ScopedMockRepository<Conversation>
-  implements InboxRepository {}
+  implements InboxRepository
+{
+  ensure(clientId: string, lead: Lead) {
+    this.check(clientId);
+    if (
+      lead.clientId !== clientId ||
+      lead.organizationId !== this.scope.organizationId
+    )
+      throw new ScopeError();
+    const existing = this.list(clientId).find((c) => c.leadId === lead.id);
+    if (existing) return existing.id;
+    const id = crypto.randomUUID();
+    this.rows.push({
+      id,
+      organizationId: lead.organizationId,
+      clientId,
+      leadId: lead.id,
+      name: lead.name,
+      owner: lead.owner,
+      connection: "disconnected",
+      messages: [],
+    });
+    return id;
+  }
+}
 export class MockAppointmentRepository
   extends ScopedMockRepository<AppointmentMirror>
   implements AppointmentRepository

@@ -135,6 +135,13 @@ export interface ClientRepository {
   get(clientId: string): Client;
 }
 export interface LeadRepository extends ScopedRepository<Lead> {
+  addTask(
+    clientId: string,
+    id: string,
+    title: string,
+    dueOn: string | null,
+  ): void;
+  toggleTask(clientId: string, id: string, taskId: string): void;
   claim(
     clientId: string,
     id: string,
@@ -157,7 +164,9 @@ export interface FormRepository extends ScopedRepository<FormDefinition> {
   archive(clientId: string, id: string): void;
   snapshot(clientId: string, id: string): FormVersion;
 }
-export type InboxRepository = ScopedRepository<Conversation>;
+export interface InboxRepository extends ScopedRepository<Conversation> {
+  ensure(clientId: string, lead: Lead): string;
+}
 export interface AppointmentRepository extends ScopedRepository<AppointmentMirror> {
   setAttendance(
     clientId: string,

@@ -97,7 +97,11 @@ export const stageLabels = {
   new: "Novo",
   in_progress: "Em atendimento",
   waiting: "Aguardando resposta",
+  awaiting_scheduling: "Aguardando agendamento",
   scheduled: "Agendado",
+  confirmed: "Agendamento confirmado",
+  rescheduling: "Reagendamento",
+  recovery: "Recuperação",
   lost: "Perdido",
 };
 export function dateTime(value: string) {

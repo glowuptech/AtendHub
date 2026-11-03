@@ -11,3 +11,13 @@ A carteira inclui cadastros parciais identificáveis já criados pelo formulári
 A vertical jurídica permanece futura; os cartões atuais identificam as categorias de saúde existentes no cadastro.
 
 Validação: 27 testes unitários aprovados; cenários E2E do Kanban e da integração fila/Inbox/portal aprovados. Axe WCAG 2A/AA/2.1AA sem violações no Kanban. Build, lint e TypeScript aprovados. Captura em `screenshots/queue-kanban.png`.
+
+## Consulta rápida do lead e cores
+
+Abrir lead agora abre dialog nativo sobre a fila, com Escape, foco contido e retorno ao botão de origem. Abas: resumo, respostas com rótulos da versão capturada, últimas 20 mensagens ordenadas por data, tarefas criadas/concluídas na memória do lead, agendamentos registrados e histórico. Ausência de registro não é interpretada como fato clínico ou comparecimento.
+
+Conversar usa leadId e clientId para localizar/criar uma conversa única no Inbox; seleciona o cliente e o contato solicitado. Conversa nova começa sem mensagens e continua com conexão desconectada. O Inbox também permite consultar o modal sem sair da conversa.
+
+Estágios adicionais: aguardando agendamento, agendamento confirmado, reagendamento e recuperação. Estágios mantêm histórico e não criam/confirmam agendamentos nem comparecimento automaticamente. Colunas usam cores por estágio: âmbar (novos/aguardando agendamento), azul (atendimento), lilás (aguardando resposta), verdes (agendado/confirmado), laranja (reagendamento), vermelhos (recuperação/perdido). Nomes textuais continuam identificando cada estágio.
+
+Validação desta revisão: 28 testes unitários aprovados, fluxo E2E do modal (respostas, tarefas, Escape/foco, Inbox correto) e fluxo anterior fila/Inbox/portal aprovados. Contraste WCAG aprovado após ajustar os títulos das colunas; build, lint e TypeScript aprovados. Capturas atualizadas em `screenshots/queue-kanban.png` e `screenshots/lead-modal.png`.

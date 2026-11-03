@@ -47,3 +47,33 @@ test("claim registra tempo e calendário; impede dupla atribuição e acesso cru
   r.leads.setStage(clientA, lead.id, "waiting");
   expect(r.leads.get(clientA, lead.id).stage).toBe("waiting");
 });
+
+test("novos estágios, tarefas e conversa preservam lead e escopo", () => {
+  const r = createMockRepositories();
+  const l = r.leads.list(clientA).find((l) => l.stage === "new" && !l.owner)!;
+  r.leads.claim(clientA, l.id);
+  for (const stage of [
+    "awaiting_scheduling",
+    "confirmed",
+    "rescheduling",
+    "recovery",
+  ] as const) {
+    r.leads.setStage(clientA, l.id, stage);
+    expect(r.leads.get(clientA, l.id).stage).toBe(stage);
+  }
+  r.leads.addTask(clientA, l.id, "Retornar contato", null);
+  const task = r.leads.get(clientA, l.id).tasks![0];
+  r.leads.toggleTask(clientA, l.id, task.id);
+  expect(r.leads.get(clientA, l.id).tasks![0].completed).toBe(true);
+  expect(() => r.leads.addTask(clientB, l.id, "Contato", null)).toThrow();
+  const conversation = r.inbox.ensure(clientA, l);
+  expect(r.inbox.ensure(clientA, l)).toBe(conversation);
+  expect(() => r.inbox.ensure(clientB, l)).toThrow();
+  const noConversation = r.leads
+    .list(clientA)
+    .find((lead) => !r.inbox.list(clientA).some((c) => c.leadId === lead.id))!;
+  if (noConversation) {
+    const id = r.inbox.ensure(clientA, noConversation);
+    expect(r.inbox.get(clientA, id).messages).toEqual([]);
+  }
+});
