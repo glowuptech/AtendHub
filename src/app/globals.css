@@ -1618,3 +1618,310 @@ footer {
     max-width: 90px;
   }
 }
+/* Client overview and editable administrative profile. */
+.partnership-card {
+  background: var(--surface-muted);
+}
+.partnership-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  margin-top: 24px;
+}
+.partnership-grid > div {
+  border-left: 1px solid var(--border-subtle);
+  padding-left: 20px;
+}
+.partnership-grid > div:first-child {
+  border: 0;
+  padding-left: 0;
+}
+.partnership-grid svg {
+  color: var(--brand-primary);
+  margin-bottom: 10px;
+}
+.partnership-grid strong {
+  display: block;
+  font-size: 22px;
+  letter-spacing: -0.5px;
+  margin: 7px 0;
+}
+.partnership-alerts {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 22px;
+  padding-top: 15px;
+}
+.partnership-alerts > small {
+  flex-basis: 100%;
+  margin-top: 4px;
+}
+.profile-period {
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 18px;
+  background: var(--surface-raised);
+  margin-bottom: 24px;
+}
+.profile-date-fields {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.profile-date-fields label {
+  min-width: 0;
+}
+.profile-date-fields label > input,
+.profile-date-fields label > select {
+  margin-bottom: 0;
+}
+.profile-date-fields label:last-child {
+  flex: 1;
+}
+.profile-date-fields select {
+  width: 100%;
+}
+.client-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.client-metrics .card {
+  padding: 20px;
+  margin-bottom: 0;
+}
+.client-metrics {
+  margin-bottom: 24px;
+}
+.client-metrics .metric-value {
+  font-size: 32px;
+}
+.client-metrics .metric-top svg {
+  color: var(--chart-blue);
+}
+.client-metrics .card:nth-child(2n) svg {
+  color: var(--chart-teal);
+}
+.client-metrics .card:nth-child(3n) svg {
+  color: var(--chart-purple);
+}
+.profile-dashboard-grid,
+.profile-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+.profile-info-grid .card {
+  margin: 0;
+}
+.profile-info-grid {
+  margin-bottom: 22px;
+}
+.chart-legend {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.chart-legend > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chart-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  display: inline-block;
+}
+.series-leads {
+  background: var(--chart-blue);
+}
+.series-appointments {
+  background: var(--chart-teal);
+}
+.daily-chart {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  height: 180px;
+  margin-top: 28px;
+  align-items: stretch;
+}
+.daily-column {
+  flex: 1;
+  min-width: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  text-align: center;
+}
+.daily-bars {
+  display: flex;
+  gap: 2px;
+  height: 145px;
+  align-items: flex-end;
+}
+.daily-bars > span {
+  flex: 1;
+  border-radius: 3px 3px 0 0;
+}
+.daily-column small {
+  font-size: 8px;
+  margin-top: 8px;
+}
+.profile-presence {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 18px;
+  margin-top: 24px;
+  font-size: 13px;
+}
+.profile-presence small {
+  margin-top: 8px;
+}
+.profile-stat-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 13px;
+}
+.profile-stat-row:last-of-type {
+  margin-bottom: 20px;
+}
+.profile-metric-note {
+  font-size: 12px;
+}
+.profile-info-field {
+  padding: 10px 0 14px;
+  min-width: 0;
+}
+.profile-info-field strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.profile-logo-row {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.profile-logo-row strong {
+  font-size: 13px;
+}
+.profile-edit-notice {
+  padding: 14px 18px;
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-radius: 10px;
+  font-size: 12px;
+  margin-bottom: 24px;
+}
+.profile-doctor-fields {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 15px 0;
+  margin-bottom: 15px;
+}
+.profile-doctor-fields legend {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.profile-save-bar {
+  position: sticky;
+  bottom: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  padding: 14px 20px;
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 5px 20px
+    color-mix(in srgb, var(--text-primary) 10%, transparent);
+  z-index: 5;
+}
+.profile-save-bar > span {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+@media (max-width: 1100px) {
+  .client-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .profile-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .partnership-grid {
+    gap: 12px;
+  }
+  .partnership-grid strong {
+    font-size: 18px;
+  }
+}
+@media (max-width: 600px) {
+  .profile-info-grid {
+    grid-template-columns: 1fr;
+  }
+  .partnership-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .partnership-grid > div {
+    padding: 0 0 15px;
+    border: 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .partnership-grid > div:first-child {
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .partnership-card .section-caption {
+    flex-wrap: wrap;
+  }
+  .profile-date-fields {
+    gap: 10px;
+  }
+  .profile-date-fields label {
+    flex: 1;
+    min-width: 110px;
+  }
+  .profile-date-fields label:last-child {
+    flex-basis: 100%;
+  }
+  .client-metrics {
+    gap: 10px;
+  }
+  .client-metrics .card {
+    padding: 16px 12px;
+  }
+  .client-metrics .metric-value {
+    font-size: 26px;
+  }
+  .client-metrics .metric-top {
+    font-size: 11px;
+  }
+  .profile-save-bar {
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+  .profile-information > .section-caption {
+    flex-wrap: wrap;
+  }
+  .profile-date-fields input {
+    font-size: 14px;
+  }
+  .profile-stat-row {
+    flex-wrap: wrap;
+  }
+}

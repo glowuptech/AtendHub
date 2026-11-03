@@ -27,6 +27,26 @@ export const clients = [
     description: "Atendimento administrativo • Unidade Jardim",
     category: "clinic",
     cnpj: "00000000000000",
+    contactName: "Recepção DEMO",
+    contactEmail: "recepcao@example.com",
+    contactPhone: "+5500000000000",
+    address: {
+      postalCode: "00000000",
+      street: "Rua Exemplo",
+      number: "100",
+      complement: "Sala DEMO",
+      neighborhood: "Jardim",
+      city: "Cidade Exemplo",
+      state: "SP",
+    },
+    partnership: {
+      projectStartedOn: "2026-10-01",
+      signedOn: "2026-09-28",
+      signatureDueOn: "2026-09-30",
+      renewsOn: "2026-11-28",
+      manager: "Equipe GlowUp DEMO",
+      notes: "Datas fictícias para acompanhamento da parceria.",
+    },
     logo: "/logos/ana-demo.svg",
     specialties: ["Ginecologia", "Obstetrícia"],
     doctors: [
@@ -57,6 +77,13 @@ export const clients = [
     description: "Atendimento administrativo • Unidade Centro",
     category: "doctor_female",
     cnpj: null,
+    partnership: {
+      projectStartedOn: "2026-11-01",
+      signedOn: null,
+      signatureDueOn: "2026-11-08",
+      renewsOn: null,
+      manager: "Equipe GlowUp DEMO",
+    },
     logo: "/logos/horizonte-demo.svg",
     specialties: ["Clínica médica"],
     doctors: [
@@ -137,6 +164,7 @@ function form(
     organizationId,
     name,
     slug,
+    doctorId: uid(n === 300 ? 41 : n === 400 ? 42 : 43),
     status: "demo",
     activeVersionId: versionId,
     versions: [
@@ -204,6 +232,14 @@ export const leads = [0, 1, 2, 3].map((i) => {
     organizationId,
     clientId: f.clientId,
     contactId: uid(700 + i),
+    doctorId: f.doctorId,
+    firstResponseAt:
+      i === 0
+        ? null
+        : i === 1
+          ? "2026-10-30T13:12:00.000Z"
+          : "2026-11-03T15:06:00.000Z",
+    handlingMinutes: i === 0 ? null : i === 1 ? 18 : 10,
     name: `Pessoa Exemplo ${["Alfa", "Beta", "Gama", "Delta"][i]}`,
     stage: ["new", "in_progress", "scheduled", "scheduled"][i],
     owner: i === 0 ? null : "Operadora DEMO",

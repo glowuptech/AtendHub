@@ -129,6 +129,7 @@ export interface ScopedRepository<T> {
   get(clientId: string, id: string): T;
 }
 export interface ClientRepository {
+  update(clientId: string, client: Client): void;
   create(client: Client): void;
   list(scope: ClientScope): Client[];
   get(clientId: string): Client;

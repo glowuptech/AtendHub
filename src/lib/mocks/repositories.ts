@@ -60,6 +60,24 @@ export class ScopedMockRepository<
 export class MockClientRepository implements ClientRepository {
   private rows = structuredClone(fixture.clients);
   constructor(private scope: ClientScope) {}
+  update(clientId: string, input: import("@/domain/schemas").Client) {
+    const old = this.get(clientId);
+    const client = ClientSchema.parse(input);
+    if (client.id !== clientId || client.organizationId !== old.organizationId)
+      throw new ScopeError();
+    const usedDoctorIds = [...fixture.leads, ...fixture.forms]
+      .filter((r) => r.clientId === clientId)
+      .map((r) => r.doctorId)
+      .filter(Boolean);
+    if (usedDoctorIds.some((id) => !client.doctors.some((d) => d.id === id)))
+      throw Error(
+        "Médico com histórico não pode ser removido nesta demonstração.",
+      );
+    if (new Set(client.doctors.map((d) => d.id)).size !== client.doctors.length)
+      throw Error("Identificadores de médicos duplicados");
+    this.rows[this.rows.findIndex((c) => c.id === clientId)] =
+      structuredClone(client);
+  }
   create(input: import("@/domain/schemas").Client) {
     const client = ClientSchema.parse(input);
     if (client.organizationId !== this.scope.organizationId)

@@ -41,6 +41,40 @@ export const DoctorSchema = z.object({
   ]),
   specialties: z.array(z.string().trim().min(2).max(80)).max(20),
 });
+export const PartnershipSchema = z
+  .object({
+    projectStartedOn: z.string().date().nullable().default(null),
+    signedOn: z.string().date().nullable().default(null),
+    signatureDueOn: z.string().date().nullable().default(null),
+    renewsOn: z.string().date().nullable().default(null),
+    manager: z.string().max(120).default(""),
+    notes: z.string().max(1500).default(""),
+  })
+  .superRefine((v, ctx) => {
+    if (
+      v.renewsOn &&
+      ((v.signedOn && v.renewsOn <= v.signedOn) ||
+        (v.projectStartedOn && v.renewsOn <= v.projectStartedOn))
+    )
+      ctx.addIssue({
+        code: "custom",
+        path: ["renewsOn"],
+        message:
+          "A renovação deve ser posterior à assinatura e ao início do projeto.",
+      });
+  });
+export const AddressSchema = z.object({
+  postalCode: z
+    .string()
+    .regex(/^(\d{8})?$/, "CEP deve ter 8 dígitos")
+    .default(""),
+  street: z.string().max(150).default(""),
+  number: z.string().max(20).default(""),
+  complement: z.string().max(100).default(""),
+  neighborhood: z.string().max(100).default(""),
+  city: z.string().max(100).default(""),
+  state: z.union([DoctorSchema.shape.uf, z.literal("")]).default(""),
+});
 export const ClientSchema = z.object({
   id: Id,
   organizationId: Id,
@@ -74,6 +108,11 @@ export const ClientSchema = z.object({
     .default(null),
   specialties: z.array(z.string().trim().min(2).max(80)).max(20).default([]),
   doctors: z.array(DoctorSchema).max(20).default([]),
+  address: AddressSchema.prefault({}),
+  partnership: PartnershipSchema.prefault({}),
+  contactName: z.string().max(120).default(""),
+  contactPhone: z.string().max(30).default(""),
+  contactEmail: z.union([z.string().email(), z.literal("")]).default(""),
 });
 export const FieldTypeSchema = z.enum([
   "short_text",
@@ -148,6 +187,7 @@ export const VersionSchema = z.object({
   destination: z.literal("demo_success"),
 });
 export const FormSchema = z.object({
+  doctorId: Id.nullable().default(null),
   ...scoped,
   name: z.string().trim().min(3),
   slug: z.string().regex(/^[a-z0-9-]+$/),
@@ -169,6 +209,9 @@ export const StageSchema = z.enum([
   "lost",
 ]);
 export const LeadSchema = z.object({
+  doctorId: Id.nullable().default(null),
+  firstResponseAt: z.string().datetime().nullable().default(null),
+  handlingMinutes: z.number().nonnegative().nullable().default(null),
   ...scoped,
   contactId: Id,
   name: z.string(),

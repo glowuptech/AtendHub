@@ -3,15 +3,11 @@ import { useState } from "react";
 
 import { useDemo } from "@/components/layout/demo-context";
 
-import {
-  Heading,
-  Card,
-  Badge,
-  NavButton,
-  Denied,
-} from "@/components/layout/shared";
+import { Heading, Card, NavButton, Denied } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
 import { LeadTable } from "@/features/leads/components/lead-table";
+import { ClientOverview } from "./overview";
+import { ClientInformation } from "./information";
 export { Clients } from "./directory";
 export function ClientProfile({ id }: { id: string }) {
   const { repositories, clientId } = useDemo();
@@ -33,7 +29,6 @@ export function ClientProfile({ id }: { id: string }) {
           "Leads",
           "Formulários",
           "Agendamento externo",
-          "Resultados",
         ].map((t) => (
           <Button
             key={t}
@@ -45,7 +40,15 @@ export function ClientProfile({ id }: { id: string }) {
           </Button>
         ))}
       </div>
-      {tab === "Leads" ? (
+      {tab === "Visão geral" ? (
+        <ClientOverview
+          key={id}
+          client={c}
+          onEdit={() => setTab("Informações")}
+        />
+      ) : tab === "Informações" ? (
+        <ClientInformation key={id} client={c} />
+      ) : tab === "Leads" ? (
         <Card>
           <LeadTable leads={repositories.leads.list(id)} />
         </Card>
@@ -89,39 +92,7 @@ export function ClientProfile({ id }: { id: string }) {
           </details>
           <small>Fonte: fixture de demonstração · revisão 03/11/2026</small>
         </Card>
-      ) : tab === "Resultados" ? (
-        <Card title="Resultados demonstrativos">
-          <p>
-            {repositories.leads.list(id).length} leads fictícios ·{" "}
-            {repositories.appointments.list(id).length} registros espelhados de
-            exemplo.
-          </p>
-          <NavButton href="/app">Ver indicadores e denominadores</NavButton>
-        </Card>
-      ) : (
-        <div className="cards-grid">
-          <Card title="Informações da clínica">
-            <p>{c.description}</p>
-            <p>Vertical: Saúde / Prescrita</p>
-            <p>
-              Operadora: GlowUp · Horário: segunda a sexta, administrativo DEMO
-            </p>
-            <Badge>Identificação fictícia</Badge>
-          </Card>
-          <Card title="Próximos passos">
-            <p>
-              Revisar formulários, acompanhar oportunidades e orientar o
-              atendimento.
-            </p>
-            <NavButton href={`/app/clientes/${id}/formularios`}>
-              Explorar formulários
-            </NavButton>
-            <p>
-              <NavButton href="/app/inbox">Abrir Inbox da clínica</NavButton>
-            </p>
-          </Card>
-        </div>
-      )}
+      ) : null}
     </>
   );
 }

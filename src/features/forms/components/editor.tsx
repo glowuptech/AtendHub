@@ -103,6 +103,7 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
       id: formId,
       organizationId: client.organizationId,
       clientId,
+      doctorId: null,
       name: "Novo formulário",
       slug: `demo-${formId}`,
       status: "draft",
