@@ -75,7 +75,24 @@ export const AddressSchema = z.object({
   city: z.string().max(100).default(""),
   state: z.union([DoctorSchema.shape.uf, z.literal("")]).default(""),
 });
+export const KnowledgeEntrySchema = z.object({
+  id: z.string().min(1),
+  category: z.string().trim().min(1).max(100),
+  question: z.string().trim().min(3).max(300),
+  answer: z.string().trim().max(6000),
+  source: z.string().trim().max(500),
+  status: z.enum(["draft", "pending", "approved"]),
+  updatedAt: z.string().datetime().nullable(),
+  priceCents: z.number().int().nonnegative().nullable(),
+  currency: z.literal("BRL"),
+  conditions: z.string().max(2000),
+}).superRefine((v, ctx) => {
+  if (v.status === "approved" && (!v.answer || !v.source))
+    ctx.addIssue({ code: "custom", message: "Para aprovar, preencha resposta e fonte." });
+});
+export type KnowledgeEntry = z.infer<typeof KnowledgeEntrySchema>;
 export const ClientSchema = z.object({
+  knowledge: z.array(KnowledgeEntrySchema).default([]),
   id: Id,
   organizationId: Id,
   name: z.string().trim().min(2).max(120),

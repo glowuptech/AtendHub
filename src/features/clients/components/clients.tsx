@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { LeadTable } from "@/features/leads/components/lead-table";
 import { ClientOverview } from "./overview";
 import { ClientInformation } from "./information";
+import { KnowledgeBase } from "./knowledge-base";
 export { Clients } from "./directory";
 export function ClientProfile({ id }: { id: string }) {
   const { repositories, clientId } = useDemo();
@@ -25,7 +26,7 @@ export function ClientProfile({ id }: { id: string }) {
         {[
           "Visão geral",
           "Informações",
-          "Serviços/FAQ",
+          "Base de conhecimento",
           "Leads",
           "Formulários",
           "Agendamento externo",
@@ -74,24 +75,8 @@ export function ClientProfile({ id }: { id: string }) {
             Abrir sistema de agenda · DEMO
           </a>
         </Card>
-      ) : tab === "Serviços/FAQ" ? (
-        <Card title="Base administrativa DEMO">
-          <details>
-            <summary>Como funciona o agendamento?</summary>
-            <p>
-              O atendente consulta o sistema externo oficial e registra um
-              espelho administrativo no Prescrita.
-            </p>
-          </details>
-          <details>
-            <summary>Há valores ou convênios confirmados?</summary>
-            <p>
-              Não. Informações comerciais reais serão revisadas pela clínica
-              antes do piloto.
-            </p>
-          </details>
-          <small>Fonte: fixture de demonstração · revisão 03/11/2026</small>
-        </Card>
+      ) : tab === "Base de conhecimento" ? (
+        <KnowledgeBase key={id} client={c} />
       ) : null}
     </>
   );
