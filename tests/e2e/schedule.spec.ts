@@ -26,8 +26,8 @@ test("agenda semanal configura médico, cria reserva, impede sobreposição e se
   });
   await expect(dialog.getByLabel("Duração em minutos")).toHaveValue("37");
   await dialog
-    .getByRole("combobox", { name: /^Lead/ })
-    .selectOption({ label: "Pessoa Exemplo Alfa" });
+    .getByRole("radio", { name: "Pessoa Exemplo Alfa", exact: true })
+    .check();
   await dialog.getByRole("button", { name: "Salvar agendamento" }).click();
   await expect(dialog).not.toBeVisible();
   await expect(page.getByRole("status")).toContainText("fila em memória");
@@ -35,8 +35,8 @@ test("agenda semanal configura médico, cria reserva, impede sobreposição e se
     .getByRole("button", { name: "Criar agendamento", exact: true })
     .click();
   await dialog
-    .getByRole("combobox", { name: /^Lead/ })
-    .selectOption({ label: "Pessoa Exemplo Beta" });
+    .getByRole("radio", { name: "Pessoa Exemplo Beta", exact: true })
+    .check();
   await dialog.getByRole("button", { name: "Salvar agendamento" }).click();
   await expect(dialog.locator("[role=alert]")).toContainText("ocupado");
   await dialog.getByRole("button", { name: "Cancelar", exact: true }).click();

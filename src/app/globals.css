@@ -4086,3 +4086,96 @@ tbody tr:hover {
     gap: 10px;
   }
 }
+.booking-lead-picker {
+  margin: 18px 0;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+.booking-lead-picker legend {
+  font-size: 13px;
+  padding: 0 6px;
+}
+.booking-lead-picker > .form-columns {
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+.booking-lead-search > span {
+  display: flex;
+  position: relative;
+  align-items: center;
+  margin: 5px 0 14px;
+}
+.booking-lead-search svg {
+  position: absolute;
+  left: 10px;
+  color: var(--text-secondary);
+}
+.booking-lead-picker .booking-lead-search input {
+  padding-left: 34px;
+  font-size: 13px;
+}
+.booking-lead-results {
+  max-height: 220px;
+  overflow-y: auto;
+  display: grid;
+  gap: 6px;
+  padding: 4px;
+  margin: 8px 0 12px;
+}
+.booking-lead-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.booking-lead-option:has(input:checked) {
+  background: var(--brand-soft);
+  border-color: var(--brand-accent);
+}
+.booking-lead-picker input[type="radio"] {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+}
+.booking-lead-option strong {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.booking-lead-option small {
+  font-size: 10px;
+  overflow-wrap: anywhere;
+  margin-top: 3px;
+}
+.booking-lead-option > span {
+  min-width: 0;
+}
+.booking-lead-selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface-muted);
+  margin-bottom: 10px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.booking-lead-empty p {
+  font-size: 12px;
+}
+@media (max-width: 600px) {
+  .booking-lead-picker {
+    padding: 10px;
+  }
+  .booking-lead-picker .booking-lead-search input {
+    font-size: 16px;
+  }
+}

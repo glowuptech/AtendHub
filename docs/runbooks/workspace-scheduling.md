@@ -19,3 +19,11 @@ Tudo ainda em memória; recarregar perde dados. O backend deve validar organiza�
 Fuso atual America/Sao_Paulo (-03). Conversão civil usa o regime atual; datas históricas com horário de verão exigem conversor IANA no backend antes de importar dados antigos. O calendário geral de Sistema continua uma página-base e não foi implementado nesta alteração.
 
 Validação: lint, TypeScript e build aprovados; 46 testes unitários e 22 testes E2E da suite completa aprovados. Após refinamentos de apresentação e preferência de duração para semanas novas, o fluxo da agenda foi reexecutado e aprovado. Verificados duração de 37 minutos, intervalo visual de 20 minutos, conflito de reserva, semana sem horários presumidos, persistência na navegação interna, acessibilidade axe e ausência de overflow global no celular. Capturas finais revisadas em `docs/runbooks/screenshots/schedule/`.
+
+## Busca de leads no agendamento
+
+O cadastro agora usa LeadPicker, com busca por nome (ignorando acentos), telefone (incluindo dígitos sem formatação) e e-mail. Filtros: todos, sem agendamento registrado, cadastros nos últimos 7 dias e nos últimos 30 dias. Todos são ordenados pela criação mais recente. O histórico de agendamentos é consultado somente para o cliente atual; “sem agendamento” não significa apenas sem consulta futura. Recentes usa a data de cadastro em America/Sao_Paulo e exclui datas futuras.
+
+São renderizados 25 resultados por vez, com ação de mostrar mais. Os dados ainda são carregados em memória; paginação e busca no servidor serão necessárias ao conectar a persistência. A escolha não muda automaticamente ao pesquisar/filtrar; se ficar fora do resultado, um resumo identifica a seleção mantida e permite limpá-la. O agendamento continua validando o lead e o cliente no serviço central.
+
+Validação da busca: 51 testes unitários aprovados, incluindo pesquisa em 500 contatos e recorte por cliente; E2E do seletor e do agendamento aprovados. Verificados filtros, seleção mantida fora do resultado, busca sem acentos, telefone normalizado, e-mail, mobile sem overflow e auditoria axe. Lint, TypeScript e build aprovados. Captura mobile revisada em `docs/runbooks/screenshots/booking-lead-picker/mobile.png`.

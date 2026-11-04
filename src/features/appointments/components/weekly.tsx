@@ -1,4 +1,5 @@
 "use client";
+import { LeadPicker } from "./lead-picker";
 import { useState, useRef, useEffect } from "react";
 import {
   ChevronLeft,
@@ -402,22 +403,13 @@ function WeeklyWorkspace() {
                 {client.doctors.find((d) => d.id === booking.doctorId)?.name}
               </strong>
             </p>
-            <label>
-              Lead
-              <select
-                value={booking.leadId}
-                onChange={(e) =>
-                  setBooking({ ...booking, leadId: e.target.value })
-                }
-              >
-                <option value="">Selecione um lead deste cliente</option>
-                {repositories.leads.list(clientId).map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <LeadPicker
+              clientId={clientId}
+              leads={repositories.leads.list(clientId)}
+              appointments={all}
+              value={booking.leadId}
+              onChange={(leadId) => setBooking({ ...booking, leadId })}
+            />
             <div className="form-columns">
               <label>
                 Data
