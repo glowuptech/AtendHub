@@ -116,10 +116,11 @@ test("fila, inbox, portal e mensuração são honestamente demonstrativos", asyn
     .click();
   await expect(page.getByRole("status")).toContainText("em memória");
   await page.getByRole("link", { name: "Inbox", exact: true }).click();
+  await page.locator(".inbox-local-preview > summary").click();
   await page.getByRole("button", { name: "Demonstrar resposta" }).click();
-  await expect(page.getByRole("status")).toContainText(
-    "Nenhuma mensagem foi enviada",
-  );
+  await expect(
+    page.locator(".inbox-local-preview [role=status]"),
+  ).toContainText("Nenhuma mensagem foi enviada");
   await page.goto(`/app/clientes/${a}/formularios/${f}/tracking`);
   await expect(
     page.getByText("Nenhum envio externo nesta fase."),

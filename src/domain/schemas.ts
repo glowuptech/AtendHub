@@ -309,6 +309,12 @@ export const AppointmentSchema = z.object({
   attendance: z.enum(["unknown", "present", "absent"]),
 });
 export const ConversationSchema = z.object({
+  photoUrl: z
+    .string()
+    .url()
+    .max(2000)
+    .refine((value) => value.startsWith("https://"), "A foto deve usar HTTPS")
+    .optional(),
   ...scoped,
   leadId: Id,
   name: z.string(),

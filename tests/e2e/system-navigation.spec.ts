@@ -30,9 +30,15 @@ test("sistema, páginas previstas e inbox pessoal de todos os clientes", async (
   await expect(page.locator(".thread header")).toContainText(
     "Clínica Ana Luiza",
   );
+  await page
+    .getByRole("button", { name: "Informações e IA", exact: true })
+    .click();
   await page.getByRole("button", { name: "Abrir lead e campos" }).click();
-  await expect(page.getByRole("dialog")).toContainText("Pessoa Exemplo Beta");
+  await expect(
+    page.getByRole("dialog", { name: "Pessoa Exemplo Beta" }),
+  ).toContainText("Pessoa Exemplo Beta");
   await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Fechar informações e IA" }).click();
   for (const label of ["Calendário", "Tráfego Pago"]) {
     await system.getByRole("link", { name: label, exact: true }).click();
     await expect(

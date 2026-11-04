@@ -6,6 +6,8 @@ import {
   useState,
   useEffect,
   type ReactNode,
+  type Dispatch,
+  type SetStateAction,
 } from "react";
 import { createMockRepositories } from "@/lib/mocks/repositories";
 import { clientA, demoScope } from "@/lib/mocks/fixtures";
@@ -14,6 +16,8 @@ import {
   type BusinessCalendar,
 } from "@/features/queue/calendar";
 interface Context {
+  inboxDrafts: Record<string, string>;
+  setInboxDrafts: Dispatch<SetStateAction<Record<string, string>>>;
   attendant: string;
   inboxLeadId: string;
   setInboxLeadId: (id: string) => void;
@@ -28,6 +32,7 @@ interface Context {
 }
 const DemoContext = createContext<Context | null>(null);
 export function DemoProvider({ children }: { children: ReactNode }) {
+  const [inboxDrafts, setInboxDrafts] = useState<Record<string, string>>({});
   const [inboxLeadId, setInboxLeadId] = useState("");
   const [calendar, setCalendar] = useState<BusinessCalendar>(defaultCalendar);
   const [scope] = useState<ClientScope>(() => structuredClone(demoScope));
@@ -44,6 +49,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   return (
     <DemoContext.Provider
       value={{
+        inboxDrafts,
+        setInboxDrafts,
         attendant: "Operadora",
         inboxLeadId,
         setInboxLeadId,

@@ -16,6 +16,11 @@ export function assignedConversations(
       .filter(
         (conversation) => leads.get(conversation.leadId)?.owner === attendant,
       )
-      .map((conversation) => ({ ...conversation, owner: attendant, client }));
+      .map((conversation) => ({
+        ...conversation,
+        owner: attendant,
+        client,
+        lead: leads.get(conversation.leadId)!,
+      }));
   });
 }

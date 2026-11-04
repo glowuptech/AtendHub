@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "../styles/tokens.css";
+@import "../features/inbox/components/inbox.css";
 @font-face {
   font-family: "Geist";
   src: url("/fonts/geist-latin.woff2") format("woff2");
@@ -761,95 +762,6 @@ tr:last-child td {
 }
 .timeline small {
   margin-top: 3px;
-}
-.inbox {
-  display: grid;
-  grid-template-columns: 230px minmax(260px, 1fr) 255px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--surface-raised);
-  min-height: 640px;
-}
-.conversation-list {
-  border-right: 1px solid var(--border-subtle);
-}
-.conversation-list > h2 {
-  padding: 20px;
-}
-.conversation-list > button {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 20px 15px;
-  border: 0;
-  border-top: 1px solid var(--border-subtle);
-  background: transparent;
-}
-.conversation-list > button.selected {
-  box-shadow: none;
-  background: var(--brand-soft);
-}
-.conversation-list small {
-  font-size: 11px;
-  margin-top: 6px;
-}
-.conversation-list span {
-  font-size: 10px;
-  color: var(--text-secondary);
-}
-.thread {
-  display: flex;
-  flex-direction: column;
-  background: var(--surface-muted);
-}
-.thread > header {
-  padding: 20px;
-  background: var(--surface-raised);
-  border-bottom: 1px solid var(--border-subtle);
-}
-.messages {
-  padding: 24px 18px;
-  flex: 1;
-}
-.bubble {
-  padding: 14px 17px;
-  border-radius: 12px;
-  margin-bottom: 22px;
-  max-width: 90%;
-  font-size: 12px;
-}
-.bubble p {
-  margin: 0 0 9px;
-}
-.bubble small {
-  font-size: 9px;
-}
-.bubble.inbound {
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
-}
-.bubble.outbound {
-  margin-left: auto;
-  background: var(--brand-soft);
-  color: var(--text-primary);
-}
-.bubble.outbound small {
-  color: var(--text-primary);
-}
-.composer {
-  padding: 20px;
-  border-top: 1px solid var(--border-subtle);
-  background: var(--surface-raised);
-  font-size: 11px;
-}
-.conversation-context {
-  padding: 24px 18px;
-  border-left: 1px solid var(--border-subtle);
-  font-size: 12px;
-}
-.conversation-context h2 {
-  margin-bottom: 15px;
 }
 .appointment-row {
   display: flex;
@@ -2745,14 +2657,6 @@ tbody tr:hover {
   .metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .inbox {
-    grid-template-columns: 190px minmax(240px, 1fr);
-  }
-  .conversation-context {
-    grid-column: 1/-1;
-    border-left: 0;
-    border-top: 1px solid var(--border-subtle);
-  }
   .page-heading {
     align-items: flex-start;
   }
@@ -2859,25 +2763,6 @@ tbody tr:hover {
     align-items: flex-start;
     flex-direction: column;
     gap: 12px;
-  }
-  .inbox {
-    display: block;
-  }
-  .conversation-list {
-    border: 0;
-  }
-  .conversation-list > button {
-    padding: 12px 18px;
-  }
-  .conversation-list > h2 {
-    font-size: 16px;
-    padding: 15px;
-  }
-  .conversation-context {
-    border-top: 1px solid var(--border-subtle);
-  }
-  .thread {
-    min-height: 430px;
   }
   .appointment-row {
     gap: 14px;
@@ -3338,8 +3223,7 @@ tbody tr:hover {
 }
 @media (prefers-reduced-motion: no-preference) {
   .sidebar a,
-  .settings-tabs > button,
-  .conversation-list > button {
+  .settings-tabs > button {
     transition:
       background-color 150ms ease,
       color 150ms ease;
