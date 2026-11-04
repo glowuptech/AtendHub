@@ -16,6 +16,10 @@ import {
   type BusinessCalendar,
 } from "@/features/queue/calendar";
 interface Context {
+  teamMembers: import("@/features/team/access").Member[];
+  setTeamMembers: Dispatch<
+    SetStateAction<import("@/features/team/access").Member[]>
+  >;
   inboxDrafts: Record<string, string>;
   setInboxDrafts: Dispatch<SetStateAction<Record<string, string>>>;
   attendant: string;
@@ -32,6 +36,9 @@ interface Context {
 }
 const DemoContext = createContext<Context | null>(null);
 export function DemoProvider({ children }: { children: ReactNode }) {
+  const [teamMembers, setTeamMembers] = useState<
+    import("@/features/team/access").Member[]
+  >([]);
   const [inboxDrafts, setInboxDrafts] = useState<Record<string, string>>({});
   const [inboxLeadId, setInboxLeadId] = useState("");
   const [calendar, setCalendar] = useState<BusinessCalendar>(defaultCalendar);
@@ -49,6 +56,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   return (
     <DemoContext.Provider
       value={{
+        teamMembers,
+        setTeamMembers,
         inboxDrafts,
         setInboxDrafts,
         attendant: "Operadora",

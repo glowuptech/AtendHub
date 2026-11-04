@@ -12,6 +12,7 @@ import {
   Database,
 } from "lucide-react";
 import { Heading, Badge } from "@/components/layout/shared";
+import { TeamPage } from "@/features/team/team";
 import { ServiceCalendar } from "./calendar";
 const tabs = [
   {
@@ -113,7 +114,7 @@ export function SettingsPage() {
             >
               <Icon size={18} aria-hidden="true" />
               <span>{title}</span>
-              {id !== "calendar" && (
+              {id !== "calendar" && id !== "team" && (
                 <span className="settings-soon">Em breve</span>
               )}
             </button>
@@ -128,6 +129,8 @@ export function SettingsPage() {
         >
           {selected === "calendar" ? (
             <ServiceCalendar />
+          ) : selected === "team" ? (
+            <TeamPage />
           ) : (
             <div className="settings-placeholder">
               <active.icon size={30} aria-hidden="true" />
