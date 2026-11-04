@@ -1,6 +1,6 @@
 # Configurações
 
-`/app/configuracoes` usa uma coluna lateral de abas: Geral, Calendário de atendimento, Conexão WhatsApp, Webhooks, Equipe, Comissões, Backup e Banco de dados. Abas têm navegação por teclado (cima/baixo, Home/End), painel identificado e layout adaptável ao celular. Seções futuras exibem estado Em breve sem controles de salvamento ou conexões fictícias.
+`/app/configuracoes` usa uma coluna lateral de abas: Geral, Calendário de atendimento, Conexão WhatsApp, Webhooks, Equipe, Comissões, Central de faturas, Backup e Banco de dados. Abas têm navegação por teclado (cima/baixo, Home/End), painel identificado e layout adaptável ao celular. Seções futuras exibem estado Em breve sem controles de salvamento ou conexões fictícias.
 
 O Calendário de atendimento foi removido da fila e movido para esta página. Usa o mesmo estado compartilhado do provider: expediente, dias da semana e feriados/exceções, fuso America/Sao_Paulo. Salvar valida horários, pelo menos um dia útil e datas de feriados; aplica a política aos prazos abertos. Descartar repõe a última configuração salva. Claims históricos preservam seu snapshot. Trocar de aba descarta rascunhos não salvos.
 

@@ -7,6 +7,7 @@ import {
   Webhook,
   Users,
   Wallet,
+  ReceiptText,
   Archive,
   Database,
 } from "lucide-react";
@@ -48,6 +49,13 @@ const tabs = [
     title: "Comissões",
     icon: Wallet,
     description: "Regras, metas e critérios de comissão da equipe.",
+  },
+  {
+    id: "invoices",
+    title: "Central de faturas",
+    icon: ReceiptText,
+    description:
+      "Faturas e cobranças por cliente: boleto mensal, cartão em até 12x ou antecipado à vista. Emissão e pagamentos serão conectados em uma próxima etapa.",
   },
   {
     id: "backup",

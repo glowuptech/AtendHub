@@ -6,7 +6,7 @@ test("calendário nas configurações persiste na navegação e sai da fila", as
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/app/configuracoes");
   const tabs = page.getByRole("tablist", { name: "Seções de configurações" });
-  await expect(tabs.getByRole("tab")).toHaveCount(8);
+  await expect(tabs.getByRole("tab")).toHaveCount(9);
   await tabs
     .getByRole("tab", { name: "Calendário de atendimento", exact: true })
     .click();

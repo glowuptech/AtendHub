@@ -1,4 +1,6 @@
 "use client";
+import { BillingFields } from "./billing-fields";
+import { BillingSchema, monthlyFeeCents } from "@/domain/billing";
 import { useState } from "react";
 import { Pencil, Save, X, Plus } from "lucide-react";
 import { z } from "zod";
@@ -66,6 +68,12 @@ export function ClientInformation({ client }: { client: Client }) {
           const formData = new FormData(e.currentTarget);
           repositories.clients.update(client.id, {
             ...draft,
+            billing: {
+              ...(draft.billing ?? BillingSchema.parse({})),
+              monthlyFeeCents: monthlyFeeCents(
+                String(formData.get("monthlyFee") ?? ""),
+              ),
+            },
             specialties: list(String(formData.get("specialties") ?? "")),
             doctors: draft.doctors.map((d) => ({
               ...d,
@@ -118,8 +126,8 @@ export function ClientInformation({ client }: { client: Client }) {
       </div>
       {editing && (
         <div className="profile-edit-notice">
-          Use apenas informações . As alterações ficam em memória;
-          nenhum contrato é assinado, renovado ou enviado por esta tela.
+          Use apenas informações . As alterações ficam em memória; nenhum
+          contrato é assinado, renovado ou enviado por esta tela.
         </div>
       )}
       <div className="profile-info-grid">
@@ -361,6 +369,11 @@ export function ClientInformation({ client }: { client: Client }) {
           </small>
         </Card>
       </div>
+      <BillingFields
+        value={c.billing}
+        editing={editing}
+        onChange={(billing) => patch({ billing })}
+      />
       <Card title="Corpo clínico">
         {c.doctors.map((d, i) => (
           <fieldset key={d.id} className="profile-doctor-fields">
@@ -467,7 +480,6 @@ export function ClientInformation({ client }: { client: Client }) {
       <p role="status">{message}</p>
       {editing && (
         <div className="profile-save-bar">
-
           <div className="actions">
             <Button
               type="button"

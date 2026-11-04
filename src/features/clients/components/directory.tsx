@@ -1,4 +1,6 @@
 "use client";
+import { BillingFields } from "./billing-fields";
+import { BillingSchema, monthlyFeeCents } from "@/domain/billing";
 import { useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -152,7 +154,6 @@ export function Clients() {
           <span className="status-dot" />{" "}
           {clients.filter((c) => c.status === "active").length} ativos
         </span>
-
       </div>
       <div className="clinic-filters">
         <div className="clinic-search">
@@ -390,6 +391,8 @@ function CreateClinic({
       { name: string; crm: string; uf: string; specialties: string }[]
     >([]),
     [error, setError] = useState("");
+  const [billing, setBilling] = useState(() => BillingSchema.parse({}));
+  const [billingKey, setBillingKey] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const parseList = (s: string) => [
     ...new Set(
@@ -400,6 +403,8 @@ function CreateClinic({
     ),
   ];
   function reset() {
+    setBilling(BillingSchema.parse({}));
+    setBillingKey((v) => v + 1);
     setName("");
     setCategory("clinic");
     setCnpj("");
@@ -420,6 +425,12 @@ function CreateClinic({
           const client = ClientSchema.parse({
             id: crypto.randomUUID(),
             organizationId: scope.organizationId,
+            billing: {
+              ...billing,
+              monthlyFeeCents: monthlyFeeCents(
+                String(new FormData(e.currentTarget).get("monthlyFee") ?? ""),
+              ),
+            },
             name,
             category,
             cnpj: cnpj ? cnpj.replace(/\D/g, "") : null,
@@ -680,6 +691,12 @@ function CreateClinic({
           {error}
         </p>
       )}
+      <BillingFields
+        key={billingKey}
+        value={billing}
+        editing
+        onChange={setBilling}
+      />
       <footer className="clinic-dialog-footer">
         <Button type="button" variant="outline" onClick={onClose}>
           Cancelar

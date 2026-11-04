@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BillingSchema } from "./billing";
 import { FormSettingsSchema } from "@/features/forms/services/settings";
 z.config(z.locales.pt());
 export const Id = z.string().uuid();
@@ -98,6 +99,7 @@ export const KnowledgeEntrySchema = z
   });
 export type KnowledgeEntry = z.infer<typeof KnowledgeEntrySchema>;
 export const ClientSchema = z.object({
+  billing: BillingSchema.optional(),
   knowledge: z.array(KnowledgeEntrySchema).default([]),
   id: Id,
   organizationId: Id,
