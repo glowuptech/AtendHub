@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useDemo } from "@/components/layout/demo-context";
 import { Heading, Badge, stageLabels } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
-import { CalendarSchema, claimSla, clock, inBusinessTime } from "./calendar";
+import { claimSla, clock, inBusinessTime } from "./calendar";
 const stages = [
   "new",
   "in_progress",
@@ -25,7 +25,6 @@ export function Queue() {
       setClientId,
       setInboxLeadId,
       calendar,
-      setCalendar,
     } = useDemo(),
     router = useRouter();
   const [opened, setOpened] = useState<{ clientId: string; id: string } | null>(
@@ -42,8 +41,7 @@ export function Queue() {
   const [now, setNow] = useState<number | null>(null),
     [message, setMessage] = useState(""),
     [search, setSearch] = useState(""),
-    [filter, setFilter] = useState(""),
-    [draft, setDraft] = useState(calendar);
+    [filter, setFilter] = useState("");
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
@@ -89,91 +87,6 @@ export function Queue() {
           <Badge>Relógio pausado · fora do expediente</Badge>
         )}
       </div>
-      <details className="queue-calendar">
-        <summary>Calendário de atendimento · America/Sao_Paulo</summary>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            const result = CalendarSchema.safeParse({
-              ...draft,
-              holidays: draft.holidays.map((v) => v.trim()).filter(Boolean),
-            });
-            if (!result.success) {
-              setMessage(result.error.issues[0].message);
-              return;
-            }
-            setCalendar(result.data);
-            setMessage(
-              "Calendário atualizado nesta sessão. Prazos abertos serão recalculados.",
-            );
-          }}
-        >
-          <div className="toolbar">
-            <label>
-              Início do expediente
-              <input
-                type="time"
-                value={draft.start}
-                onChange={(e) => setDraft({ ...draft, start: e.target.value })}
-              />
-            </label>
-            <label>
-              Fim do expediente
-              <input
-                type="time"
-                value={draft.end}
-                onChange={(e) => setDraft({ ...draft, end: e.target.value })}
-              />
-            </label>
-          </div>
-          <fieldset>
-            <legend>Dias úteis</legend>
-            {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map(
-              (label, i) => (
-                <label className="queue-day" key={i}>
-                  <input
-                    type="checkbox"
-                    checked={draft.days.includes(i)}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        days: e.target.checked
-                          ? [...draft.days, i]
-                          : draft.days.filter((d) => d !== i),
-                      })
-                    }
-                  />
-                  {label}
-                </label>
-              ),
-            )}
-          </fieldset>
-          <label>
-            Feriados e exceções (AAAA-MM-DD, um por linha)
-            <textarea
-              value={draft.holidays.join("\n")}
-              onChange={(e) =>
-                setDraft({ ...draft, holidays: e.target.value.split("\n") })
-              }
-            />
-          </label>
-          <Button
-            type="submit"
-            onClick={() =>
-              setDraft((d) => ({
-                ...d,
-                holidays: d.holidays.map((v) => v.trim()).filter(Boolean),
-              }))
-            }
-          >
-            Salvar calendário
-          </Button>
-        </form>
-        <p>
-          Expediente inicial: segunda a sexta, 09h às 17h. Cadastre os feriados
-          da operação. A contagem pausa fora desses períodos.
-        </p>
-      </details>
       <p role="status">{message}</p>
       <div
         className="queue-board"
