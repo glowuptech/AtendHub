@@ -29,7 +29,7 @@ export function Leads() {
   return (
     <>
       <Heading
-        title="Cada oportunidade, uma história."
+        title="Leads e CRM"
         description={`${c.name} · CRM administrativo .`}
       />
       <div className="toolbar">

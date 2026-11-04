@@ -21,7 +21,7 @@ import {
 } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
 import {
- DEMO_TODAY,
+  DEMO_TODAY,
   shiftDay,
   partnershipSummary,
   ratio,
@@ -43,7 +43,7 @@ export function Partnership({
     <Card className="partnership-card">
       <div className="section-caption">
         <div>
-          <p className="eyebrow">RELACIONAMENTO COM A PRESCRITA</p>
+          <p className="eyebrow">PARCERIA</p>
           <h2>Parceria e contrato</h2>
         </div>
         <Button variant="outline" size="sm" onClick={onEdit}>
@@ -131,7 +131,7 @@ export function ClientOverview({
   const { repositories } = useDemo();
   const [range, setRange] = useState({
       from: shiftDay(DEMO_TODAY, -29),
-      to:DEMO_TODAY,
+      to: DEMO_TODAY,
     }),
     [draftRange, setDraftRange] = useState(range),
     [doctor, setDoctor] = useState("all"),
@@ -193,7 +193,6 @@ export function ClientOverview({
   ];
   return (
     <>
-      <Partnership client={client} onEdit={onEdit} />
       <div className="section-caption">
         <div>
           <h2>Desempenho da clínica</h2>
@@ -201,7 +200,6 @@ export function ClientOverview({
             Aquisição, atendimento e agendamento no mesmo recorte.
           </p>
         </div>
-
       </div>
       <form
         className="profile-period"
@@ -223,7 +221,7 @@ export function ClientOverview({
               type="button"
               variant={
                 range.from === shiftDay(DEMO_TODAY, 1 - days) &&
-                range.to ===DEMO_TODAY
+                range.to === DEMO_TODAY
                   ? "default"
                   : "outline"
               }
@@ -231,7 +229,7 @@ export function ClientOverview({
               onClick={() => {
                 const next = {
                   from: shiftDay(DEMO_TODAY, 1 - days),
-                  to:DEMO_TODAY,
+                  to: DEMO_TODAY,
                 };
                 setRange(next);
                 setDraftRange(next);
@@ -286,21 +284,23 @@ export function ClientOverview({
         )}
         <small>
           Período aplicado: {dateLabel(range.from)} a {dateLabel(range.to)} ·
-          America/Sao_Paulo · Período internas. Presets relativos a{" "}
-          {dateLabel(DEMO_TODAY)}.
+          America/Sao_Paulo · Referência dos atalhos: {dateLabel(DEMO_TODAY)}.
         </small>
       </form>
-      <div className="client-metrics">
-        {metrics.map((m) => (
-          <Card key={m.title}>
-            <div className="metric-top">
-              <span>{m.title}</span>
-              <m.icon size={18} />
-            </div>
-            <strong className="metric-value">{m.value}</strong>
-            <small>{m.detail}</small>
-          </Card>
-        ))}
+      <div className="client-summary-bento">
+        <div className="client-metrics">
+          {metrics.map((m) => (
+            <Card key={m.title}>
+              <div className="metric-top">
+                <span>{m.title}</span>
+                <m.icon size={18} />
+              </div>
+              <strong className="metric-value">{m.value}</strong>
+              <small>{m.detail}</small>
+            </Card>
+          ))}
+        </div>
+        <Partnership client={client} onEdit={onEdit} />
       </div>
       <div className="profile-dashboard-grid">
         <Card title="Movimento no período">
@@ -451,7 +451,6 @@ export function ClientOverview({
         {!data.forms.length && (
           <Empty title="Nenhum formulário neste recorte" />
         )}
-
       </Card>
       <div className="profile-dashboard-grid">
         <Card title="Leads por estágio">
@@ -494,9 +493,7 @@ export function ClientOverview({
           ))}
           {!data.appointments.length &&
             !data.leads.some((l) => !l.firstResponseAt) && (
-              <p className="muted">
-                Nenhuma pendência neste recorte.
-              </p>
+              <p className="muted">Nenhuma pendência neste recorte.</p>
             )}
           <NavButton href="/app/agendamentos">Ver agendamentos</NavButton>
         </Card>

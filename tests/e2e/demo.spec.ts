@@ -15,7 +15,7 @@ test("dashboard, contexto e isolamento de navegação", async ({ page }) => {
   await page.goto("/app");
   await expect(
     page.getByRole("heading", {
-      name: "O cuidado começa no primeiro contato.",
+      name: "Visão geral",
     }),
   ).toBeVisible();
   await expect(page.getByText("Pessoa Exemplo Alfa")).toBeVisible();

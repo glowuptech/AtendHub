@@ -54,262 +54,271 @@ export function SettingsEditor({
           Formulário ativo
         </label>
       </Card>
-      <Card title="Dados de contato">
-        <label>
-          Posição dos contatos
-          <select
-            value={s.contactPosition}
-            onChange={(e) =>
-              patch({ contactPosition: e.target.value as "start" | "end" })
-            }
-          >
-            <option value="start">Antes das perguntas</option>
-            <option value="end">Depois das perguntas</option>
-          </select>
-        </label>
-        {(["name", "phone", "email"] as const).map((k) => (
-          <div className="contact-config" key={k}>
-            <label>
-              <input
-                type="checkbox"
-                checked={s.contacts[k].enabled}
-                onChange={(e) =>
-                  patch({
-                    contacts: {
-                      ...s.contacts,
-                      [k]: { ...s.contacts[k], enabled: e.target.checked },
-                    },
-                  })
-                }
-              />{" "}
-              {{ name: "Nome", phone: "Telefone", email: "E-mail" }[k]}
-            </label>
-            <label>
-              Rótulo de{" "}
-              {{ name: "nome", phone: "telefone", email: "e-mail" }[k]}
-              <input
-                maxLength={80}
-                value={s.contacts[k].label}
-                onChange={(e) =>
-                  patch({
-                    contacts: {
-                      ...s.contacts,
-                      [k]: { ...s.contacts[k], label: e.target.value },
-                    },
-                  })
-                }
-              />
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                disabled={!s.contacts[k].enabled}
-                checked={s.contacts[k].required}
-                onChange={(e) =>
-                  patch({
-                    contacts: {
-                      ...s.contacts,
-                      [k]: { ...s.contacts[k], required: e.target.checked },
-                    },
-                  })
-                }
-              />{" "}
-              Obrigatório
-            </label>
-          </div>
-        ))}
-        <p className="muted">
-          Com nome e telefone no início, o contato pode ser salvo antes de
-          concluir as perguntas.
-        </p>
-      </Card>
-      <Card title="Identidade do formulário">
-        <div className="profile-info-grid">
-          {(
-            [
-              "primary",
-              "button",
-              "buttonText",
-              "background",
-              "text",
-              "border",
-            ] as const
-          ).map((k) => (
-            <label key={k}>
-              {
-                {
-                  primary: "Cor principal",
-                  button: "Botão",
-                  buttonText: "Texto do botão",
-                  background: "Fundo",
-                  text: "Texto",
-                  border: "Borda",
-                }[k]
-              }
-              <input
-                type="color"
-                value={s.appearance[k]}
-                onChange={(e) =>
-                  patch({
-                    appearance: { ...s.appearance, [k]: e.target.value },
-                  })
-                }
-              />
-            </label>
-          ))}
+      <div id="editor-contacts">
+        <Card title="Dados de contato">
           <label>
-            Fonte
+            Posição dos contatos
             <select
-              value={s.appearance.font}
+              value={s.contactPosition}
               onChange={(e) =>
-                patch({
-                  appearance: {
-                    ...s.appearance,
-                    font: e.target.value as FormSettings["appearance"]["font"],
-                  },
-                })
+                patch({ contactPosition: e.target.value as "start" | "end" })
               }
             >
-              {[
-                "system",
-                "Arial",
-                "Verdana",
-                "Georgia",
-                "Trebuchet MS",
-                "Palatino",
-              ].map((f) => (
-                <option key={f} value={f}>
-                  {f === "system" ? "Sistema (moderna)" : f}
-                </option>
-              ))}
+              <option value="start">Antes das perguntas</option>
+              <option value="end">Depois das perguntas</option>
             </select>
           </label>
+          {(["name", "phone", "email"] as const).map((k) => (
+            <div className="contact-config" key={k}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={s.contacts[k].enabled}
+                  onChange={(e) =>
+                    patch({
+                      contacts: {
+                        ...s.contacts,
+                        [k]: { ...s.contacts[k], enabled: e.target.checked },
+                      },
+                    })
+                  }
+                />{" "}
+                {{ name: "Nome", phone: "Telefone", email: "E-mail" }[k]}
+              </label>
+              <label>
+                Rótulo de{" "}
+                {{ name: "nome", phone: "telefone", email: "e-mail" }[k]}
+                <input
+                  maxLength={80}
+                  value={s.contacts[k].label}
+                  onChange={(e) =>
+                    patch({
+                      contacts: {
+                        ...s.contacts,
+                        [k]: { ...s.contacts[k], label: e.target.value },
+                      },
+                    })
+                  }
+                />
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  disabled={!s.contacts[k].enabled}
+                  checked={s.contacts[k].required}
+                  onChange={(e) =>
+                    patch({
+                      contacts: {
+                        ...s.contacts,
+                        [k]: { ...s.contacts[k], required: e.target.checked },
+                      },
+                    })
+                  }
+                />{" "}
+                Obrigatório
+              </label>
+            </div>
+          ))}
+          <p className="muted">
+            Com nome e telefone no início, o contato pode ser salvo antes de
+            concluir as perguntas.
+          </p>
+        </Card>
+      </div>
+      <div id="editor-appearance">
+        <Card title="Identidade do formulário">
+          <div className="profile-info-grid">
+            {(
+              [
+                "primary",
+                "button",
+                "buttonText",
+                "background",
+                "text",
+                "border",
+              ] as const
+            ).map((k) => (
+              <label key={k}>
+                {
+                  {
+                    primary: "Cor principal",
+                    button: "Botão",
+                    buttonText: "Texto do botão",
+                    background: "Fundo",
+                    text: "Texto",
+                    border: "Borda",
+                  }[k]
+                }
+                <input
+                  type="color"
+                  value={s.appearance[k]}
+                  onChange={(e) =>
+                    patch({
+                      appearance: { ...s.appearance, [k]: e.target.value },
+                    })
+                  }
+                />
+              </label>
+            ))}
+            <label>
+              Fonte
+              <select
+                value={s.appearance.font}
+                onChange={(e) =>
+                  patch({
+                    appearance: {
+                      ...s.appearance,
+                      font: e.target
+                        .value as FormSettings["appearance"]["font"],
+                    },
+                  })
+                }
+              >
+                {[
+                  "system",
+                  "Arial",
+                  "Verdana",
+                  "Georgia",
+                  "Trebuchet MS",
+                  "Palatino",
+                ].map((f) => (
+                  <option key={f} value={f}>
+                    {f === "system" ? "Sistema (moderna)" : f}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Arredondamento dos botões
+              <input
+                type="number"
+                min={0}
+                max={50}
+                value={s.appearance.radius}
+                onChange={(e) =>
+                  patch({
+                    appearance: {
+                      ...s.appearance,
+                      radius: Number(e.target.value),
+                    },
+                  })
+                }
+              />
+            </label>
+            {(["cover", "backgroundImage"] as const).map((k) => (
+              <div key={k}>
+                <label>
+                  {k === "cover" ? "Capa opcional" : "Imagem de fundo opcional"}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(e) => void upload(e.target.files?.[0], k)}
+                  />
+                </label>
+                {s.appearance[k] && (
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={() =>
+                      patch({ appearance: { ...s.appearance, [k]: "" } })
+                    }
+                  >
+                    Remover imagem
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {error && <p role="alert">{error}</p>}
+        </Card>
+      </div>
+      <div id="editor-tracking">
+        <Card title="Meta Pixel e conversões">
           <label>
-            Arredondamento dos botões
+            ID do Meta Pixel (opcional)
             <input
-              type="number"
-              min={0}
-              max={50}
-              value={s.appearance.radius}
+              inputMode="numeric"
+              value={s.tracking.pixelId}
               onChange={(e) =>
                 patch({
-                  appearance: {
-                    ...s.appearance,
-                    radius: Number(e.target.value),
+                  tracking: {
+                    ...s.tracking,
+                    pixelId: e.target.value.replace(/\D/g, "").slice(0, 30),
                   },
                 })
               }
             />
           </label>
-          {(["cover", "backgroundImage"] as const).map((k) => (
-            <div key={k}>
-              <label>
-                {k === "cover" ? "Capa opcional" : "Imagem de fundo opcional"}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={(e) => void upload(e.target.files?.[0], k)}
-                />
-              </label>
-              {s.appearance[k] && (
-                <button
-                  type="button"
-                  className="text-button"
-                  onClick={() =>
-                    patch({ appearance: { ...s.appearance, [k]: "" } })
-                  }
-                >
-                  Remover imagem
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-        {error && <p role="alert">{error}</p>}
-      </Card>
-      <Card title="Meta Pixel e conversões">
-        <label>
-          ID do Meta Pixel (opcional)
-          <input
-            inputMode="numeric"
-            value={s.tracking.pixelId}
-            onChange={(e) =>
-              patch({
-                tracking: {
-                  ...s.tracking,
-                  pixelId: e.target.value.replace(/\D/g, "").slice(0, 30),
-                },
-              })
-            }
-          />
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={s.tracking.pageView}
-            onChange={(e) =>
-              patch({ tracking: { ...s.tracking, pageView: e.target.checked } })
-            }
-          />{" "}
-          Preparar PageView após tempo mínimo
-        </label>
-        <label>
-          Tempo de página visível
-          <select
-            value={s.tracking.viewSeconds}
-            onChange={(e) =>
-              patch({
-                tracking: {
-                  ...s.tracking,
-                  viewSeconds: Number(e.target.value) as 5 | 10,
-                },
-              })
-            }
-          >
-            <option value={5}>5 segundos</option>
-            <option value={10}>10 segundos</option>
-          </select>
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={s.tracking.lead}
-            onChange={(e) =>
-              patch({ tracking: { ...s.tracking, lead: e.target.checked } })
-            }
-          />{" "}
-          Preparar Lead após cadastro aceito
-        </label>
-        <p className="muted">
-          Eventos por botão são configurados nas perguntas. Configuração
-          preparada; nenhum evento é enviado à Meta nesta fase. Cadastro
-          concluído não significa lead qualificado.
-        </p>
-      </Card>
-      <Card title="Cadastros incompletos e notificações">
-        <label>
-          Minutos sem avanço antes de marcar incompleto
-          <input
-            type="number"
-            min={1}
-            max={1440}
-            value={s.tracking.abandonMinutes}
-            onChange={(e) =>
-              patch({
-                tracking: {
-                  ...s.tracking,
-                  abandonMinutes: Number(e.target.value),
-                },
-              })
-            }
-          />
-        </label>
-        <p>
-          Todos os formulários geram eventos de cadastro concluído e incompleto
-          para a fila de notificações. O destino n8n será configurado no
-          servidor.
-        </p>
-      </Card>
+          <label>
+            <input
+              type="checkbox"
+              checked={s.tracking.pageView}
+              onChange={(e) =>
+                patch({
+                  tracking: { ...s.tracking, pageView: e.target.checked },
+                })
+              }
+            />{" "}
+            Preparar PageView após tempo mínimo
+          </label>
+          <label>
+            Tempo de página visível
+            <select
+              value={s.tracking.viewSeconds}
+              onChange={(e) =>
+                patch({
+                  tracking: {
+                    ...s.tracking,
+                    viewSeconds: Number(e.target.value) as 5 | 10,
+                  },
+                })
+              }
+            >
+              <option value={5}>5 segundos</option>
+              <option value={10}>10 segundos</option>
+            </select>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={s.tracking.lead}
+              onChange={(e) =>
+                patch({ tracking: { ...s.tracking, lead: e.target.checked } })
+              }
+            />{" "}
+            Preparar Lead após cadastro aceito
+          </label>
+          <p className="muted">
+            Eventos por botão são configurados nas perguntas. Configuração
+            preparada; nenhum evento é enviado à Meta nesta fase. Cadastro
+            concluído não significa lead qualificado.
+          </p>
+        </Card>
+        <Card title="Cadastros incompletos e notificações">
+          <label>
+            Minutos sem avanço antes de marcar incompleto
+            <input
+              type="number"
+              min={1}
+              max={1440}
+              value={s.tracking.abandonMinutes}
+              onChange={(e) =>
+                patch({
+                  tracking: {
+                    ...s.tracking,
+                    abandonMinutes: Number(e.target.value),
+                  },
+                })
+              }
+            />
+          </label>
+          <p>
+            Todos os formulários geram eventos de cadastro concluído e
+            incompleto para a fila de notificações. O destino n8n será
+            configurado no servidor.
+          </p>
+        </Card>
+      </div>
     </fieldset>
   );
 }

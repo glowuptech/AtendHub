@@ -23,7 +23,7 @@ export function Inbox() {
   return (
     <>
       <Heading
-        title="Conversas que acolhem."
+        title="Inbox"
         description={`${client.name} · atendimento humano, sem conexão WhatsApp.`}
       />
       <div className="toolbar">

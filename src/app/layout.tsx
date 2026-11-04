@@ -3,8 +3,8 @@ import { DemoProvider } from "@/components/layout/demo-context";
 import "./globals.css";
 export const metadata: Metadata = {
   title: {
-    default: "Atend Hub · Gestão de atendimento",
-    template: "%s · Atend Hub",
+    default: "Atend&Hub · Gestão de atendimento",
+    template: "%s · Atend&Hub",
   },
   description: "Gestão de atendimento e relacionamento.",
   robots: { index: false, follow: false },

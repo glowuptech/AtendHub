@@ -207,91 +207,97 @@ export function SystemDashboard() {
         </small>
         {error && <p role="alert">{error}</p>}
       </form>
-      <div className="system-kpis">
-        {[
-          [
-            "Clientes cadastrados",
-            total.clients,
-            `${total.active} ativos · ${total.clients - total.active} pausados`,
-          ],
-          [
-            "Leads recebidos",
-            total.leads,
-            `${total.completed} concluídos · ${total.incomplete} parciais`,
-          ],
-          [
-            "Investimento informado",
-            money(total.coverage ? total.spent : null),
-            `${total.coverage} de ${total.expected} dias/cliente informados`,
-          ],
-          [
-            "Custo por lead geral",
-            money(total.cpl),
-            "Investimento ÷ todos os leads do período",
-          ],
-          [
-            "Conversão em agendamento",
-            pct(total.conversion),
-            `${total.converted} leads com agendamento / ${total.leads} recebidos`,
-          ],
-          [
-            "Custo por lead convertido",
-            money(total.cpa),
-            "Investimento ÷ leads com agendamento",
-          ],
-        ].map(([title, value, detail]) => (
-          <Card key={title} title={String(title)}>
-            <strong className="system-value">{value}</strong>
-            <small>{detail}</small>
-          </Card>
-        ))}
-      </div>
-      <div className="vertical-comparison">
-        {(["healthcare", "legal"] as const).map((v) => {
-          const s = data[v];
-          return (
-            <section className={`vertical-card ${v}`} key={v}>
-              <header>
-                <div>
-                  <small>{v === "healthcare" ? "SAÚDE" : "JURÍDICO"}</small>
-                  <h2>{v === "healthcare" ? "Prescrita" : "Veredite"}</h2>
+      <div className="system-summary-bento">
+        <div className="system-kpis">
+          {[
+            [
+              "Clientes cadastrados",
+              total.clients,
+              `${total.active} ativos · ${total.clients - total.active} pausados`,
+            ],
+            [
+              "Leads recebidos",
+              total.leads,
+              `${total.completed} concluídos · ${total.incomplete} parciais`,
+            ],
+            [
+              "Investimento informado",
+              money(total.coverage ? total.spent : null),
+              `${total.coverage} de ${total.expected} dias/cliente informados`,
+            ],
+            [
+              "Custo por lead geral",
+              money(total.cpl),
+              "Investimento ÷ todos os leads do período",
+            ],
+            [
+              "Conversão em agendamento",
+              pct(total.conversion),
+              `${total.converted} leads com agendamento / ${total.leads} recebidos`,
+            ],
+            [
+              "Custo por lead convertido",
+              money(total.cpa),
+              "Investimento ÷ leads com agendamento",
+            ],
+          ].map(([title, value, detail]) => (
+            <Card key={title} title={String(title)}>
+              <strong
+                className={`system-value ${value === "Não disponível" ? "is-unavailable" : ""}`}
+              >
+                {value}
+              </strong>
+              <small>{detail}</small>
+            </Card>
+          ))}
+        </div>
+        <div className="vertical-comparison">
+          {(["healthcare", "legal"] as const).map((v) => {
+            const s = data[v];
+            return (
+              <section className={`vertical-card ${v}`} key={v}>
+                <header>
+                  <div>
+                    <small>{v === "healthcare" ? "SAÚDE" : "JURÍDICO"}</small>
+                    <h2>{v === "healthcare" ? "Prescrita" : "Veredite"}</h2>
+                  </div>
+                  <Badge>{s.clients} clientes</Badge>
+                </header>
+                <div className="vertical-stats">
+                  <div>
+                    <span>Leads</span>
+                    <strong>{s.leads}</strong>
+                  </div>
+                  <div>
+                    <span>Investimento</span>
+                    <strong>{money(s.coverage ? s.spent : null)}</strong>
+                  </div>
+                  <div>
+                    <span>CPL geral</span>
+                    <strong>{money(s.cpl)}</strong>
+                  </div>
+                  <div>
+                    <span>Conversão</span>
+                    <strong>{pct(s.conversion)}</strong>
+                  </div>
                 </div>
-                <Badge>{s.clients} clientes</Badge>
-              </header>
-              <div className="vertical-stats">
-                <div>
-                  <span>Leads</span>
-                  <strong>{s.leads}</strong>
-                </div>
-                <div>
-                  <span>Investimento</span>
-                  <strong>{money(s.coverage ? s.spent : null)}</strong>
-                </div>
-                <div>
-                  <span>CPL geral</span>
-                  <strong>{money(s.cpl)}</strong>
-                </div>
-                <div>
-                  <span>Conversão</span>
-                  <strong>{pct(s.conversion)}</strong>
-                </div>
-              </div>
-              <p>
-                {v === "healthcare"
-                  ? "Clínicas e contas médicas"
-                  : "Escritórios e contas de advocacia"}{" "}
-                · {s.active} ativos
-              </p>
-              {!s.clients ? (
-                <small>Nenhum cliente desta frente no recorte.</small>
-              ) : !s.complete ? (
-                <small>Complete os investimentos para calcular custos.</small>
-              ) : (
-                <small>Investimento completo para o recorte.</small>
-              )}
-            </section>
-          );
-        })}
+                <p>
+                  {v === "healthcare"
+                    ? "Clínicas e contas médicas"
+                    : "Escritórios e contas de advocacia"}{" "}
+                  · {s.active} ativos
+                </p>
+                {!s.clients ? (
+                  <small>Nenhum cliente desta frente no recorte.</small>
+                ) : !s.complete ? (
+                  <small>Complete os investimentos para calcular custos.</small>
+                ) : (
+                  <small>Investimento completo para o recorte.</small>
+                )}
+              </section>
+            );
+          })}
+        </div>
       </div>
       <section className="system-section">
         <div className="section-caption">

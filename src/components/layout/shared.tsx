@@ -111,3 +111,25 @@ export function dateTime(value: string) {
     timeZone: "America/Sao_Paulo",
   }).format(new Date(value));
 }
+
+export function LoadingState({
+  label = "Carregando o aplicativo…",
+}: {
+  label?: string;
+}) {
+  return (
+    <div className="loading-state" role="status" aria-busy="true">
+      <span className="sr-only">{label}</span>
+      <div className="skeleton skeleton-title" aria-hidden="true" />
+      <div className="metrics" aria-hidden="true">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="card">
+            <div className="skeleton skeleton-label" />
+            <div className="skeleton skeleton-number" />
+          </div>
+        ))}
+      </div>
+      <div className="skeleton skeleton-panel" aria-hidden="true" />
+    </div>
+  );
+}

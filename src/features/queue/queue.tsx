@@ -211,20 +211,22 @@ export function Queue() {
                         </label>
                       </>
                     )}
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        setOpened({ clientId: l.clientId, id: l.id });
-                      }}
-                    >
-                      Abrir lead
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => converse(l.clientId, l.id)}
-                    >
-                      Conversar
-                    </Button>
+                    <div className="queue-card-actions">
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          setOpened({ clientId: l.clientId, id: l.id });
+                        }}
+                      >
+                        Abrir lead
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => converse(l.clientId, l.id)}
+                      >
+                        Conversar
+                      </Button>
+                    </div>
                   </article>
                 );
               })}

@@ -1,7 +1,4 @@
+import { LoadingState } from "@/components/layout/shared";
 export default function Loading() {
-  return (
-    <div className="empty" role="status" aria-busy="true">
-      Carregando o aplicativo…
-    </div>
-  );
+  return <LoadingState />;
 }

@@ -14,6 +14,7 @@ import {
   Badge,
   NavButton,
   Empty,
+  LoadingState,
   stageLabels,
 } from "@/components/layout/shared";
 import { LeadTable } from "@/features/leads/components/lead-table";
@@ -31,21 +32,18 @@ export function Dashboard() {
         (period !== "today" || l.createdAt.startsWith("2026-11-03")) &&
         (stage === "all" || l.stage === stage),
     );
-  const scheduled = leads.filter((l) => ["scheduled","confirmed"].includes(l.stage)).length;
+  const scheduled = leads.filter((l) =>
+    ["scheduled", "confirmed"].includes(l.stage),
+  ).length;
   const metrics = [
-    ["Leads recebidos", leads.length, "contatos  no recorte", Users],
+    ["Leads recebidos", leads.length, "Contatos no período", Users],
     [
       "Aguardando atendimento",
       leads.filter((l) => l.stage === "new").length,
       "leads sem primeiro atendimento",
       Clock3,
     ],
-    [
-      "Agendamentos registrados",
-      scheduled,
-      "leads com espelho ",
-      CalendarCheck,
-    ],
+    ["Agendamentos registrados", scheduled, "Leads agendados", CalendarCheck],
     [
       "Lead → agendamento",
       leads.length ? `${Math.round((scheduled / leads.length) * 100)}%` : "N/D",
@@ -56,7 +54,7 @@ export function Dashboard() {
   return (
     <>
       <Heading
-        title="O cuidado começa no primeiro contato."
+        title="Visão geral"
         description={`${client.name} · acompanhe sua operação em um só lugar.`}
         action={
           <NavButton href="/app/fila">Abrir fila de atendimento</NavButton>
@@ -99,14 +97,12 @@ export function Dashboard() {
         </label>
       </div>
       {state === "loading" ? (
-        <div className="empty" role="status" aria-busy="true">
-          Carregando… estado
-        </div>
+        <LoadingState label="Carregando indicadores…" />
       ) : state === "empty" ? (
         <Empty />
       ) : state === "error" ? (
         <Card>
-          <p role="alert">Falha  ao carregar indicadores.</p>
+          <p role="alert">Falha ao carregar indicadores.</p>
           <Button onClick={() => setState("ready")}>Tentar novamente</Button>
         </Card>
       ) : (
@@ -127,11 +123,9 @@ export function Dashboard() {
               </Card>
             ))}
           </div>
-          <div className="dashboard-grid">
-            <Card title="Da intenção ao agendamento">
-              <div className="section-caption">
-                Funil operacional
-              </div>
+          <div className="dashboard-bento">
+            <Card title="Da intenção ao agendamento" className="bento-funnel">
+              <div className="section-caption">Funil operacional</div>
               {[
                 ["Leads recebidos", leads.length],
                 ["Em atendimento", leads.filter((l) => l.owner).length],
@@ -160,14 +154,21 @@ export function Dashboard() {
                 ou disponibilidade.
               </small>
             </Card>
-            <Card className="attention-card">
+            <Card title="Prioridade de atendimento" className="bento-priority">
+              <div className="priority-value">
+                <Clock3 size={20} />
+                <strong>{leads.filter((l) => !l.owner).length}</strong>
+                <span>leads sem responsável</span>
+              </div>
+              <NavButton href="/app/fila">Acessar fila</NavButton>
+            </Card>
+            <Card className="attention-card bento-attention">
               <div className="section-caption">
                 <h2>Precisa de atenção</h2>
                 <AlertCircle size={20} />
               </div>
               <Badge tone="warning">Conexão não configurada</Badge>
-              <h3>Central de mensagens</h3>
-              <p>Consulte conversas e acompanhe os próximos atendimentos.</p>
+              <p>Consulte o histórico na central de mensagens.</p>
               <NavButton href="/app/inbox">Explorar Inbox</NavButton>
             </Card>
           </div>
