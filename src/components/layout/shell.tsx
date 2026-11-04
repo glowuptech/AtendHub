@@ -69,6 +69,14 @@ export function Shell({
             <p className="nav-label">SISTEMA</p>
             <nav aria-label="Sistema">
               <Link
+                href="/app/sistema"
+                aria-current={pathname === "/app/sistema" ? "page" : undefined}
+                onClick={() => setOpen(false)}
+              >
+                <LayoutDashboard size={18} />
+                Dashboard geral
+              </Link>
+              <Link
                 href="/app/fila"
                 aria-current={pathname === "/app/fila" ? "page" : undefined}
                 onClick={() => setOpen(false)}

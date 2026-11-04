@@ -1,3 +1,4 @@
+import { MemoryInvestments } from "@/features/system-dashboard/service";
 import {
   claimSla,
   defaultCalendar,
@@ -404,9 +405,11 @@ export function createMockRepositories(
       fields,
     );
   const leadRows = structuredClone(fixture.leads);
+  const clients = new MockClientRepository(scope);
   return {
     capture: new MemoryCaptureRepository(scope, forms, fields, leadRows),
-    clients: new MockClientRepository(scope),
+    clients,
+    investments: new MemoryInvestments(clients),
     fields,
     forms,
     leads: new MockLeadRepository(leadRows, scope, fields),

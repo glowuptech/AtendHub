@@ -193,6 +193,7 @@ export interface MarketingEventProvider {
 
 /** UI-facing query/cache facade. C2 adapters load authenticated DTOs asynchronously. */
 export interface RepositoryRegistry {
+  investments: import("@/features/system-dashboard/service").InvestmentRepository;
   capture: import("@/features/forms/services/capture").CaptureRepository;
   clients: ClientRepository;
   fields: FieldRepository;
