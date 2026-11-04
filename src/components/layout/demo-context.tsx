@@ -14,6 +14,7 @@ import {
   type BusinessCalendar,
 } from "@/features/queue/calendar";
 interface Context {
+  attendant: string;
   inboxLeadId: string;
   setInboxLeadId: (id: string) => void;
   calendar: BusinessCalendar;
@@ -43,6 +44,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   return (
     <DemoContext.Provider
       value={{
+        attendant: "Operadora",
         inboxLeadId,
         setInboxLeadId,
         calendar,

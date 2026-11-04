@@ -15,6 +15,7 @@ import {
   PanelLeftOpen,
   X,
   Layers2,
+  Megaphone,
 } from "lucide-react";
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import { useDemo } from "./demo-context";
@@ -83,13 +84,20 @@ export function Shell({
       ] as const)
     : ([
         ["/app", "Visão geral", LayoutDashboard],
-        ["/app/clientes", "Clínicas", Building2],
         ["/app/leads", "Leads e CRM", Users],
-        ["/app/inbox", "Inbox", MessagesSquare],
         ["/app/agendamentos", "Agendamentos", CalendarDays],
         [`/app/clientes/${clientId}/formularios`, "Formulários", FileText],
-        ["/app/configuracoes", "Configurações", Settings],
       ] as const);
+  const systemLinks = [
+    ["/app/sistema", "Dashboard geral", LayoutDashboard],
+    ["/app/fila", "Fila de atendimento", ListTodo],
+    ["/app/clientes", "Clientes", Building2],
+    ["/app/inbox", "Inbox", MessagesSquare],
+    ["/app/calendario", "Calendário", CalendarDays],
+    ["/app/trafego-pago", "Tráfego Pago", Megaphone],
+    ["/app/configuracoes", "Configurações", Settings],
+  ] as const;
+  const systemPage = !portal && systemLinks.find(([href]) => pathname === href);
   return (
     <div className={`shell ${collapsed ? "is-collapsed" : ""}`}>
       <a className="skip-link" href="#main">
@@ -147,24 +155,18 @@ export function Shell({
           <>
             <p className="nav-label">SISTEMA</p>
             <nav aria-label="Sistema">
-              <Link
-                title="Dashboard geral"
-                href="/app/sistema"
-                aria-current={pathname === "/app/sistema" ? "page" : undefined}
-                onClick={() => setOpen(false)}
-              >
-                <LayoutDashboard size={18} />
-                <span>Dashboard geral</span>
-              </Link>
-              <Link
-                title="Fila de atendimento"
-                href="/app/fila"
-                aria-current={pathname === "/app/fila" ? "page" : undefined}
-                onClick={() => setOpen(false)}
-              >
-                <ListTodo size={18} />
-                <span>Fila de atendimento</span>
-              </Link>
+              {systemLinks.map(([href, label, Icon]) => (
+                <Link
+                  key={href}
+                  href={href}
+                  title={label}
+                  aria-current={pathname === href ? "page" : undefined}
+                  onClick={() => setOpen(false)}
+                >
+                  <Icon size={18} />
+                  <span>{label}</span>
+                </Link>
+              ))}
             </nav>
           </>
         )}
@@ -230,20 +232,17 @@ export function Shell({
           </button>
           <div className="context-label">
             <span className="context-parent">
-              {portal
-                ? "Portal"
-                : pathname === "/app/fila" || pathname === "/app/sistema"
-                  ? "Sistema"
-                  : "Workspace"}
+              {portal ? "Portal" : systemPage ? "Sistema" : "Workspace"}
             </span>
             <span aria-hidden="true">/</span>
             <span>
               {portal
                 ? "Clínica"
-                : pathname === "/app/fila"
-                  ? "Fila de atendimento"
-                  : pathname === "/app/sistema"
-                    ? "Dashboard geral"
+                : systemPage
+                  ? systemPage[1]
+                  : pathname.startsWith("/app/clientes/") &&
+                      !pathname.includes("formularios")
+                    ? "Perfil do cliente"
                     : (links.find(
                         ([href]) =>
                           href !== "/app" && pathname.startsWith(href),
@@ -251,34 +250,44 @@ export function Shell({
             </span>
           </div>
           <div className="topbar-controls">
-            <label className="sr-only" htmlFor="clinic">
-              Clínica em contexto
-            </label>
-            <select
-              id="clinic"
-              value={clientId}
-              onChange={(e) => {
-                const id = e.target.value;
-                setClientId(id);
-                if (pathname.includes("/clientes/"))
-                  router.push(`/app/clientes/${id}`);
-                else if (pathname.includes("/leads/"))
-                  router.push("/app/leads");
-              }}
-            >
-              {clinics.map((c) => (
-                <option value={c.id} key={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <label className="sr-only" htmlFor="vertical">
-              Vertical
-            </label>
-            <select id="vertical" defaultValue="healthcare">
-              <option value="healthcare">Saúde · Prescrita</option>
-              <option disabled>Jurídico · Veredite</option>
-            </select>
+            {systemPage ? (
+              <span className="badge badge-neutral">
+                {pathname === "/app/inbox"
+                  ? "Meus atendimentos · todos os clientes"
+                  : "Todos os clientes"}
+              </span>
+            ) : (
+              <>
+                <label className="sr-only" htmlFor="clinic">
+                  Clínica em contexto
+                </label>
+                <select
+                  id="clinic"
+                  value={clientId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setClientId(id);
+                    if (pathname.includes("/clientes/"))
+                      router.push(`/app/clientes/${id}`);
+                    else if (pathname.includes("/leads/"))
+                      router.push("/app/leads");
+                  }}
+                >
+                  {clinics.map((c) => (
+                    <option value={c.id} key={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <label className="sr-only" htmlFor="vertical">
+                  Vertical
+                </label>
+                <select id="vertical" defaultValue="healthcare">
+                  <option value="healthcare">Saúde · Prescrita</option>
+                  <option disabled>Jurídico · Veredite</option>
+                </select>
+              </>
+            )}
             <details className="account-menu">
               <summary aria-label="Perfil da sessão">
                 <span className="avatar">OD</span>

@@ -19,7 +19,7 @@ export function ClientProfile({ id }: { id: string }) {
   return (
     <>
       <Heading
-        eyebrow="CLÍNICAS / PERFIL OPERACIONAL"
+        eyebrow="CLIENTES / PERFIL OPERACIONAL"
         title={c.name}
         description="Informações administrativas  · sem dados clínicos."
       />

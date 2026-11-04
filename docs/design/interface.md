@@ -37,3 +37,13 @@ Dados continuam em memória. Não foram criados banco de dados, autenticação, 
 `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` e Playwright com Chromium do ambiente. `tests/e2e/redesign.spec.ts` valida menu recolhido/mobile, teclado, auditoria axe e largura nas principais rotas a 1440, 768 e 390 px. Capturas são geradas em `test-results/redesign-*.png`; seleções ficam em `docs/runbooks/screenshots/redesign/`.
 
 Resultado em 04/11/2026: lint sem avisos, TypeScript e build aprovados, 33 testes unitários e 15 testes E2E aprovados. Auditoria axe nas 12 telas principais e navegação recolhida sem violações WCAG A/AA detectadas; overflow verificado a 1440, 768 e 390 px. Revisão visual das capturas de dashboard, perfil, fila e editor realizada. A validação automatizada usou Chromium; outros navegadores e aparelhos físicos não foram exercitados.
+
+## Organização por alcance
+
+Sistema: Dashboard geral, Fila de atendimento, Clientes, Inbox, Calendário, Tráfego Pago e Configurações (por último). Workspace: Visão geral, Leads e CRM, Agendamentos e Formulários. A lista de clientes é global; o perfil aberto é contextual. Os seletores de cliente/operação aparecem somente no Workspace, preservando a última seleção ao navegar pelo Sistema.
+
+Calendário e Tráfego Pago são páginas-base. O calendário semanal depende da referência futura; Tráfego Pago remete ao dashboard para os investimentos existentes. Criar cliente mantém o cadastro médico atual e apresenta advogado como opção futura desativada.
+
+O Inbox agrega apenas os clientes permitidos no escopo e filtra pela atribuição atual do lead, não pelo snapshot antigo da conversa. A sessão em memória representa “Operadora”; isto não substitui autenticação nem autorização no servidor. A abertura do lead usa o cliente da conversa selecionada. A fila orienta assumir o atendimento antes de abrir a conversa pessoal.
+
+Validação da reorganização: 34 testes unitários e 16 E2E aprovados, lint, TypeScript e build aprovados. O teste `system-navigation.spec.ts` cobre a ordem do menu, páginas-base, manutenção do cliente selecionado e Inbox com conversas de diferentes clientes; `assigned-inbox.test.ts` cobre atribuições de outra atendente, contatos sem responsável e escopo de clientes.

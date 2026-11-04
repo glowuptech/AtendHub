@@ -137,12 +137,12 @@ export function Clients() {
     <>
       <Heading
         eyebrow="CARTEIRA DE CLIENTES"
-        title="Clínicas e profissionais"
+        title="Clientes"
         description="Informações essenciais e atalhos para o atendimento, em um só lugar."
         action={
           <Button onClick={() => dialog.current?.showModal()}>
             <Plus size={17} />
-            Criar clínica
+            Criar cliente
           </Button>
         }
       />
@@ -159,7 +159,7 @@ export function Clients() {
         <div className="clinic-search">
           <Search size={18} />
           <label className="sr-only" htmlFor="clinic-search">
-            Buscar clínica ou profissional
+            Buscar cliente ou profissional
           </label>
           <input
             id="clinic-search"
@@ -348,7 +348,7 @@ export function Clients() {
       </div>
       {!list.length && (
         <Empty
-          title="Nenhuma clínica encontrada"
+          title="Nenhum cliente encontrado"
           description="Tente outro nome ou ajuste os filtros da sua busca."
         />
       )}
@@ -467,7 +467,7 @@ function CreateClinic({
       <header className="section-caption">
         <div>
           <p className="eyebrow">NOVO CADASTRO</p>
-          <h2 id="create-clinic-title">Criar clínica</h2>
+          <h2 id="create-clinic-title">Criar cliente</h2>
         </div>
         <Button
           type="button"
@@ -479,6 +479,15 @@ function CreateClinic({
         </Button>
       </header>
 
+      <label>
+        Tipo de cliente
+        <select defaultValue="healthcare">
+          <option value="healthcare">Médico / Clínica · Prescrita</option>
+          <option value="legal" disabled>
+            Advogado · Veredite (em breve)
+          </option>
+        </select>
+      </label>
       <div className="clinic-upload">
         <ClinicLogo client={{ name: name || "Novo cadastro", logo }} />
         <label>
@@ -701,7 +710,7 @@ function CreateClinic({
         <Button type="button" variant="outline" onClick={onClose}>
           Cancelar
         </Button>
-        <Button type="submit">Criar clínica</Button>
+        <Button type="submit">Criar cliente</Button>
       </footer>
     </form>
   );

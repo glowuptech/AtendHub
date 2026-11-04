@@ -30,7 +30,7 @@ test("diretório: copiar dados, filtrar, criar e abrir perfil", async ({
       exact: true,
     }),
   ).toBeDisabled();
-  await page.getByLabel("Buscar clínica ou profissional").fill("obstetricia");
+  await page.getByLabel("Buscar cliente ou profissional").fill("obstetricia");
   await expect(
     page.getByRole("heading", {
       name: "Clínica Horizonte",
@@ -63,10 +63,10 @@ test("diretório: copiar dados, filtrar, criar e abrir perfil", async ({
     fullPage: true,
   });
   await page
-    .getByRole("button", { name: "Criar clínica", exact: true })
+    .getByRole("button", { name: "Criar cliente", exact: true })
     .click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("button", { name: "Criar clínica" }).click();
+  await dialog.getByRole("button", { name: "Criar cliente" }).click();
   await expect(dialog.getByRole("alert")).toBeVisible();
   await dialog
     .getByLabel("Nome da clínica ou profissional")
@@ -90,7 +90,7 @@ test("diretório: copiar dados, filtrar, criar e abrir perfil", async ({
   await expect(
     dialog.getByRole("button", { name: "Remover", exact: true }),
   ).toBeVisible();
-  await dialog.getByRole("button", { name: "Criar clínica" }).click();
+  await dialog.getByRole("button", { name: "Criar cliente" }).click();
   await expect(dialog).not.toBeVisible();
   const card = page.locator(".clinic-directory-card").filter({
     has: page.getByRole("heading", {
@@ -103,7 +103,7 @@ test("diretório: copiar dados, filtrar, criar e abrir perfil", async ({
   await expect(
     page.getByRole("heading", { name: "Clínica Teste DEMO", exact: true }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Clínicas", exact: true }).click();
+  await page.getByRole("link", { name: "Clientes", exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
@@ -116,7 +116,7 @@ test("diretório: copiar dados, filtrar, criar e abrir perfil", async ({
     fullPage: true,
   });
   await page
-    .getByRole("button", { name: "Criar clínica", exact: true })
+    .getByRole("button", { name: "Criar cliente", exact: true })
     .click();
   await page.keyboard.press("Escape");
   await expect(dialog).not.toBeVisible();

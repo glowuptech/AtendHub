@@ -14,9 +14,7 @@ test("fila geral agrega clientes, atribui e move preservando contexto", async ({
   await expect(
     page.getByRole("heading", { name: "Pessoa Exemplo Delta" }),
   ).toBeVisible();
-  await page
-    .getByLabel("Clínica em contexto")
-    .selectOption("00000000-0000-4000-8000-000000000020");
+  await expect(page.getByLabel("Clínica em contexto")).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Pessoa Exemplo Alfa" }),
   ).toBeVisible();

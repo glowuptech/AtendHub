@@ -20,6 +20,7 @@ const stages = [
 export function Queue() {
   const {
       scope,
+      attendant,
       repositories,
       refresh,
       setClientId,
@@ -32,6 +33,14 @@ export function Queue() {
   );
   function converse(clientId: string, id: string) {
     const lead = repositories.leads.get(clientId, id);
+    if (lead.owner !== attendant) {
+      setMessage(
+        lead.owner
+          ? "Este atendimento está atribuído a outra pessoa."
+          : "Assuma o atendimento para abrir a conversa no seu Inbox.",
+      );
+      return;
+    }
     repositories.inbox.ensure(clientId, lead);
     setClientId(clientId);
     setInboxLeadId(id);

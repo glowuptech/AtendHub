@@ -1,44 +1,56 @@
 "use client";
+import { assignedConversations } from "../services/assigned";
 import { LeadModal } from "@/features/queue/lead-modal";
 import { useState } from "react";
 import { useDemo } from "@/components/layout/demo-context";
 import { Heading, Badge, Empty, dateTime } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
 export function Inbox() {
-  const { repositories, clientId, inboxLeadId } = useDemo();
-  const [openedLead, setOpenedLead] = useState<string | null>(null);
+  const { repositories, scope, attendant, inboxLeadId } = useDemo();
+  const [openedLead, setOpenedLead] = useState<{
+    id: string;
+    clientId: string;
+  } | null>(null);
   const [selected, setSelected] = useState(""),
-    [owner, setOwner] = useState("all"),
+    [filter, setFilter] = useState("all"),
     [notice, setNotice] = useState("");
-  const conversations = repositories.inbox
-    .list(clientId)
-    .filter(
-      (c) => owner === "all" || (owner === "unassigned" ? !c.owner : !!c.owner),
-    );
+  const clients = repositories.clients.list(scope);
+  const conversations = assignedConversations(
+    repositories,
+    scope,
+    attendant,
+  ).filter((c) => filter === "all" || c.clientId === filter);
   const conversation =
     conversations.find((c) => c.id === selected) ??
     conversations.find((c) => c.leadId === inboxLeadId) ??
     conversations[0];
-  const client = repositories.clients.get(clientId);
+  const client = conversation?.client;
   return (
     <>
       <Heading
         title="Inbox"
-        description={`${client.name} · atendimento humano, sem conexão WhatsApp.`}
+        eyebrow="SISTEMA"
+        description="Seus atendimentos de todos os clientes e operações."
       />
       <div className="toolbar">
         <label>
-          Responsável
-          <select value={owner} onChange={(e) => setOwner(e.target.value)}>
-            <option value="all">Todos</option>
-            <option value="assigned">Operadora</option>
-            <option value="unassigned">Não atribuído</option>
+          Filtrar cliente
+          <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <option value="all">Todos os clientes</option>
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
           </select>
         </label>
         <Badge tone="warning">Canal desconectado · simulação</Badge>
       </div>
-      {!conversation ? (
-        <Empty />
+      {!conversation || !client ? (
+        <Empty
+          title="Nenhum atendimento atribuído"
+          description="Assuma um lead na fila de atendimento para encontrá-lo no seu Inbox."
+        />
       ) : (
         <div className="inbox">
           <section className="conversation-list" aria-label="Conversas">
@@ -55,6 +67,12 @@ export function Inbox() {
                 }}
               >
                 <strong>{c.name}</strong>
+                <small>
+                  {c.client.name} ·{" "}
+                  {c.client.vertical === "healthcare"
+                    ? "Prescrita"
+                    : "Veredite"}
+                </small>
                 <small>
                   {c.messages.at(-1)?.body || "Sem mensagens ainda"}
                 </small>
@@ -93,13 +111,22 @@ export function Inbox() {
             </div>
           </section>
           <aside className="conversation-context">
-            <span className="eyebrow">CONTEXTO DA CLÍNICA</span>
+            <span className="eyebrow">CONTEXTO DO CLIENTE</span>
             <h2>{client.name}</h2>
-            <Badge>Saúde</Badge>
+            <Badge>
+              {client.vertical === "healthcare"
+                ? "Prescrita · Saúde"
+                : "Veredite · Jurídico"}
+            </Badge>
             <p>Responsável: {conversation.owner ?? "Não atribuído"}</p>
             <Button
               variant="outline"
-              onClick={() => setOpenedLead(conversation.leadId)}
+              onClick={() =>
+                setOpenedLead({
+                  id: conversation.leadId,
+                  clientId: conversation.clientId,
+                })
+              }
             >
               Abrir lead e campos
             </Button>
@@ -121,8 +148,8 @@ export function Inbox() {
       )}
       {openedLead && (
         <LeadModal
-          clientId={clientId}
-          id={openedLead}
+          clientId={openedLead.clientId}
+          id={openedLead.id}
           onClose={() => setOpenedLead(null)}
           onConverse={() => setOpenedLead(null)}
         />
