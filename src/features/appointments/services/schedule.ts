@@ -212,6 +212,7 @@ export class MemorySchedule {
       notes: b.notes,
       source: "Registro manual",
       attendance: "unknown",
+      status: "awaiting_confirmation",
     });
     const event: AppointmentEvent = {
       id: crypto.randomUUID(),

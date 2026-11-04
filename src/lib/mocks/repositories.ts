@@ -359,6 +359,17 @@ export class MockAppointmentRepository
   extends ScopedMockRepository<AppointmentMirror>
   implements AppointmentRepository
 {
+  setStatus(
+    clientId: string,
+    id: string,
+    status: NonNullable<AppointmentMirror["status"]>,
+  ) {
+    if (
+      !["awaiting_confirmation", "confirmed", "rescheduling"].includes(status)
+    )
+      throw Error("Status inválido.");
+    this.row(clientId, id).status = status;
+  }
   setAttendance(
     clientId: string,
     id: string,

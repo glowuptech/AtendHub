@@ -301,6 +301,9 @@ export const LeadSchema = z.object({
   ),
 });
 export const AppointmentSchema = z.object({
+  status: z
+    .enum(["awaiting_confirmation", "confirmed", "rescheduling"])
+    .optional(),
   doctorId: Id.nullable().optional(),
   endsAt: z.string().datetime().optional(),
   notes: z.string().max(1000).optional(),

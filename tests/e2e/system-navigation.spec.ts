@@ -44,7 +44,14 @@ test("sistema, páginas previstas e inbox pessoal de todos os clientes", async (
     await expect(
       page.getByRole("heading", { level: 1, name: label }),
     ).toBeVisible();
-    await expect(page.getByText("Em breve", { exact: true })).toBeVisible();
+    if (label === "Tráfego Pago")
+      await expect(page.getByText("Em breve", { exact: true })).toBeVisible();
+    else
+      await expect(
+        page.getByLabel("Calendário semanal de todos os clientes", {
+          exact: true,
+        }),
+      ).toBeVisible();
     expect(
       (
         await new AxeBuilder({ page })

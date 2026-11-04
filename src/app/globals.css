@@ -3872,3 +3872,217 @@ tbody tr:hover {
   flex: 1;
   width: 100%;
 }
+.system-calendar-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.system-calendar-toolbar > div {
+  text-align: center;
+  font-size: 16px;
+}
+.system-calendar-toolbar small {
+  font-size: 11px;
+  margin-top: 5px;
+}
+.system-calendar-filters {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  padding: 16px;
+  background: white;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+}
+.system-calendar-filters > label {
+  flex: 1;
+  min-width: 150px;
+}
+.system-calendar-filters label > input,
+.system-calendar-filters label > select {
+  width: 100%;
+  margin-bottom: 0;
+}
+.system-calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 18px 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.system-calendar-legend [data-operation="healthcare"] {
+  color: var(--prescrita);
+}
+.system-calendar-legend [data-operation="legal"] {
+  color: var(--veredite);
+}
+.system-calendar-scroll {
+  overflow-x: auto;
+  padding: 3px 2px 16px;
+}
+.system-calendar-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(155px, 1fr));
+  gap: 12px;
+  min-width: 1160px;
+  align-items: stretch;
+}
+.system-calendar-day {
+  border: 1px solid var(--border-subtle);
+  background: white;
+  border-radius: 14px;
+  min-height: 430px;
+  padding: 14px 10px;
+  min-width: 0;
+  box-shadow: var(--shadow-soft);
+}
+.system-calendar-day[data-today="true"] {
+  border: 2px solid var(--brand-accent);
+  padding: 13px 9px;
+}
+.system-calendar-day > header {
+  min-height: 112px;
+  padding: 0 3px 12px;
+  position: relative;
+}
+.system-calendar-day > header > span {
+  font-size: 12px;
+  text-transform: capitalize;
+}
+.system-calendar-day > header > strong {
+  display: block;
+  font-size: 25px;
+  line-height: 1.3;
+  margin-top: 3px;
+}
+.system-calendar-day[data-today="true"] > header > span,
+.system-calendar-day[data-today="true"] > header > strong {
+  color: var(--brand-primary);
+}
+.system-calendar-day > header > p {
+  font-size: 11px;
+  margin: 18px 0 0;
+  color: var(--text-secondary);
+}
+.system-calendar-today {
+  color: var(--brand-primary);
+  font-size: 10px;
+  position: absolute;
+  top: 33px;
+  right: 5px;
+}
+.system-calendar-cards {
+  display: grid;
+  gap: 10px;
+}
+.system-appointment-card {
+  --operation: var(--prescrita);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  text-align: left;
+  background: var(--prescrita-soft);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--operation);
+  border-radius: 7px;
+  padding: 10px 8px;
+  min-width: 0;
+}
+.system-appointment-card[data-operation="legal"] {
+  --operation: var(--veredite);
+  background: var(--veredite-soft);
+}
+.system-appointment-card:hover {
+  border-color: var(--operation);
+}
+.system-appointment-card > strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.system-appointment-card > small {
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.system-appointment-time {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+}
+.system-appointment-client {
+  font-size: 11px;
+  font-weight: 550;
+  color: var(--operation);
+  overflow-wrap: anywhere;
+}
+.system-appointment-operation {
+  font-size: 10px;
+  color: var(--operation);
+}
+.system-appointment-card .badge {
+  font-size: 10px;
+  align-self: flex-start;
+}
+.system-calendar-empty {
+  padding: 24px 5px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+.system-calendar-empty > svg {
+  margin: auto;
+  color: var(--border-control);
+}
+.system-calendar-empty p {
+  font-size: 11px;
+}
+.system-calendar-note {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.schedule-day-heading[data-today="true"] > strong {
+  color: var(--brand-primary);
+}
+.schedule-today-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  margin-top: 3px;
+}
+.schedule-grid {
+  position: relative;
+}
+.schedule-grid[data-has-today="true"]::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(70px + ((100% - 106px) / 7 + 6px) * var(--today-index));
+  width: calc((100% - 106px) / 7);
+  border: 2px solid var(--brand-accent);
+  border-radius: 9px;
+  pointer-events: none;
+  z-index: 2;
+}
+@media (max-width: 600px) {
+  .system-calendar-toolbar {
+    flex-wrap: wrap;
+  }
+  .system-calendar-toolbar > div {
+    order: -1;
+    width: 100%;
+  }
+  .system-calendar-filters {
+    padding: 12px;
+  }
+  .system-calendar-filters > label {
+    min-width: 120px;
+  }
+  .system-calendar-week {
+    gap: 10px;
+  }
+}

@@ -277,11 +277,35 @@ function WeeklyWorkspace() {
             tabIndex={0}
             aria-label="Agenda semanal do profissional"
           >
-            <div className="schedule-grid">
+            <div
+              className="schedule-grid"
+              data-has-today={days.includes(localDay(new Date().toISOString()))}
+              style={
+                {
+                  "--today-index": days.indexOf(
+                    localDay(new Date().toISOString()),
+                  ),
+                } as React.CSSProperties
+              }
+            >
               <div className="schedule-hour-heading">Horário</div>
               {days.map((day) => (
-                <div className="schedule-day-heading" key={day}>
-                  <strong>{shortDay(day)}</strong>
+                <div
+                  className="schedule-day-heading"
+                  key={day}
+                  data-today={day === localDay(new Date().toISOString())}
+                  aria-current={
+                    day === localDay(new Date().toISOString())
+                      ? "date"
+                      : undefined
+                  }
+                >
+                  <strong>
+                    {shortDay(day)}
+                    {day === localDay(new Date().toISOString()) && (
+                      <span className="schedule-today-label">Hoje</span>
+                    )}
+                  </strong>
                   <small>
                     {
                       appointments.filter(
@@ -551,7 +575,11 @@ function ScheduleRow({
           free = slots.has(`${day}T${time}`);
         if (booked.length)
           return (
-            <div className="schedule-cell" key={day}>
+            <div
+              className="schedule-cell"
+              key={day}
+              data-today={day === localDay(new Date().toISOString())}
+            >
               {booked.map((a) => (
                 <button
                   key={a.id}
@@ -579,6 +607,7 @@ function ScheduleRow({
           <button
             key={day}
             className="schedule-slot"
+            data-today={day === localDay(new Date().toISOString())}
             data-state={free ? "free" : "blocked"}
             disabled={!free}
             aria-label={`${shortDay(day)} ${time} ${free ? "Disponível" : "Indisponível"}`}
@@ -592,7 +621,7 @@ function ScheduleRow({
     </>
   );
 }
-function ScheduleDialog({
+export function ScheduleDialog({
   title,
   onClose,
   children,

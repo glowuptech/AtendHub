@@ -168,6 +168,11 @@ export interface InboxRepository extends ScopedRepository<Conversation> {
   ensure(clientId: string, lead: Lead): string;
 }
 export interface AppointmentRepository extends ScopedRepository<AppointmentMirror> {
+  setStatus(
+    clientId: string,
+    id: string,
+    status: NonNullable<AppointmentMirror["status"]>,
+  ): void;
   setAttendance(
     clientId: string,
     id: string,
