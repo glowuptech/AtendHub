@@ -3520,3 +3520,71 @@ tbody tr:hover {
     font-size: 16px;
   }
 }
+.webhook-destination {
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 18px;
+  margin: 24px 0;
+}
+.webhook-destination legend {
+  padding: 0 8px;
+  font-size: 14px;
+}
+.webhook-caption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.webhook-caption > svg {
+  color: var(--brand-primary);
+}
+.webhook-destination p {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.webhook-destination input {
+  width: 100%;
+  margin-top: 6px;
+}
+.webhook-destination .field-error {
+  color: var(--error);
+}
+.webhook-events {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.webhook-events code {
+  font-size: 10px;
+  padding: 3px 6px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  overflow-wrap: anywhere;
+}
+.webhook-help {
+  font-size: 12px;
+}
+.webhook-save {
+  position: sticky;
+  bottom: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: white;
+  padding: 12px;
+}
+@media (max-width: 600px) {
+  .webhook-destination {
+    padding: 12px;
+  }
+  .webhook-destination input {
+    font-size: 16px;
+  }
+  .webhook-save .button {
+    white-space: normal;
+  }
+}

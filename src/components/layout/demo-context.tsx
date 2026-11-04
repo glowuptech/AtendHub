@@ -1,4 +1,8 @@
 "use client";
+import {
+  emptyWebhookConfig,
+  type WebhookConfig,
+} from "@/features/webhooks/config";
 import type { RepositoryRegistry, ClientScope } from "@/domain/contracts";
 import {
   createContext,
@@ -16,6 +20,8 @@ import {
   type BusinessCalendar,
 } from "@/features/queue/calendar";
 interface Context {
+  webhookConfig: WebhookConfig;
+  setWebhookConfig: Dispatch<SetStateAction<WebhookConfig>>;
   teamMembers: import("@/features/team/access").Member[];
   setTeamMembers: Dispatch<
     SetStateAction<import("@/features/team/access").Member[]>
@@ -36,6 +42,8 @@ interface Context {
 }
 const DemoContext = createContext<Context | null>(null);
 export function DemoProvider({ children }: { children: ReactNode }) {
+  const [webhookConfig, setWebhookConfig] =
+    useState<WebhookConfig>(emptyWebhookConfig);
   const [teamMembers, setTeamMembers] = useState<
     import("@/features/team/access").Member[]
   >([]);
@@ -56,6 +64,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   return (
     <DemoContext.Provider
       value={{
+        webhookConfig,
+        setWebhookConfig,
         teamMembers,
         setTeamMembers,
         inboxDrafts,

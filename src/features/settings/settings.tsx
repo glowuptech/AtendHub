@@ -12,6 +12,7 @@ import {
   Database,
 } from "lucide-react";
 import { Heading, Badge } from "@/components/layout/shared";
+import { WebhookSettings } from "@/features/webhooks/settings";
 import { TeamPage } from "@/features/team/team";
 import { ServiceCalendar } from "./calendar";
 const tabs = [
@@ -114,7 +115,7 @@ export function SettingsPage() {
             >
               <Icon size={18} aria-hidden="true" />
               <span>{title}</span>
-              {id !== "calendar" && id !== "team" && (
+              {id !== "calendar" && id !== "team" && id !== "webhooks" && (
                 <span className="settings-soon">Em breve</span>
               )}
             </button>
@@ -129,6 +130,8 @@ export function SettingsPage() {
         >
           {selected === "calendar" ? (
             <ServiceCalendar />
+          ) : selected === "webhooks" ? (
+            <WebhookSettings />
           ) : selected === "team" ? (
             <TeamPage />
           ) : (
