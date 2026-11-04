@@ -1,4 +1,5 @@
 "use client";
+import { WeeklyAppointments } from "./weekly";
 import { useDemo } from "@/components/layout/demo-context";
 import {
   Heading,
@@ -11,6 +12,9 @@ import {
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 export function Appointments({ portal = false }: { portal?: boolean }) {
+  return portal ? <AppointmentRecords portal /> : <WeeklyAppointments />;
+}
+function AppointmentRecords({ portal = false }: { portal?: boolean }) {
   const { repositories, clientId, refresh } = useDemo();
   const [notice, setNotice] = useState("");
   const appointments = repositories.appointments.list(clientId);
@@ -123,7 +127,7 @@ export function Portal() {
         </Card>
         <Card title="Espelhos registrados">
           <strong className="metric-value">{appointments.length}</strong>
-          <small>Registros  · sem sincronização externa</small>
+          <small>Registros · sem sincronização externa</small>
         </Card>
         <Card title="Comparecimento">
           <strong className="metric-value">

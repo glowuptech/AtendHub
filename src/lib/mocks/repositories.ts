@@ -1,3 +1,4 @@
+import { MemorySchedule } from "@/features/appointments/services/schedule";
 import { MemoryInvestments } from "@/features/system-dashboard/service";
 import {
   claimSla,
@@ -406,21 +407,21 @@ export function createMockRepositories(
     );
   const leadRows = structuredClone(fixture.leads);
   const clients = new MockClientRepository(scope);
+  const appointmentRows = structuredClone(fixture.appointments);
+  const leads = new MockLeadRepository(leadRows, scope, fields);
   return {
+    schedule: new MemorySchedule(scope, clients, leads, appointmentRows),
     capture: new MemoryCaptureRepository(scope, forms, fields, leadRows),
     clients,
     investments: new MemoryInvestments(clients),
     fields,
     forms,
-    leads: new MockLeadRepository(leadRows, scope, fields),
+    leads,
     inbox: new MockInboxRepository(
       structuredClone(fixture.conversations),
       scope,
     ),
-    appointments: new MockAppointmentRepository(
-      structuredClone(fixture.appointments),
-      scope,
-    ),
+    appointments: new MockAppointmentRepository(appointmentRows, scope),
     analytics: new MockAnalyticsRepository(forms),
   };
 }

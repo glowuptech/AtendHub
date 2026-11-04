@@ -301,6 +301,9 @@ export const LeadSchema = z.object({
   ),
 });
 export const AppointmentSchema = z.object({
+  doctorId: Id.nullable().optional(),
+  endsAt: z.string().datetime().optional(),
+  notes: z.string().max(1000).optional(),
   ...scoped,
   leadId: Id,
   name: z.string(),
