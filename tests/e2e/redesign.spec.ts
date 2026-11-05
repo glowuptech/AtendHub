@@ -59,7 +59,11 @@ test("telas principais mantêm contraste e largura em desktop, tablet e celular"
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(path);
     await page.evaluate(() => document.fonts.ready);
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    if (name === "inbox")
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Inbox" }),
+      ).toHaveClass("sr-only");
+    else await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     expect(
       (
         await new AxeBuilder({ page })

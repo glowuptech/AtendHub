@@ -40,3 +40,7 @@ A base atual é por cliente; segmentação de fontes por profissional requer def
 37 testes unitários aprovados; suite completa de 18 E2E aprovada. Após os refinamentos visuais finais, 8 testes dos fluxos afetados foram executados novamente e passaram. Lint, TypeScript e build aprovados. Axe sem violações WCAG A/AA detectadas nos cenários exercitados. Verificados desktop de 1800 px, notebook de 1024 px, celular de 390 px, redução de altura para 500 px, foco de drawer/Escape, isolamento de bases, inserção sem envio e rascunho após navegação ao cadastro. As capturas foram revisadas visualmente e estão em `docs/runbooks/screenshots/inbox/`.
 
 Os testes usam Chromium. Teclados virtuais em aparelhos físicos, Safari/Firefox, provedores de WhatsApp e modelos de IA reais não foram exercitados. Dados criados pelos testes são efêmeros e não alteram as fixtures do aplicativo.
+
+## Aproveitamento vertical
+
+O cabeçalho visual “Inbox / Seus atendimentos” e o resumo da operadora foram removidos exclusivamente desta página. O título h1 permanece acessível a leitores de tela, sem ocupar espaço visual. Os painéis começam 8 px abaixo da barra superior. Ajuste validado por lint, TypeScript, build e dois E2E do Inbox (desktop/mobile, foco, rascunhos e acessibilidade); captura desktop atualizada.

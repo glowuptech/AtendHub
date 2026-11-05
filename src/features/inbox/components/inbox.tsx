@@ -155,17 +155,7 @@ export function Inbox() {
   ) : null;
   return (
     <div className="inbox-page" ref={root}>
-      <div className="inbox-page-heading">
-        <div>
-          <h1>Inbox</h1>
-          <p>Seus atendimentos, em um só lugar.</p>
-        </div>
-        <span className="inbox-attendant">
-          <span className="status-dot" />
-          {attendant}
-          <small>{all.length} conversas atribuídas</small>
-        </span>
-      </div>
+      <h1 className="sr-only">Inbox</h1>
       <div
         className="inbox-layout"
         data-chat={mobileChat && !!conversation}

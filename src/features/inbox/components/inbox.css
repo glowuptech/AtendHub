@@ -1,6 +1,6 @@
 /* Inbox presentation shares tokens and controls with the application. */
 .workspace main:has(.inbox-page) {
-  padding: 20px;
+  padding: 8px 20px 16px;
   max-width: none;
 }
 .inbox-page {
@@ -10,33 +10,6 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-}
-.inbox-page-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  flex-shrink: 0;
-}
-.inbox-page-heading h1 {
-  font-size: 25px;
-  letter-spacing: -0.7px;
-}
-.inbox-page-heading p {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin: 3px 0 0;
-}
-.inbox-attendant {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 1px 8px;
-  align-items: center;
-  font-size: 12px;
-}
-.inbox-attendant small {
-  grid-column: 2;
-  font-size: 11px;
 }
 .inbox-layout {
   display: grid;
@@ -790,9 +763,6 @@
   }
 }
 @container (max-width:600px) {
-  .inbox-page-heading {
-    display: none;
-  }
   .inbox-layout {
     display: flex;
     border-radius: 10px;
