@@ -1,6 +1,6 @@
 "use client";
 import { LeadPicker } from "./lead-picker";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -9,7 +9,13 @@ import {
   X,
 } from "lucide-react";
 import { useDemo } from "@/components/layout/demo-context";
-import { Heading, Badge, Empty, dateTime } from "@/components/layout/shared";
+import {
+  Heading,
+  Badge,
+  Empty,
+  dateTime,
+  LoadingState,
+} from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
 import { localDay, shiftDay } from "@/features/clients/services/overview";
 import {
@@ -24,9 +30,19 @@ import {
 import { AvailabilityEditor, shortDay } from "./availability";
 import type { AppointmentMirror } from "@/domain/schemas";
 import { z } from "zod";
+const subscribe = () => () => {};
 export function WeeklyAppointments() {
+  const ready = useSyncExternalStore(
+    subscribe,
+    () => true,
+    () => false,
+  );
   const { clientId } = useDemo();
-  return <WeeklyWorkspace key={clientId} />;
+  return ready ? (
+    <WeeklyWorkspace key={clientId} />
+  ) : (
+    <LoadingState label="Carregando agenda…" />
+  );
 }
 function WeeklyWorkspace() {
   const { repositories, clientId, refresh } = useDemo();

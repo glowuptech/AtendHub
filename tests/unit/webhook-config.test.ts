@@ -4,8 +4,8 @@ import {
   WebhookConfigSchema,
   webhookDestinations,
 } from "@/features/webhooks/config";
-test("cinco destinos independentes e vazios permitidos", () => {
-  expect(webhookDestinations).toHaveLength(5);
+test("oito destinos independentes e vazios permitidos", () => {
+  expect(webhookDestinations).toHaveLength(8);
   expect(
     WebhookConfigSchema.parse({
       ...emptyWebhookConfig(),

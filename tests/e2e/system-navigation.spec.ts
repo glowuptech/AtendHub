@@ -14,6 +14,7 @@ test("sistema, páginas previstas e inbox pessoal de todos os clientes", async (
     "Clientes",
     "Inbox",
     "Calendário",
+    "Automações",
     "Tráfego Pago",
     "Configurações",
   ]);

@@ -16,6 +16,9 @@ import {
   X,
   Layers2,
   Megaphone,
+  Workflow,
+  Repeat2,
+  BellRing,
 } from "lucide-react";
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import { useDemo } from "./demo-context";
@@ -86,6 +89,8 @@ export function Shell({
         ["/app", "Visão geral", LayoutDashboard],
         ["/app/leads", "Leads e CRM", Users],
         ["/app/agendamentos", "Agendamentos", CalendarDays],
+        ["/app/follow-up", "Follow-up", Repeat2],
+        ["/app/confirmacoes", "Confirmações e lembretes", BellRing],
         [`/app/clientes/${clientId}/formularios`, "Formulários", FileText],
       ] as const);
   const systemLinks = [
@@ -94,6 +99,7 @@ export function Shell({
     ["/app/clientes", "Clientes", Building2],
     ["/app/inbox", "Inbox", MessagesSquare],
     ["/app/calendario", "Calendário", CalendarDays],
+    ["/app/automacoes", "Automações", Workflow],
     ["/app/trafego-pago", "Tráfego Pago", Megaphone],
     ["/app/configuracoes", "Configurações", Settings],
   ] as const;

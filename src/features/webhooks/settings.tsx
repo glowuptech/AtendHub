@@ -27,7 +27,7 @@ export function WebhookSettings() {
         </div>
         <Badge>
           {webhookDestinations.filter(({ id }) => !!webhookConfig[id]).length}{" "}
-          de 5 URLs cadastradas
+          de {webhookDestinations.length} URLs cadastradas
         </Badge>
       </div>
       <p className="team-note">

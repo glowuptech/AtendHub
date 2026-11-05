@@ -4179,3 +4179,129 @@ tbody tr:hover {
     font-size: 16px;
   }
 }
+.automation-section {
+  padding: 22px;
+  margin: 20px 0;
+  background: white;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  min-width: 0;
+}
+.automation-section .section-caption {
+  flex-wrap: wrap;
+}
+.automation-section p {
+  font-size: 12px;
+}
+.automation-rule {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 10px;
+}
+.automation-rule strong {
+  font-size: 13px;
+}
+.automation-rule small {
+  margin-top: 5px;
+}
+.automation-filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.automation-filters > label {
+  min-width: 140px;
+}
+.automation-section td details {
+  white-space: normal;
+  max-width: 300px;
+  min-width: 150px;
+}
+.automation-step {
+  margin: 20px 0;
+  padding: 18px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+.automation-step legend {
+  padding: 0 8px;
+  font-size: 13px;
+}
+.automation-step .section-caption {
+  align-items: flex-end;
+}
+.automation-step .form-columns {
+  margin-top: 14px;
+}
+.automation-variables {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.automation-variables code {
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+}
+.automation-save {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-subtle);
+}
+.automation-log {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 13px;
+}
+.automation-preferences {
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 20px;
+  padding-top: 20px;
+}
+@media (max-width: 600px) {
+  .automation-section {
+    padding: 16px;
+  }
+  .automation-step {
+    padding: 12px;
+  }
+  .automation-step .form-columns {
+    grid-template-columns: 1fr;
+  }
+  .automation-filters > label {
+    width: 100%;
+  }
+  .automation-filters select {
+    width: 100%;
+  }
+}
+.automation-window {
+  padding: 14px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  margin: 14px 0;
+}
+.automation-weekdays {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.automation-weekdays > label {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+@media (max-width: 600px) {
+  .automation-window .form-columns {
+    grid-template-columns: 1fr;
+  }
+}

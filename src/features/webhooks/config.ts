@@ -35,6 +35,27 @@ export const webhookDestinations = [
       "Agendamento manual salvo com sucesso. O evento identifica agendamento, cliente, lead, profissional, operação, data e horário. Um identificador único permitirá evitar notificações duplicadas nas retentativas.",
     events: ["appointment.created"],
   },
+  {
+    id: "automations",
+    title: "Eventos de automação (opcional)",
+    description:
+      "Auditoria das movimentações automáticas da fila. As regras internas não dependem deste webhook.",
+    events: ["automation.stage_changed"],
+  },
+  {
+    id: "followups",
+    title: "Disparos de follow-up",
+    description:
+      "Tarefa elegível para retomar um contato sem resposta. O n8n recebe IDs, canal WhatsApp ou SMS, versão e chave de deduplicação; revalida antes de enviar.",
+    events: ["followup.send_requested"],
+  },
+  {
+    id: "reminders",
+    title: "Confirmações e lembretes",
+    description:
+      "Disparo programado antes de um agendamento válido, indicando canal e finalidade. Confirmar ou remarcar invalida tarefas que deixarem de ser elegíveis.",
+    events: ["appointment.reminder.send_requested"],
+  },
 ] as const;
 export type DestinationId = (typeof webhookDestinations)[number]["id"];
 const url = z
@@ -62,6 +83,9 @@ export const WebhookConfigSchema = z.object({
   inboxMessages: url,
   assistant: url,
   appointments: url,
+  automations: url.default(""),
+  followups: url.default(""),
+  reminders: url.default(""),
 });
 export type WebhookConfig = z.infer<typeof WebhookConfigSchema>;
 export const emptyWebhookConfig = (): WebhookConfig => ({
@@ -70,4 +94,7 @@ export const emptyWebhookConfig = (): WebhookConfig => ({
   inboxMessages: "",
   assistant: "",
   appointments: "",
+  automations: "",
+  followups: "",
+  reminders: "",
 });

@@ -1,6 +1,6 @@
 # Configuração dos destinos de webhook
 
-Configurações → Webhooks contém cinco campos independentes de URL: notificações de formulários, conexão WhatsApp, envio de mensagens do Inbox, Assistente IA e agendamentos. HTTPS obrigatório, sem usuário/senha ou fragmentos na URL. Campos são opcionais; limpar e salvar remove um destino. Validação precede o salvamento conjunto. Há indicação de alterações pendentes, descarte, foco no campo inválido e confirmação do salvamento.
+Configurações → Webhooks contém oito campos independentes de URL: notificações de formulários, conexão WhatsApp, envio de mensagens do Inbox, Assistente IA, agendamentos, eventos de automação (opcional), disparos de follow-up e confirmações/lembretes. HTTPS obrigatório, sem usuário/senha ou fragmentos na URL. Campos são opcionais; limpar e salvar remove um destino. Validação precede o salvamento conjunto. Há indicação de alterações pendentes, descarte, foco no campo inválido e confirmação do salvamento.
 
 Dados ficam no DemoProvider durante a sessão do aplicativo, sobrevivendo à navegação interna. Recarregar limpa a memória. Não são gravados em localStorage nem em variáveis de ambiente; nenhuma chamada de rede ocorre ao salvar. URL cadastrada não significa conexão verificada.
 

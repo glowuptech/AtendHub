@@ -15,6 +15,17 @@ export const actions = {
   supervise: "Supervisionar",
 } as const;
 export const areas = [
+  {
+    id: "automations",
+    label: "Automações",
+    actions: ["view", "edit", "export"],
+  },
+  { id: "followups", label: "Follow-up", actions: ["view", "edit"] },
+  {
+    id: "reminders",
+    label: "Confirmações e lembretes",
+    actions: ["view", "edit"],
+  },
   { id: "dashboard", label: "Dashboard geral", actions: ["view", "export"] },
   {
     id: "queue",
@@ -103,6 +114,8 @@ export function defaults(role: Role): Record<string, Grant> {
   allow("queue", ["view", "claim"]);
   allow("clients", ["view"]);
   allow("knowledge", ["view"]);
+  allow("followups", ["view"]);
+  allow("reminders", ["view"]);
   allow("hours", ["view"]);
   allow("inbox", ["view", "edit"], "own");
   allow("leads", ["view", "edit"], role === "manager" ? "team" : "own");
@@ -114,6 +127,9 @@ export function defaults(role: Role): Record<string, Grant> {
   allow("commissions", ["view"], role === "manager" ? "team" : "own");
   if (role === "manager") {
     allow("queue", ["manage"]);
+    allow("automations", ["view", "edit"]);
+    allow("followups", ["edit"]);
+    allow("reminders", ["edit"]);
     allow("dashboard", ["view"]);
     allow("clients", ["create", "edit"]);
     allow("inbox", ["supervise"], "team");
@@ -203,9 +219,16 @@ export function canAccess(
     return false;
   const [area, action] = input.permission.split(".");
   if (
-    ["clients", "inbox", "calendar", "leads", "forms", "knowledge"].includes(
-      area,
-    ) &&
+    [
+      "clients",
+      "inbox",
+      "calendar",
+      "leads",
+      "forms",
+      "knowledge",
+      "followups",
+      "reminders",
+    ].includes(area) &&
     !input.clientId &&
     !(area === "clients" && action === "create")
   )

@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-test("webhooks valida, salva cinco destinos, descarta e mantém na navegação sem envios", async ({
+test("webhooks valida, salva oito destinos, descarta e mantém na navegação sem envios", async ({
   page,
 }) => {
   const outbound: string[] = [];
@@ -11,21 +11,21 @@ test("webhooks valida, salva cinco destinos, descarta e mantém na navegação s
   await page.goto("/app/configuracoes");
   await page.getByRole("tab", { name: "Webhooks", exact: true }).click();
   const inputs = page.locator(".webhook-destination input");
-  await expect(inputs).toHaveCount(5);
+  await expect(inputs).toHaveCount(8);
   await inputs.nth(0).fill("http://example.com/invalid");
   await page.getByRole("button", { name: "Salvar webhooks" }).click();
   await expect(page.locator(".webhook-destination [role=alert]")).toContainText(
     "HTTPS",
   );
   await expect(inputs.nth(0)).toBeFocused();
-  for (let i = 0; i < 5; i++)
+  for (let i = 0; i < 8; i++)
     await inputs.nth(i).fill(`https://example.com/hook-${i}`);
   await page.getByRole("button", { name: "Salvar webhooks" }).click();
   await expect(page.getByRole("status")).toContainText(
     "Nenhum evento foi enviado",
   );
   await expect(
-    page.getByText("5 de 5 URLs cadastradas", { exact: true }),
+    page.getByText("8 de 8 URLs cadastradas", { exact: true }),
   ).toBeVisible();
   await inputs.nth(3).fill("https://example.com/changed");
   await page.getByRole("button", { name: "Descartar alterações" }).click();
@@ -37,7 +37,7 @@ test("webhooks valida, salva cinco destinos, descarta e mantém na navegação s
   await inputs.nth(4).fill("");
   await page.getByRole("button", { name: "Salvar webhooks" }).click();
   await expect(
-    page.getByText("4 de 5 URLs cadastradas", { exact: true }),
+    page.getByText("7 de 8 URLs cadastradas", { exact: true }),
   ).toBeVisible();
   expect(outbound).toEqual([]);
   await page.setViewportSize({ width: 390, height: 844 });

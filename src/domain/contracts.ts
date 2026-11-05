@@ -198,6 +198,7 @@ export interface MarketingEventProvider {
 
 /** UI-facing query/cache facade. C2 adapters load authenticated DTOs asynchronously. */
 export interface RepositoryRegistry {
+  automations: import("@/features/automation/engine").MemoryAutomations;
   schedule: import("@/features/appointments/services/schedule").MemorySchedule;
   investments: import("@/features/system-dashboard/service").InvestmentRepository;
   capture: import("@/features/forms/services/capture").CaptureRepository;

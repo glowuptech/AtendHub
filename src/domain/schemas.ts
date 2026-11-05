@@ -329,10 +329,19 @@ export const ConversationSchema = z.object({
   messages: z.array(
     z.object({
       id: Id,
+      automationJobId: Id.optional(),
       direction: z.enum(["inbound", "outbound"]),
       body: z.string(),
       at: z.string().datetime(),
-      status: z.literal("simulated"),
+      status: z.enum([
+        "simulated",
+        "pending",
+        "sent",
+        "delivered",
+        "read",
+        "failed",
+        "received",
+      ]),
     }),
   ),
 });

@@ -57,10 +57,11 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const timer = setInterval(() => {
       repositories.capture.sweep();
+      repositories.automations.reconcile(calendar, webhookConfig);
       setRevision((v) => v + 1);
     }, 15000);
     return () => clearInterval(timer);
-  }, [repositories]);
+  }, [repositories, calendar, webhookConfig]);
   return (
     <DemoContext.Provider
       value={{
@@ -80,7 +81,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         clientId,
         setClientId,
         revision,
-        refresh: () => setRevision((v) => v + 1),
+        refresh: () => {
+          repositories.automations.reconcile(calendar, webhookConfig);
+          setRevision((v) => v + 1);
+        },
       }}
     >
       {children}

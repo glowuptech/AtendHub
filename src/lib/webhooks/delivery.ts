@@ -6,11 +6,6 @@ export async function deliverCaptureEvent(
   config: { url?: string; secret?: string },
   transport: typeof fetch = fetch,
 ) {
-  if (!config.url) return { status: "unconfigured" as const };
-  const url = new URL(config.url);
-  if (url.protocol !== "https:" || url.username || url.password)
-    throw Error("Webhook exige HTTPS sem credenciais na URL");
-  if (!config.secret) throw Error("Configure a assinatura do webhook");
   const body = JSON.stringify({
     id: event.id,
     schemaVersion: event.schemaVersion,
@@ -22,13 +17,33 @@ export async function deliverCaptureEvent(
     leadId: event.leadId,
     occurredAt: event.occurredAt,
   });
+  return deliverSignedWebhook(
+    event.id,
+    body,
+    config,
+    event.attempts,
+    transport,
+  );
+}
+export async function deliverSignedWebhook(
+  id: string,
+  body: string,
+  config: { url?: string; secret?: string },
+  attempts = 0,
+  transport: typeof fetch = fetch,
+) {
+  if (!config.url) return { status: "unconfigured" as const };
+  const url = new URL(config.url);
+  if (url.protocol !== "https:" || url.username || url.password)
+    throw Error("Webhook exige HTTPS sem credenciais na URL");
+  if (!config.secret) throw Error("Configure a assinatura do webhook");
   try {
     const response = await transport(url, {
       method: "POST",
       redirect: "error",
       headers: {
         "Content-Type": "application/json",
-        "Idempotency-Key": event.id,
+        "Idempotency-Key": id,
         "X-AtendHub-Signature": createHmac("sha256", config.secret)
           .update(body)
           .digest("hex"),
@@ -43,7 +58,7 @@ export async function deliverCaptureEvent(
   return {
     status: "retry" as const,
     nextAttemptAt: new Date(
-      Date.now() + Math.min(3600000, 30000 * 2 ** Math.min(event.attempts, 7)),
+      Date.now() + Math.min(3600000, 30000 * 2 ** Math.min(attempts, 7)),
     ).toISOString(),
   };
 }

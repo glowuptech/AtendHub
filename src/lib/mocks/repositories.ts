@@ -1,3 +1,4 @@
+import { MemoryAutomations } from "@/features/automation/engine";
 import { MemorySchedule } from "@/features/appointments/services/schedule";
 import { MemoryInvestments } from "@/features/system-dashboard/service";
 import {
@@ -420,7 +421,7 @@ export function createMockRepositories(
   const clients = new MockClientRepository(scope);
   const appointmentRows = structuredClone(fixture.appointments);
   const leads = new MockLeadRepository(leadRows, scope, fields);
-  return {
+  const base = {
     schedule: new MemorySchedule(scope, clients, leads, appointmentRows),
     capture: new MemoryCaptureRepository(scope, forms, fields, leadRows),
     clients,
@@ -435,5 +436,6 @@ export function createMockRepositories(
     appointments: new MockAppointmentRepository(appointmentRows, scope),
     analytics: new MockAnalyticsRepository(forms),
   };
+  return { ...base, automations: new MemoryAutomations(scope, base) };
 }
 export type DemoRepositories = ReturnType<typeof createMockRepositories>;
