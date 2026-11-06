@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useClients } from "../hooks";
 
 import { useDemo } from "@/components/layout/demo-context";
 
@@ -13,9 +14,13 @@ import { KnowledgeBase } from "./knowledge-base";
 export { Clients } from "./directory";
 export function ClientProfile({ id }: { id: string }) {
   const { repositories, clientId } = useDemo();
+  const { data: clients, error, isLoading } = useClients();
   const [tab, setTab] = useState("Visão geral");
   if (id !== clientId) return <Denied />;
-  const c = repositories.clients.get(id);
+  if (isLoading) return <Card><p role="status">Carregando cliente persistido…</p></Card>;
+  if (error) return <Card><p role="alert" className="field-error">{error.message}</p></Card>;
+  const c = clients?.find((client) => client.id === id);
+  if (!c) return <Denied />;
   return (
     <>
       <Heading

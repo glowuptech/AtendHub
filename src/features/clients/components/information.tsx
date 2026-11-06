@@ -6,11 +6,11 @@ import { Pencil, Save, X, Plus } from "lucide-react";
 import { z } from "zod";
 import type { Client } from "@/domain/schemas";
 import { DoctorSchema } from "@/domain/schemas";
-import { useDemo } from "@/components/layout/demo-context";
 import { Card, Badge } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
 import { ClinicLogo } from "./directory";
 import { dateLabel } from "./overview";
+import { useClients } from "../hooks";
 function Field({
   label,
   value,
@@ -46,7 +46,7 @@ function Field({
   );
 }
 export function ClientInformation({ client }: { client: Client }) {
-  const { repositories, refresh } = useDemo();
+  const { mutate } = useClients();
   const [editing, setEditing] = useState(false),
     [draft, setDraft] = useState(client),
     [message, setMessage] = useState(""),
@@ -62,32 +62,26 @@ export function ClientInformation({ client }: { client: Client }) {
     <form
       className="profile-information"
       noValidate
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
         try {
           const formData = new FormData(e.currentTarget);
-          repositories.clients.update(client.id, {
+          const payload = {
             ...draft,
             billing: {
               ...(draft.billing ?? BillingSchema.parse({})),
-              monthlyFeeCents: monthlyFeeCents(
-                String(formData.get("monthlyFee") ?? ""),
-              ),
+              monthlyFeeCents: monthlyFeeCents(String(formData.get("monthlyFee") ?? "")),
             },
             specialties: list(String(formData.get("specialties") ?? "")),
-            doctors: draft.doctors.map((d) => ({
-              ...d,
-              specialties: list(
-                String(formData.get(`doctor-specialties-${d.id}`) ?? ""),
-              ),
-            })),
-          });
-          refresh();
+            doctors: draft.doctors.map((d) => ({ ...d, specialties: list(String(formData.get(`doctor-specialties-${d.id}`) ?? "")) })),
+          };
+          const response = await fetch(`/api/clients/${client.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+          const body = await response.json();
+          if (!response.ok) throw new Error(body.error ?? "Não foi possível salvar o cliente.");
+          await mutate((items) => items?.map((item) => item.id === client.id ? body : item), { revalidate: true });
           setEditing(false);
           setError("");
-          setMessage(
-            "Informações atualizadas nesta sessão. Recarregar a página restaura os dados iniciais.",
-          );
+          setMessage("Informações, profissionais e operação salvos no Supabase.");
         } catch (err) {
           setError(
             err instanceof z.ZodError

@@ -110,7 +110,7 @@ export const ClientSchema = z.object({
   externalSchedulingUrl: z
     .string()
     .url()
-    .refine((v) => new URL(v).hostname === "example.com"),
+    .refine((v) => new URL(v).protocol === "https:", "A agenda deve usar HTTPS"),
   description: z.string(),
   category: z
     .enum(["clinic", "doctor_male", "doctor_female"])
