@@ -33,7 +33,7 @@ async function context() {
   if (!serviceRole || !supabaseUrl) return { error: NextResponse.json({ error: "Configuração segura incompleta." }, { status: 500 }) } as const;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient<any>(supabaseUrl, serviceRole, { auth: { autoRefreshToken: false, persistSession: false } });
-  return { admin: admin as AdminClient, organizationId: membership.organization_id } as const;
+  return { admin: admin as AdminClient, organizationId: membership.organization_id, userId: user.id } as const;
 }
 
 function responseError(error: unknown, status = 400) {
@@ -71,6 +71,7 @@ export async function PATCH(request: Request) {
   if ("error" in auth) return auth.error;
   const memberId = new URL(request.url).searchParams.get("memberId");
   if (!memberId || !z.string().uuid().safeParse(memberId).success) return responseError("Funcionário inválido.");
+  if (memberId === auth.userId) return responseError("Você não pode alterar o próprio cargo ou status.", 403);
   const parsed = memberSchema.safeParse(await request.json());
   if (!parsed.success) return responseError(parsed.error.issues[0]?.message);
   const input = parsed.data;

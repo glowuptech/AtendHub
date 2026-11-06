@@ -1,4 +1,7 @@
 import { Shell } from "@/components/layout/shell";
-export default function Layout({ children }: { children: React.ReactNode }) {
+import { requireAtendhubMembership } from "@/lib/supabase/access";
+
+export default async function Layout({ children }: { children: React.ReactNode }) {
+  await requireAtendhubMembership();
   return <Shell portal={false}>{children}</Shell>;
 }

@@ -45,8 +45,14 @@ O cargo gerente não concede acesso a todos os clientes. Atendentes acessam some
 
 ## Primeiro superadministrador
 
-Na próxima etapa, o primeiro superadministrador deve ser provisionado por operação server-side protegida, com usuário já existente em `auth.users`, verificação explícita de que a organização ainda não tem um membro `super_admin`, auditoria e execução privilegiada fora do navegador. Não haverá autocadastro público nem endpoint que aceite livremente a promoção de cargo.
+O autocadastro e as configurações globais do Supabase Auth não são alterados. Crie a conta pelo fluxo normal já aprovado e, em ambiente administrativo com `POSTGRES_URL_NON_POOLING`, execute:
+
+```bash
+npm run atendhub:provision-admin -- pessoa@dominio.com <organization-uuid>
+```
+
+O script usa lock transacional por organização, exige que a organização exista e recusa a operação quando já houver um superadministrador ativo. Ele procura o usuário existente em `auth.users`, cria/atualiza somente o vínculo em `atendhub_team_members` e não insere diretamente em `auth.users`.
 
 ## Não concluído
 
-Autenticação real, convites, políticas RLS por cargo/cliente, persistência dos repositórios, portal do cliente, integrações externas e ajustes globais do Supabase Auth permanecem fora desta etapa.
+Persistência dos repositórios de domínio, portal completo do cliente e integrações externas permanecem fora desta etapa. O login, proteção de rotas, convites server-side, listagem/edição de equipe e políticas RLS por organização/cliente já estão conectados. O hardening também impede autoalteração de cargo/status e protege o último superadministrador em exclusões e atualizações concorrentes.
