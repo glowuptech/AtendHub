@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { FileText, Plus, Copy, Archive } from "lucide-react";
 import { useDemo } from "@/components/layout/demo-context";
+import { useClients } from "@/features/clients/hooks";
 import {
   Heading,
   Card,
@@ -13,18 +14,20 @@ import {
 } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
 export function FormsList({ id }: { id: string }) {
-  const { repositories, clientId, refresh } = useDemo();
+  const { repositories, scope, clientId, refresh } = useDemo();
+  const { data: persistedClients } = useClients();
   const [status, setStatus] = useState("all"),
     [notice, setNotice] = useState("");
   if (id !== clientId) return <Denied />;
-  const forms = repositories.forms
-    .list(id)
-    .filter((f) => status === "all" || f.status === status);
+  const isFixtureClient = scope.clientIds.includes(id);
+  const forms = isFixtureClient
+    ? repositories.forms.list(id).filter((f) => status === "all" || f.status === status)
+    : [];
   const base = `/app/clientes/${id}/formularios`;
   return (
     <>
       <Heading
-        eyebrow={repositories.clients.get(id).name}
+        eyebrow={persistedClients?.find((client) => client.id === id)?.name ?? (isFixtureClient ? repositories.clients.get(id).name : "Cliente persistido")}
         title="Formulários"
         description="Formulários nativos com a identidade da clínica e campos conectados ao CRM."
         action={
