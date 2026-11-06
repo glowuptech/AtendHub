@@ -15,7 +15,7 @@ export async function requireAtendhubMembership() {
     .eq("status", "active")
     .maybeSingle();
 
-  if (!membership) redirect("/login?error=sem-acesso");
+  if (!membership) redirect("/acesso-negado");
 
   return { user, membership };
 }

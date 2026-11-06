@@ -22,11 +22,5 @@ export async function updateSession(request: NextRequest) {
     login.searchParams.set("next", request.nextUrl.pathname);
     return NextResponse.redirect(login);
   }
-  if (request.nextUrl.pathname === "/login" && user) {
-    const app = request.nextUrl.clone();
-    app.pathname = "/app";
-    app.search = "";
-    return NextResponse.redirect(app);
-  }
   return response;
 }

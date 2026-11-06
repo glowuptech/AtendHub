@@ -16,11 +16,44 @@ function authErrorMessage(error: unknown): string {
   return "Não foi possível concluir o acesso. Tente novamente.";
 }
 
+function getSafeNextPath() {
+  const next = new URLSearchParams(window.location.search).get("next");
+  return next?.startsWith("/") && !next.startsWith("//") && next !== "/login" ? next : "/app";
+}
+
 export function AccessPage() {
   const router = useRouter();
   const [visible, setVisible] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [unauthorized, setUnauthorized] = useState(false);
+
+  async function signOut() {
+    setPending(true);
+    await createClient().auth.signOut();
+    router.replace("/login");
+    router.refresh();
+  }
+
+  if (unauthorized) {
+    return (
+      <main className="access-page">
+        <section className="access-form-panel" aria-label="Acesso não autorizado">
+          <div className="access-form-card">
+            <p className="eyebrow">ACESSO DA EQUIPE</p>
+            <h1>Acesso não autorizado</h1>
+            <p className="muted">
+              Sua sessão está válida, mas este usuário não possui um vínculo ativo no Atend&Hub.
+              Solicite ao superadministrador que conclua seu cadastro.
+            </p>
+            <Button type="button" onClick={signOut} disabled={pending}>
+              {pending ? "Saindo…" : "Sair"}
+            </Button>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="access-page">
@@ -52,9 +85,26 @@ export function AccessPage() {
             if (!password) { setError("Informe sua senha."); return; }
             setPending(true);
             try {
-              const { error: signInError } = await createClient().auth.signInWithPassword({ email: emailResult.data, password });
+              const supabase = createClient();
+              const { error: signInError } = await supabase.auth.signInWithPassword({ email: emailResult.data, password });
               if (signInError) throw signInError;
-              router.replace("/app");
+
+              const { data: { user }, error: userError } = await supabase.auth.getUser();
+              if (userError || !user) throw userError ?? new Error("Sessão não encontrada");
+
+              const { data: membership, error: membershipError } = await supabase
+                .from("atendhub_team_members")
+                .select("id")
+                .eq("id", user.id)
+                .eq("status", "active")
+                .maybeSingle();
+              if (membershipError) throw membershipError;
+              if (!membership) {
+                setUnauthorized(true);
+                return;
+              }
+
+              router.replace(getSafeNextPath());
               router.refresh();
             } catch (authError) {
               setError(authErrorMessage(authError));
@@ -62,7 +112,7 @@ export function AccessPage() {
               setPending(false);
             }
           }}>
-            <label>E-mail<input name="email" type="email" autoComplete="username" required /></label>
+            <label htmlFor="access-email">E-mail<input id="access-email" name="email" type="email" autoComplete="username" required /></label>
             <label htmlFor="access-password">Senha</label>
             <div className="access-password">
               <input id="access-password" name="password" type={visible ? "text" : "password"} autoComplete="current-password" required />
