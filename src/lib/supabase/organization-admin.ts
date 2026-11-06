@@ -17,9 +17,24 @@ export async function organizationContext() {
   const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!serviceRole || !supabaseUrl) return { error: NextResponse.json({ error: "Configuração segura incompleta." }, { status: 500 }) } as const;
   const admin = createAdminClient(supabaseUrl, serviceRole, { auth: { autoRefreshToken: false, persistSession: false } });
-  return { admin, userId: user.id, organizationId: membership.organization_id as string, role: membership.role as string } as const;
+  return { supabase, admin, userId: user.id, organizationId: membership.organization_id as string, role: membership.role as string } as const;
 }
 
-export function apiError(error: unknown, status = 400) {
-  return NextResponse.json({ error: error instanceof Error ? error.message : "Não foi possível concluir a operação." }, { status });
+function errorDetails(error: unknown) {
+  if (!error || typeof error !== "object") return { code: "UNKNOWN" };
+  const candidate = error as { code?: unknown; status?: unknown; message?: unknown };
+  return {
+    code: typeof candidate.code === "string" ? candidate.code : "UNKNOWN",
+    status: typeof candidate.status === "number" ? candidate.status : undefined,
+    message: typeof candidate.message === "string" ? candidate.message : undefined,
+  };
+}
+
+export function apiError(error: unknown, status = 400, context?: { requestId?: string; stage?: string }) {
+  const requestId = context?.requestId ?? crypto.randomUUID();
+  const stage = context?.stage ?? "request";
+  const details = errorDetails(error);
+  console.error("[v0] atendhub-api-error", { requestId, stage, code: details.code });
+  const userMessage = status >= 500 ? "Não foi possível concluir a operação. Informe o código de suporte." : "Não foi possível salvar as alterações. Confira os dados e informe o código de suporte.";
+  return NextResponse.json({ error: userMessage, supportId: requestId, code: details.code }, { status });
 }

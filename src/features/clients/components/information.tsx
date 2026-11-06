@@ -77,7 +77,7 @@ export function ClientInformation({ client }: { client: Client }) {
           };
           const response = await fetch(`/api/clients/${client.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
           const body = await response.json();
-          if (!response.ok) throw new Error(body.error ?? "Não foi possível salvar o cliente.");
+          if (!response.ok) throw new Error(`${body.error ?? "Não foi possível salvar o cliente."}${body.supportId ? ` Código de suporte: ${body.supportId}` : ""}`);
           await mutate((items) => items?.map((item) => item.id === client.id ? body : item), { revalidate: true });
           setEditing(false);
           setError("");
