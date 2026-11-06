@@ -43,9 +43,17 @@ function responseError(error: unknown, status = 400) {
 export async function GET() {
   const auth = await context();
   if ("error" in auth) return auth.error;
-  const { data, error } = await auth.admin.from("atendhub_team_members").select("id, organization_id, display_name, role, status, client_access_mode, atendhub_team_client_access(client_id), atendhub_team_member_permissions(permission_key, grant_level)").eq("organization_id", auth.organizationId).order("display_name");
-  if (error) return responseError(error, 500);
-  return NextResponse.json(data ?? []);
+  const [{ data: members, error }, { data: clients, error: clientsError }, { data: users, error: usersError }] = await Promise.all([
+    auth.admin.from("atendhub_team_members").select("id, organization_id, display_name, role, status, client_access_mode, atendhub_team_client_access(client_id), atendhub_team_member_permissions(permission_key, grant_level)").eq("organization_id", auth.organizationId).order("display_name"),
+    auth.admin.from("atendhub_clients").select("id, name, status").eq("organization_id", auth.organizationId).order("name"),
+    auth.admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+  ]);
+  if (error || clientsError || usersError) return responseError(error ?? clientsError ?? usersError, 500);
+  const emails = new Map((users?.users ?? []).map((user) => [user.id, user.email ?? ""]));
+  return NextResponse.json({
+    members: (members ?? []).map((member) => ({ ...member, email: emails.get(member.id) ?? "" })),
+    clients: clients ?? [],
+  });
 }
 
 export async function POST(request: Request) {
