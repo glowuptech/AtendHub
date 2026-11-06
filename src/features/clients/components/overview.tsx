@@ -136,7 +136,7 @@ export function ClientOverview({
     [draftRange, setDraftRange] = useState(range),
     [doctor, setDoctor] = useState("all"),
     [error, setError] = useState("");
-  const data = getClientOverview(repositories, client.id, range, doctor);
+  const data = getClientOverview(repositories, client.id, range, doctor, client);
   const known = data.appointments.filter(
       (a) => a.attendance !== "unknown",
     ).length,
