@@ -89,7 +89,7 @@ function CopyButton({ value, label }: { value: string | null; label: string }) {
   );
 }
 export function Clients() {
-  const { repositories, setClientId } = useDemo();
+  const { repositories, scope, setClientId } = useDemo();
   const { data: remoteClients, error: clientsError, isLoading } = useClients();
   const [search, setSearch] = useState(""),
     [status, setStatus] = useState("all"),
@@ -335,8 +335,8 @@ export function Clients() {
             </div>
             <div className="clinic-card-footer">
               <small>
-                {repositories.leads.list(c.id).length} leads ·{" "}
-                {repositories.forms.list(c.id).length} formulários
+                {scope.clientIds.includes(c.id) ? repositories.leads.list(c.id).length : 0} leads ·{" "}
+                {scope.clientIds.includes(c.id) ? repositories.forms.list(c.id).length : 0} formulários
               </small>
               <Link
                 className={buttonVariants({ variant: "outline", size: "sm" })}
