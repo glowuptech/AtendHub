@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FileText, Plus, Archive } from "lucide-react";
 import { useDemo } from "@/components/layout/demo-context";
 import { useClients } from "@/features/clients/hooks";
@@ -8,13 +8,18 @@ import { Heading, Card, Badge, NavButton, Denied, Empty } from "@/components/lay
 import { Button } from "@/components/ui/button";
 
 export function FormsList({ id }: { id: string }) {
-  const { clientId } = useDemo();
-  const { data: clients, error: clientsError } = useClients();
+  const { setClientId } = useDemo();
+  const { data: clients, error: clientsError, isLoading: clientsLoading } = useClients();
   const { data: forms = [], error, isLoading, mutate } = useForms(id);
   const [status, setStatus] = useState("all");
   const [notice, setNotice] = useState("");
   const client = clients?.find((item) => item.id === id);
-  if (id !== clientId) return <Denied />;
+  useEffect(() => {
+    if (client) setClientId(client.id);
+  }, [client, setClientId]);
+  if (clientsLoading) return <p role="status">Carregando cliente autorizado…</p>;
+  if (clientsError) return <p role="alert">Não foi possível consultar os clientes autorizados.</p>;
+  if (!client) return <Denied />;
   const visible = forms.filter((form) => status === "all" || form.status === status);
   async function archive(formId: string) {
     const response = await fetch(`/api/forms/${formId}`, { method: "DELETE" });

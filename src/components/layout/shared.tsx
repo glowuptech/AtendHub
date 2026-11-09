@@ -89,7 +89,7 @@ export function Denied() {
   return (
     <Empty
       title="Recurso indisponível neste contexto"
-      description="Selecione a clínica correspondente ou volte à lista. Os mocks verificam o escopo; autenticação e RLS serão implementadas em C2."
+      description="Este cliente não está disponível para a sua sessão ou não existe. Volte à lista de clientes autorizados e selecione um cliente válido."
     />
   );
 }

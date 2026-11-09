@@ -1,5 +1,5 @@
 "use client";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 const subscribe = () => () => {};
 import { z } from "zod";
 import { Plus, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
@@ -65,13 +65,18 @@ export function FormEditor({
   clientId: string;
   formId?: string;
 }) {
-  const { clientId } = useDemo();
-  const { data: clients, isLoading: clientsLoading } = useClients();
+  const { setClientId } = useDemo();
+  const { data: clients, isLoading: clientsLoading, error: clientsError } = useClients();
   const { data: forms, isLoading: formsLoading, error: formsError } = useForms(id);
+  useEffect(() => {
+    if (clients?.some((item) => item.id === id)) setClientId(id);
+  }, [clients, id, setClientId]);
   const mounted = useSyncExternalStore(subscribe, () => true, () => false);
   const client = clients?.find((item) => item.id === id);
-  if (!mounted || clientsLoading || formsLoading) return <p role="status">Carregando editor…</p>;
-  if (id !== clientId || !client || formsError) return <Denied />;
+  if (!mounted || clientsLoading || formsLoading) return <p role="status">Carregando cliente e formulários…</p>;
+  if (clientsError) return <p role="alert">Não foi possível consultar os clientes autorizados. Tente novamente.</p>;
+  if (!client) return <Denied />;
+  if (formsError) return <p role="alert">Não foi possível consultar os formulários deste cliente.</p>;
   const source = formId ? forms?.find((form) => form.id === formId) : undefined;
   if (formId && !source) return <Denied />;
   return <EditorWorkspace key={`${id}-${formId ?? "new"}`} client={client} source={source} />;

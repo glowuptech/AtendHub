@@ -59,10 +59,9 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!authorizedClients) return;
     const timer = window.setTimeout(() => {
-      const scopedClients = repositories.clients.list(scope);
-      const scopedIds = new Set(scopedClients.map((client) => client.id));
-      const nextId = authorizedClients.find((client) => scopedIds.has(client.id))?.id ?? scopedClients[0]?.id ?? "";
-      setClientId((current) => (current && scopedIds.has(current) ? current : nextId));
+      const authorizedIds = new Set(authorizedClients.map((client) => client.id));
+      const nextId = authorizedClients[0]?.id ?? "";
+      setClientId((current) => (current && authorizedIds.has(current) ? current : nextId));
     }, 0);
     return () => window.clearTimeout(timer);
   }, [authorizedClients, repositories, scope]);

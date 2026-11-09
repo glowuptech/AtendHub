@@ -414,6 +414,7 @@ export function ClientOverview({
         </Card>
       </div>
       <Card title="Conversão por formulário">
+        <div className="actions"><NavButton href={`/app/clientes/${client.id}/formularios`}>Gerenciar formulários</NavButton><NavButton href={`/app/clientes/${client.id}/formularios/novo`}>Novo formulário</NavButton></div>
         <div
           className="table-scroll"
           tabIndex={0}

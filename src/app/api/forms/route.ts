@@ -35,6 +35,9 @@ export async function POST(request: Request) {
   if ("error" in auth) return auth.error;
   const parsed = inputSchema.safeParse(await request.json());
   if (!parsed.success) return apiError(new Error("Dados de formulário inválidos."), 400);
+  const { data: authorizedClient, error: clientError } = await auth.supabase.from("atendhub_clients").select("id").eq("id", parsed.data.clientId).eq("organization_id", auth.organizationId).maybeSingle();
+  if (clientError) return apiError(new Error("Não foi possível validar o cliente."), 500);
+  if (!authorizedClient) return apiError(new Error("Cliente não encontrado ou não autorizado."), 403);
   const form = FormSchema.parse(parsed.data.form);
   const version = form.versions.find((item) => item.id === form.activeVersionId) ?? form.versions.at(-1);
   if (!version) return apiError(new Error("Versão do formulário ausente."), 400);
