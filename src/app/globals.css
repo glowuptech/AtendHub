@@ -4369,3 +4369,19 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* Focused form builder: one question and one configuration area at a time. */
+.editor-fields [hidden], .editor-fields fieldset[hidden] { display: none !important; }
+.editor-section-nav { display: flex; gap: 4px; flex-wrap: wrap; margin-block: 18px; }
+.editor-save-bar { position: sticky; top: 0; z-index: 5; background: var(--background, #f6f7fb); padding: 12px; border: 1px solid #e3e4ed; border-radius: 12px; margin-bottom: 12px; }
+.question-editor-item { border: 1px solid #e3e4ed; border-radius: 12px; margin-block: 12px; background: white; }
+.question-editor-item > summary { padding: 16px; cursor: pointer; font-weight: 600; }
+.question-editor-item > summary span { display: block; margin-top: 6px; font-size: 12px; font-weight: 400; }
+.question-editor-item .step-editor { border: 0; margin: 0; }
+.flow-editor-shell { border: 0; padding: 0; min-width: 0; }
+.flow-path-row { display: flex; align-items: center; gap: 12px; margin-block: 12px; }
+.flow-path-row label { flex: 1; min-width: 0; }
+.flow-membership { margin-block: 12px; border: 1px solid #e3e4ed; border-radius: 10px; padding: 14px; }
+.flow-membership label { display: inline-flex; align-items: center; margin-right: 16px; gap: 8px; }
+.question-options-panel { margin-block: 16px; }
+@media(max-width: 700px) { .flow-path-row { flex-wrap: wrap; } .editor-save-bar { position: static; } }

@@ -6,10 +6,12 @@ export function SettingsEditor({
   value,
   onChange,
   disabled,
+  section,
 }: {
   value?: FormSettings;
   onChange: (v: FormSettings) => void;
   disabled: boolean;
+  section?: "presentation" | "contacts" | "appearance" | "tracking" | "none";
 }) {
   const s = settingsOf(value);
   const [error, setError] = useState("");
@@ -36,38 +38,168 @@ export function SettingsEditor({
   }
   return (
     <fieldset disabled={disabled}>
-      <Card title="Apresentação">
-        <label>
-          Como apresentar
-          <select value={s.introduction.mode} onChange={(e) => patch({ introduction: { ...s.introduction, mode: e.target.value as FormSettings["introduction"]["mode"] } })}>
-            <option value="separate">Tela de apresentação separada</option>
-            <option value="integrated">Apresentação junto da primeira pergunta</option>
-            <option value="none">Sem apresentação</option>
-          </select>
-        </label>
-        <label>Título<input maxLength={160} value={s.introduction.title} onChange={(e) => patch({ introduction: { ...s.introduction, title: e.target.value } })} /></label>
-        <label>Texto formatado (uma linha por parágrafo)<textarea value={s.introduction.blocks.map((b) => b.text).join("\\n")} onChange={(e) => patch({ introduction: { ...s.introduction, blocks: e.target.value.split("\\n").map((text) => ({ text, style: "support" as const, align: s.introduction.align, bold: false, italic: false })) } })} /></label>
-        <div className="profile-info-grid">
-          <label>Alinhamento<select value={s.introduction.align} onChange={(e) => patch({ introduction: { ...s.introduction, align: e.target.value as FormSettings["introduction"]["align"] } })}><option value="left">Esquerda</option><option value="center">Centro</option><option value="right">Direita</option></select></label>
-          <label>Largura máxima<input type="number" min={280} max={1000} value={s.introduction.maxWidth} onChange={(e) => patch({ introduction: { ...s.introduction, maxWidth: Number(e.target.value) } })} /></label>
-          <label>Posição vertical<select value={s.introduction.vertical} onChange={(e) => patch({ introduction: { ...s.introduction, vertical: e.target.value as FormSettings["introduction"]["vertical"] } })}><option value="top">Topo</option><option value="center">Centro</option><option value="bottom">Inferior</option></select></label>
-          <label>Texto do botão<input value={s.introduction.buttonLabel} onChange={(e) => patch({ introduction: { ...s.introduction, buttonLabel: e.target.value } })} /></label>
-        </div>
-        <label><input type="checkbox" checked={s.introduction.inheritAppearance} onChange={(e) => patch({ introduction: { ...s.introduction, inheritAppearance: e.target.checked } })} /> Herdar aparência geral</label>
-        <label>
-          Descrição antiga (compatibilidade)
-          <textarea value={s.description} maxLength={1500} onChange={(e) => patch({ description: e.target.value })} />
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={s.enabled}
-            onChange={(e) => patch({ enabled: e.target.checked })}
-          />{" "}
-          Formulário ativo
-        </label>
-      </Card>
-      <div id="editor-contacts">
+      <div hidden={!!section && section !== "presentation"}>
+        <Card title="Apresentação">
+          <label>
+            Como apresentar
+            <select
+              value={s.introduction.mode}
+              onChange={(e) =>
+                patch({
+                  introduction: {
+                    ...s.introduction,
+                    mode: e.target
+                      .value as FormSettings["introduction"]["mode"],
+                  },
+                })
+              }
+            >
+              <option value="separate">Tela de apresentação separada</option>
+              <option value="integrated">
+                Apresentação junto da primeira pergunta
+              </option>
+              <option value="none">Sem apresentação</option>
+            </select>
+          </label>
+          <label>
+            Título
+            <input
+              maxLength={160}
+              value={s.introduction.title}
+              onChange={(e) =>
+                patch({
+                  introduction: { ...s.introduction, title: e.target.value },
+                })
+              }
+            />
+          </label>
+          <label>
+            Texto formatado (uma linha por parágrafo)
+            <textarea
+              value={s.introduction.blocks.map((b) => b.text).join("\\n")}
+              onChange={(e) =>
+                patch({
+                  introduction: {
+                    ...s.introduction,
+                    blocks: e.target.value
+                      .split("\\n")
+                      .map((text) => ({
+                        text,
+                        style: "support" as const,
+                        align: s.introduction.align,
+                        bold: false,
+                        italic: false,
+                      })),
+                  },
+                })
+              }
+            />
+          </label>
+          <div className="profile-info-grid">
+            <label>
+              Alinhamento
+              <select
+                value={s.introduction.align}
+                onChange={(e) =>
+                  patch({
+                    introduction: {
+                      ...s.introduction,
+                      align: e.target
+                        .value as FormSettings["introduction"]["align"],
+                    },
+                  })
+                }
+              >
+                <option value="left">Esquerda</option>
+                <option value="center">Centro</option>
+                <option value="right">Direita</option>
+              </select>
+            </label>
+            <label>
+              Largura máxima
+              <input
+                type="number"
+                min={280}
+                max={1000}
+                value={s.introduction.maxWidth}
+                onChange={(e) =>
+                  patch({
+                    introduction: {
+                      ...s.introduction,
+                      maxWidth: Number(e.target.value),
+                    },
+                  })
+                }
+              />
+            </label>
+            <label>
+              Posição vertical
+              <select
+                value={s.introduction.vertical}
+                onChange={(e) =>
+                  patch({
+                    introduction: {
+                      ...s.introduction,
+                      vertical: e.target
+                        .value as FormSettings["introduction"]["vertical"],
+                    },
+                  })
+                }
+              >
+                <option value="top">Topo</option>
+                <option value="center">Centro</option>
+                <option value="bottom">Inferior</option>
+              </select>
+            </label>
+            <label>
+              Texto do botão
+              <input
+                value={s.introduction.buttonLabel}
+                onChange={(e) =>
+                  patch({
+                    introduction: {
+                      ...s.introduction,
+                      buttonLabel: e.target.value,
+                    },
+                  })
+                }
+              />
+            </label>
+          </div>
+          <label>
+            <input
+              type="checkbox"
+              checked={s.introduction.inheritAppearance}
+              onChange={(e) =>
+                patch({
+                  introduction: {
+                    ...s.introduction,
+                    inheritAppearance: e.target.checked,
+                  },
+                })
+              }
+            />{" "}
+            Herdar aparência geral
+          </label>
+          <label>
+            Descrição antiga (compatibilidade)
+            <textarea
+              value={s.description}
+              maxLength={1500}
+              onChange={(e) => patch({ description: e.target.value })}
+            />
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={s.enabled}
+              onChange={(e) => patch({ enabled: e.target.checked })}
+            />{" "}
+            Formulário ativo
+          </label>
+        </Card>
+      </div>
+      <div id="editor-contacts" hidden={!!section && section !== "contacts"}>
         <Card title="Dados de contato">
           <label>
             Posição dos contatos
@@ -138,7 +270,10 @@ export function SettingsEditor({
           </p>
         </Card>
       </div>
-      <div id="editor-appearance">
+      <div
+        id="editor-appearance"
+        hidden={!!section && section !== "appearance"}
+      >
         <Card title="Identidade do formulário">
           <div className="profile-info-grid">
             {(
@@ -243,15 +378,61 @@ export function SettingsEditor({
             ))}
           </div>
           <div className="appearance-control-grid">
-            <label>Fundo do painel: {s.appearance.panelOpacity}%<input type="range" min="0" max="100" value={s.appearance.panelOpacity} onChange={(e) => patch({ appearance: { ...s.appearance, panelOpacity: Number(e.target.value) } })} /></label>
-            <label>Escurecimento da imagem: {s.appearance.overlayOpacity}%<input type="range" min="0" max="100" value={s.appearance.overlayOpacity} onChange={(e) => patch({ appearance: { ...s.appearance, overlayOpacity: Number(e.target.value) } })} /></label>
-            <label>Cor da sobreposição<input type="color" value={s.appearance.overlay} onChange={(e) => patch({ appearance: { ...s.appearance, overlay: e.target.value } })} /></label>
+            <label>
+              Fundo do painel: {s.appearance.panelOpacity}%
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={s.appearance.panelOpacity}
+                onChange={(e) =>
+                  patch({
+                    appearance: {
+                      ...s.appearance,
+                      panelOpacity: Number(e.target.value),
+                    },
+                  })
+                }
+              />
+            </label>
+            <label>
+              Escurecimento da imagem: {s.appearance.overlayOpacity}%
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={s.appearance.overlayOpacity}
+                onChange={(e) =>
+                  patch({
+                    appearance: {
+                      ...s.appearance,
+                      overlayOpacity: Number(e.target.value),
+                    },
+                  })
+                }
+              />
+            </label>
+            <label>
+              Cor da sobreposição
+              <input
+                type="color"
+                value={s.appearance.overlay}
+                onChange={(e) =>
+                  patch({
+                    appearance: { ...s.appearance, overlay: e.target.value },
+                  })
+                }
+              />
+            </label>
           </div>
-          <p className="muted">O painel, o texto e a sobreposição são camadas independentes. Transparência não afeta a legibilidade do conteúdo.</p>
+          <p className="muted">
+            O painel, o texto e a sobreposição são camadas independentes.
+            Transparência não afeta a legibilidade do conteúdo.
+          </p>
           {error && <p role="alert">{error}</p>}
         </Card>
       </div>
-      <div id="editor-tracking">
+      <div id="editor-tracking" hidden={!!section && section !== "tracking"}>
         <Card title="Meta Pixel e conversões">
           <label>
             ID do Meta Pixel (opcional)
