@@ -25,6 +25,9 @@ import {
 } from "@/domain/schemas";
 import { QuestionOptions } from "./question-options";
 import { SettingsEditor } from "./settings-editor";
+import { EditorAccordion } from "./editor-accordion";
+import { FlowEditor } from "./flow-editor";
+import { validateRouting } from "../services/routing";
 import { settingsOf } from "../services/settings";
 import { FormWizard } from "./wizard";
 const typeLabels: Record<FieldType, string> = {
@@ -52,10 +55,10 @@ function newStep(fieldId: string, label: string, order: number): FormStep {
       id: crypto.randomUUID(),
       fieldDefinitionId: fieldId,
       label,
-          required: true,
-          pathIds: [],
-          definesPath: false,
-        },
+      required: true,
+      pathIds: [],
+      definesPath: false,
+    },
   };
 }
 export function FormEditor({
@@ -66,22 +69,57 @@ export function FormEditor({
   formId?: string;
 }) {
   const { setClientId } = useDemo();
-  const { data: clients, isLoading: clientsLoading, error: clientsError } = useClients();
-  const { data: forms, isLoading: formsLoading, error: formsError } = useForms(id);
+  const {
+    data: clients,
+    isLoading: clientsLoading,
+    error: clientsError,
+  } = useClients();
+  const {
+    data: forms,
+    isLoading: formsLoading,
+    error: formsError,
+  } = useForms(id);
   useEffect(() => {
     if (clients?.some((item) => item.id === id)) setClientId(id);
   }, [clients, id, setClientId]);
-  const mounted = useSyncExternalStore(subscribe, () => true, () => false);
+  const mounted = useSyncExternalStore(
+    subscribe,
+    () => true,
+    () => false,
+  );
   const client = clients?.find((item) => item.id === id);
-  if (!mounted || clientsLoading || formsLoading) return <p role="status">Carregando cliente e formulários…</p>;
-  if (clientsError) return <p role="alert">Não foi possível consultar os clientes autorizados. Tente novamente.</p>;
+  if (!mounted || clientsLoading || formsLoading)
+    return <p role="status">Carregando cliente e formulários…</p>;
+  if (clientsError)
+    return (
+      <p role="alert">
+        Não foi possível consultar os clientes autorizados. Tente novamente.
+      </p>
+    );
   if (!client) return <Denied />;
-  if (formsError) return <p role="alert">Não foi possível consultar os formulários deste cliente.</p>;
+  if (formsError)
+    return (
+      <p role="alert">
+        Não foi possível consultar os formulários deste cliente.
+      </p>
+    );
   const source = formId ? forms?.find((form) => form.id === formId) : undefined;
   if (formId && !source) return <Denied />;
-  return <EditorWorkspace key={`${id}-${formId ?? "new"}`} client={client} source={source} />;
+  return (
+    <EditorWorkspace
+      key={`${id}-${formId ?? "new"}`}
+      client={client}
+      source={source}
+    />
+  );
 }
-function EditorWorkspace({ source, client }: { source?: FormDefinition; client: import("@/domain/schemas").Client }) {
+export function EditorWorkspace({
+  source,
+  client,
+}: {
+  source?: FormDefinition;
+  client: import("@/domain/schemas").Client;
+}) {
   const clientId = client.id;
   const [draft, setDraft] = useState<FormDefinition>(() => {
     if (source) {
@@ -138,12 +176,14 @@ function EditorWorkspace({ source, client }: { source?: FormDefinition; client: 
       ],
     };
   });
-  const [fields, setFields] = useState(source?.fields ?? []);
+  const fields = draft.fields;
+  const [section, setSection] = useState("");
+  const [activeStep, setActiveStep] = useState("");
+  const [saving, setSaving] = useState(false);
   const [persistedId, setPersistedId] = useState(source?.id ?? "");
   const [mode, setMode] = useState("new"),
     [selected, setSelected] = useState(""),
     [label, setLabel] = useState(""),
-    [stableKey, setStableKey] = useState(""),
     [type, setType] = useState<FieldType>("short_text"),
     [options, setOptions] = useState(""),
     [confirmed, setConfirmed] = useState(false),
@@ -168,19 +208,31 @@ function EditorWorkspace({ source, client }: { source?: FormDefinition; client: 
     });
   }
   async function save(snapshot = false) {
+    if (saving) return;
+    setSaving(true);
     try {
-      const response = await fetch(persistedId ? `/api/forms/${persistedId}` : "/api/forms", {
-        method: persistedId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, form: draft, publish: snapshot }),
-      });
+      if (snapshot) validateRouting(version, fields);
+      const response = await fetch(
+        persistedId ? `/api/forms/${persistedId}` : "/api/forms",
+        {
+          method: persistedId ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientId, form: draft, publish: snapshot }),
+        },
+      );
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Não foi possível salvar o formulário.");
+      if (!response.ok)
+        throw new Error(
+          result.error ?? "Não foi possível salvar o formulário.",
+        );
       setPersistedId(result.id);
       setDraft(result);
-      setFields(result.fields ?? []);
       setSaved(true);
-      setNotice(snapshot ? "Formulário publicado. A versão anterior permanece preservada." : "Formulário salvo como rascunho.");
+      setNotice(
+        snapshot
+          ? "Formulário publicado. A versão anterior permanece preservada."
+          : "Formulário salvo como rascunho.",
+      );
     } catch (e) {
       setNotice(
         e instanceof z.ZodError
@@ -189,6 +241,8 @@ function EditorWorkspace({ source, client }: { source?: FormDefinition; client: 
             ? e.message
             : "Verifique os campos.",
       );
+    } finally {
+      setSaving(false);
     }
   }
   return (
@@ -203,405 +257,557 @@ function EditorWorkspace({ source, client }: { source?: FormDefinition; client: 
           </NavButton>
         }
       />
-      <nav className="editor-section-nav" aria-label="Seções do editor">
-        <a href="#editor-identity">01 · Identidade</a>
-        <a href="#editor-contacts">02 · Contatos</a>
-        <a href="#editor-appearance">03 · Aparência</a>
-        <a href="#editor-paths">04 · Caminhos ({version.paths?.length ?? 0})</a>
-        <a href="#editor-questions">05 · Perguntas ({version.steps.length})</a>
-        <a href="#editor-tracking">06 · Eventos</a>
-      </nav>
+      <div className="actions editor-save-bar">
+        <Button disabled={frozen || saving} onClick={() => save()}>
+          {saving ? "Salvando…" : "Salvar rascunho"}
+        </Button>
+        <Button
+          variant="outline"
+          disabled={frozen || saving}
+          onClick={() => save(true)}
+        >
+          Publicar formulário
+        </Button>
+        <span className="muted">
+          {saved
+            ? "Alterações salvas"
+            : "Rascunho — salve para manter as alterações"}
+        </span>
+      </div>
+      <p role="status" className="notice">
+        {notice}
+      </p>
       <div className={`editor-grid preview-${previewMode}`}>
         <div className="editor-fields">
-          <div id="editor-identity">
-            <Card title="Identidade e destino">
-              <label>
-                Profissional vinculado
-                <select
-                  disabled={frozen}
-                  value={draft.doctorId ?? ""}
-                  onChange={(e) => {
-                    setSaved(false);
-                    setDraft({ ...draft, doctorId: e.target.value || null });
-                  }}
-                >
-                  <option value="">Todos / sem profissional específico</option>
-                  {client.doctors.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Nome do formulário
-                <input
-                  disabled={frozen}
-                  value={draft.name}
-                  onChange={(e) => {
-                    setSaved(false);
-                    setDraft({ ...draft, name: e.target.value });
-                  }}
-                />
-              </label>
-              <label>
-                Slug
-                <input
-                  disabled={frozen}
-                  value={draft.slug}
-                  onChange={(e) => {
-                    setSaved(false);
-                    setDraft({ ...draft, slug: e.target.value });
-                  }}
-                />
-              </label>
-              <label>
-                Mensagem de conclusão
-                <input
-                  disabled={frozen}
-                  value={version.successMessage}
-                  onChange={(e) =>
-                    updateVersion({ successMessage: e.target.value })
-                  }
-                />
-              </label>
-              <Badge>
-                Versão {version.number} · {frozen ? "ativa" : "rascunho"}
-              </Badge>
-            </Card>
-          </div>
-          <SettingsEditor
-            value={version.settings}
-            onChange={(settings) => updateVersion({ settings })}
-            disabled={frozen}
-          />
-          <div id="editor-paths">
-            <Card title="Caminhos">
-              <p className="muted">Defina caminhos antes de associar perguntas. Sem caminhos, o formulário continua linear.</p>
-              {(version.paths ?? []).map((path) => <div className="path-editor-row" key={path.id}><input aria-label="Letra do caminho" maxLength={1} value={path.letter} onChange={(e) => updateVersion({ paths: (version.paths ?? []).map((item) => item.id === path.id ? { ...item, letter: e.target.value.toUpperCase() } : item) })} /><input aria-label="Nome do caminho" value={path.name} onChange={(e) => updateVersion({ paths: (version.paths ?? []).map((item) => item.id === path.id ? { ...item, name: e.target.value } : item) })} /><Button type="button" variant="ghost" onClick={() => updateVersion({ paths: (version.paths ?? []).filter((item) => item.id !== path.id) })}>Remover</Button></div>)}
-              <Button type="button" variant="outline" onClick={() => { const paths = version.paths ?? []; const letter = String.fromCharCode(65 + paths.length); updateVersion({ paths: [...paths, { id: `caminho_${letter.toLowerCase()}`, letter, name: `Novo caminho ${letter}` }] }); }}>Adicionar caminho</Button>
-            </Card>
-          </div>
-          <div id="editor-questions">
-            <Card title="Etapas e perguntas">
-              {!version.steps.length && (
-                <p>Adicione a primeira pergunta abaixo.</p>
-              )}
-              {version.steps.map((s, i) => (
-                <fieldset className="step-editor" key={s.id} disabled={frozen}>
-                  <legend>
-                    Etapa {i + 1} · {s.id.slice(-8)}
-                  </legend>
-                  <label>
-                    Título interno da etapa
-                    <input
-                      value={s.title}
-                      onChange={(e) =>
-                        updateStep(s.id, { title: e.target.value })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Pergunta
-                    <input
-                      value={s.question.label}
-                      onChange={(e) =>
-                        updateStep(s.id, {
-                          question: { ...s.question, label: e.target.value },
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Descrição
-                    <input
-                      value={s.description}
-                      onChange={(e) =>
-                        updateStep(s.id, { description: e.target.value })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Rótulo do botão
-                    <input
-                      value={s.buttonLabel}
-                      onChange={(e) =>
-                        updateStep(s.id, { buttonLabel: e.target.value })
-                      }
-                    />
-                  </label>
-                  {fields.find(
-                    (f) => f.id === s.question.fieldDefinitionId,
-                  ) && (
-                    <QuestionOptions
-                      key={s.question.fieldDefinitionId}
-                      field={fields.find(
-                        (f) => f.id === s.question.fieldDefinitionId,
-                      )!}
-                      paths={version.paths ?? []}
-                      onSave={(field) => {
-                        setFields((current) => current.some((item) => item.id === field.id) ? current.map((item) => item.id === field.id ? field : item) : [...current, field]);
-                        setDraft((current) => ({ ...current, fields: current.fields.some((item) => item.id === field.id) ? current.fields.map((item) => item.id === field.id ? field : item) : [...current.fields, field] }));
-                        updateStep(s.id, {
-                          question: {
-                            ...s.question,
-                            fieldDefinitionId: field.id,
-                          },
-                        });
-                      }}
-                    />
-                  )}
-                  <label>
-                    Evento Meta desta etapa (opcional)
-                    <input
-                      placeholder="Ex.: EtapaCincoConcluida"
-                      value={s.metaEvent ?? ""}
-                      onChange={(e) =>
-                        updateStep(s.id, { metaEvent: e.target.value })
-                      }
-                    />
-                  </label>
-                  {!!(version.paths ?? []).length && <>
-                    <label>Disponível em caminhos (vazio = comum a todos)<select multiple value={s.question.pathIds} onChange={(e) => updateStep(s.id, { question: { ...s.question, pathIds: Array.from(e.target.selectedOptions, (option) => option.value) } })}>{(version.paths ?? []).map((path) => <option key={path.id} value={path.id}>{path.letter} — {path.name}</option>)}</select></label>
-                    <label className="check-option"><input type="checkbox" checked={s.question.definesPath} onChange={(e) => updateStep(s.id, { question: { ...s.question, definesPath: e.target.checked, pathIds: [] } })} /> Define o caminho</label>
-                  </>}
-                  <label className="check-option">
-                    <input
-                      type="checkbox"
-                      checked={s.question.required}
-                      onChange={(e) =>
-                        updateStep(s.id, {
-                          question: {
-                            ...s.question,
-                            required: e.target.checked,
-                          },
-                        })
-                      }
-                    />
-                    Obrigatória
-                  </label>
-                  <small>
-                    Campo:{" "}
-                    {
-                      fields.find((f) => f.id === s.question.fieldDefinitionId)
-                        ?.stableKey
-                    }{" "}
-                    · ação {s.actionId.slice(-8)}
-                  </small>
-                  <div className="actions">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      aria-label={`Mover etapa ${i + 1} para cima`}
-                      disabled={i === 0}
-                      onClick={() => {
-                        const steps = [...version.steps];
-                        [steps[i - 1], steps[i]] = [steps[i], steps[i - 1]];
-                        updateVersion({
-                          steps: steps.map((s, j) => ({ ...s, order: j })),
-                        });
-                      }}
-                    >
-                      <ArrowUp size={15} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      aria-label={`Mover etapa ${i + 1} para baixo`}
-                      disabled={i === version.steps.length - 1}
-                      onClick={() => {
-                        const steps = [...version.steps];
-                        [steps[i + 1], steps[i]] = [steps[i], steps[i + 1]];
-                        updateVersion({
-                          steps: steps.map((s, j) => ({ ...s, order: j })),
-                        });
-                      }}
-                    >
-                      <ArrowDown size={15} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      aria-label={`Remover etapa ${i + 1}`}
-                      onClick={() =>
-                        updateVersion({
-                          steps: version.steps
-                            .filter((t) => t.id !== s.id)
-                            .map((s, j) => ({ ...s, order: j })),
-                        })
-                      }
-                    >
-                      <Trash2 size={15} />
-                    </Button>
-                  </div>
-                </fieldset>
-              ))}
-            </Card>
-            <Card title="Adicionar pergunta">
-              <fieldset disabled={frozen}>
+          <EditorAccordion
+            id="identity"
+            number="01"
+            title="Identidade"
+            description="Nome, link e profissional"
+            color="#2563eb"
+            open={section === "identity"}
+            onToggle={() =>
+              setSection(section === "identity" ? "" : "identity")
+            }
+          >
+            {" "}
+            <div id="editor-identity">
+              <Card title="Identidade e destino">
                 <label>
-                  Vínculo com o catálogo
+                  Profissional vinculado
                   <select
-                    value={mode}
+                    disabled={frozen}
+                    value={draft.doctorId ?? ""}
                     onChange={(e) => {
-                      setMode(e.target.value);
-                      setConfirmed(false);
+                      setSaved(false);
+                      setDraft({ ...draft, doctorId: e.target.value || null });
                     }}
                   >
-                    <option value="reuse">
-                      Reutilizar definição existente
+                    <option value="">
+                      Todos / sem profissional específico
                     </option>
-                    <option value="new">Criar nova definição</option>
+                    {client.doctors.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
                   </select>
                 </label>
-                {mode === "reuse" ? (
-                  <>
+                <label>
+                  Nome do formulário
+                  <input
+                    disabled={frozen}
+                    value={draft.name}
+                    onChange={(e) => {
+                      setSaved(false);
+                      setDraft({ ...draft, name: e.target.value });
+                    }}
+                  />
+                </label>
+                <label>
+                  Slug
+                  <input
+                    disabled={frozen}
+                    value={draft.slug}
+                    onChange={(e) => {
+                      setSaved(false);
+                      setDraft({ ...draft, slug: e.target.value });
+                    }}
+                  />
+                </label>
+                <label>
+                  Mensagem de conclusão
+                  <input
+                    disabled={frozen}
+                    value={version.successMessage}
+                    onChange={(e) =>
+                      updateVersion({ successMessage: e.target.value })
+                    }
+                  />
+                </label>
+                <Badge>
+                  Versão {version.number} · {frozen ? "ativa" : "rascunho"}
+                </Badge>
+              </Card>
+            </div>
+          </EditorAccordion>
+          <EditorAccordion
+            id="presentation"
+            number="02"
+            title="Apresentação"
+            description="Tela inicial, texto e botão de início"
+            color="#7c3aed"
+            open={section === "presentation"}
+            onToggle={() =>
+              setSection(section === "presentation" ? "" : "presentation")
+            }
+          >
+            <SettingsEditor
+              value={version.settings}
+              onChange={(settings) => updateVersion({ settings })}
+              disabled={frozen}
+              section="presentation"
+            />
+          </EditorAccordion>
+          <EditorAccordion
+            id="contacts"
+            number="03"
+            title="Contatos"
+            description="Nome, telefone e e-mail"
+            color="#0f766e"
+            open={section === "contacts"}
+            onToggle={() =>
+              setSection(section === "contacts" ? "" : "contacts")
+            }
+          >
+            <SettingsEditor
+              value={version.settings}
+              onChange={(settings) => updateVersion({ settings })}
+              disabled={frozen}
+              section="contacts"
+            />
+          </EditorAccordion>
+          <EditorAccordion
+            id="appearance"
+            number="04"
+            title="Aparência"
+            description="Cores, fonte e imagem de fundo"
+            color="#b45309"
+            open={section === "appearance"}
+            onToggle={() =>
+              setSection(section === "appearance" ? "" : "appearance")
+            }
+          >
+            <SettingsEditor
+              value={version.settings}
+              onChange={(settings) => updateVersion({ settings })}
+              disabled={frozen}
+              section="appearance"
+            />
+          </EditorAccordion>
+          <EditorAccordion
+            id="flow"
+            number="05"
+            title="Caminhos"
+            description="Direcionamento conforme a resposta"
+            color="#be185d"
+            open={section === "flow"}
+            onToggle={() => setSection(section === "flow" ? "" : "flow")}
+          >
+            {" "}
+            <fieldset disabled={frozen} className="flow-editor-shell">
+              <FlowEditor
+                version={version}
+                fields={fields}
+                onChange={(next, nextFields) => {
+                  setSaved(false);
+                  setDraft((current) => ({
+                    ...current,
+                    fields: nextFields,
+                    versions: current.versions.map((v) =>
+                      v.id === current.activeVersionId ? next : v,
+                    ),
+                  }));
+                }}
+              />
+            </fieldset>
+          </EditorAccordion>
+          <EditorAccordion
+            id="questions"
+            number="06"
+            title="Perguntas"
+            description="Adicionar, editar e ordenar perguntas"
+            color="#4338ca"
+            open={section === "questions"}
+            onToggle={() =>
+              setSection(section === "questions" ? "" : "questions")
+            }
+          >
+            {" "}
+            <div id="editor-questions">
+              <Card title="Etapas e perguntas">
+                {!version.steps.length && (
+                  <p>Adicione a primeira pergunta abaixo.</p>
+                )}
+                <p className="muted">
+                  Edite uma pergunta por vez. Configure os desvios somente em
+                  Caminhos.
+                </p>
+                {version.steps.map((s, i) => (
+                  <details
+                    className="question-editor-item"
+                    key={s.id}
+                    open={activeStep === s.id}
+                  >
+                    <summary
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setActiveStep(activeStep === s.id ? "" : s.id);
+                      }}
+                    >
+                      {i + 1}. {s.question.label || "Pergunta sem título"}
+                      <span className="muted">
+                        {s.question.definesPath
+                          ? "Escolhe o caminho"
+                          : s.question.pathIds.length
+                            ? s.question.pathIds
+                                .map(
+                                  (id) =>
+                                    version.paths.find((p) => p.id === id)
+                                      ?.name ?? "Caminho inválido",
+                                )
+                                .join(", ")
+                            : "Comum a todos"}
+                      </span>
+                    </summary>
+                    <fieldset
+                      className="step-editor"
+                      key={s.id}
+                      disabled={frozen}
+                    >
+                      <legend>Editar pergunta {i + 1}</legend>
+                      <label>
+                        Pergunta
+                        <input
+                          value={s.question.label}
+                          onChange={(e) =>
+                            updateStep(s.id, {
+                              question: {
+                                ...s.question,
+                                label: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </label>
+                      {fields.find(
+                        (f) => f.id === s.question.fieldDefinitionId,
+                      ) && (
+                        <QuestionOptions
+                          key={s.question.fieldDefinitionId}
+                          field={fields.find(
+                            (f) => f.id === s.question.fieldDefinitionId,
+                          )!}
+                          onSave={(field) => {
+                            setSaved(false);
+                            setDraft((current) => ({
+                              ...current,
+                              fields: current.fields.map((item) =>
+                                item.id === field.id ? field : item,
+                              ),
+                            }));
+                          }}
+                        />
+                      )}
+                      <details>
+                        <summary>Texto de apoio, botão e evento</summary>
+                        <label>
+                          Descrição
+                          <input
+                            value={s.description}
+                            onChange={(e) =>
+                              updateStep(s.id, { description: e.target.value })
+                            }
+                          />
+                        </label>
+                        <label>
+                          Rótulo do botão
+                          <input
+                            value={s.buttonLabel}
+                            onChange={(e) =>
+                              updateStep(s.id, { buttonLabel: e.target.value })
+                            }
+                          />
+                        </label>
+
+                        <label>
+                          Evento Meta desta etapa (opcional)
+                          <input
+                            placeholder="Ex.: EtapaCincoConcluida"
+                            value={s.metaEvent ?? ""}
+                            onChange={(e) =>
+                              updateStep(s.id, { metaEvent: e.target.value })
+                            }
+                          />
+                        </label>
+                      </details>
+                      <label className="check-option">
+                        <input
+                          type="checkbox"
+                          checked={s.question.required}
+                          onChange={(e) =>
+                            updateStep(s.id, {
+                              question: {
+                                ...s.question,
+                                required: e.target.checked,
+                              },
+                            })
+                          }
+                        />
+                        Obrigatória
+                      </label>
+                      <div className="actions">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Mover etapa ${i + 1} para cima`}
+                          disabled={i === 0}
+                          onClick={() => {
+                            const steps = [...version.steps];
+                            [steps[i - 1], steps[i]] = [steps[i], steps[i - 1]];
+                            updateVersion({
+                              steps: steps.map((s, j) => ({ ...s, order: j })),
+                            });
+                          }}
+                        >
+                          <ArrowUp size={15} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Mover etapa ${i + 1} para baixo`}
+                          disabled={i === version.steps.length - 1}
+                          onClick={() => {
+                            const steps = [...version.steps];
+                            [steps[i + 1], steps[i]] = [steps[i], steps[i + 1]];
+                            updateVersion({
+                              steps: steps.map((s, j) => ({ ...s, order: j })),
+                            });
+                          }}
+                        >
+                          <ArrowDown size={15} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Remover etapa ${i + 1}`}
+                          onClick={() =>
+                            updateVersion({
+                              steps: version.steps
+                                .filter((t) => t.id !== s.id)
+                                .map((s, j) => ({ ...s, order: j })),
+                            })
+                          }
+                        >
+                          <Trash2 size={15} />
+                        </Button>
+                      </div>
+                    </fieldset>
+                  </details>
+                ))}
+              </Card>
+              <Card title="Adicionar pergunta">
+                <fieldset disabled={frozen}>
+                  <details>
+                    <summary>Avançado: reutilizar campo existente</summary>
                     <label>
-                      Campo desta clínica
+                      Vínculo com o catálogo
                       <select
-                        value={selected}
+                        value={mode}
                         onChange={(e) => {
-                          setSelected(e.target.value);
+                          setMode(e.target.value);
                           setConfirmed(false);
                         }}
                       >
-                        <option value="">Selecione um campo</option>
-                        {fields.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.label} · {f.stableKey}
-                          </option>
-                        ))}
+                        <option value="reuse">
+                          Reutilizar definição existente
+                        </option>
+                        <option value="new">Criar nova definição</option>
                       </select>
                     </label>
-                    <label className="check-option">
-                      <input
-                        type="checkbox"
-                        checked={confirmed}
-                        onChange={(e) => setConfirmed(e.target.checked)}
-                      />
-                      Confirmo a reutilização deste campo no mesmo cliente.
-                    </label>
-                  </>
-                ) : (
-                  <>
-                    <label>
-                      Nome do campo
-                      <input
-                        value={label}
-                        onChange={(e) => setLabel(e.target.value)}
-                      />
-                    </label>
-                    <label>
-                      Chave estável
-                      <input
-                        value={stableKey}
-                        placeholder="preferencia_administrativa"
-                        onChange={(e) => setStableKey(e.target.value)}
-                      />
-                    </label>
-                    <label>
-                      Tipo
-                      <select
-                        value={type}
-                        onChange={(e) => setType(e.target.value as FieldType)}
-                      >
-                        {FieldTypeSchema.options.map((t) => (
-                          <option value={t} key={t}>
-                            {typeLabels[t]}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    {["single_select", "image_choice", "multi_select"].includes(type) && (
+                  </details>
+                  {mode === "reuse" ? (
+                    <>
                       <label>
-                        Opções, uma por linha
-                        <textarea
-                          value={options}
-                          onChange={(e) => setOptions(e.target.value)}
+                        Campo desta clínica
+                        <select
+                          value={selected}
+                          onChange={(e) => {
+                            setSelected(e.target.value);
+                            setConfirmed(false);
+                          }}
+                        >
+                          <option value="">Selecione um campo</option>
+                          {fields.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.label} · {f.stableKey}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="check-option">
+                        <input
+                          type="checkbox"
+                          checked={confirmed}
+                          onChange={(e) => setConfirmed(e.target.checked)}
+                        />
+                        Confirmo a reutilização deste campo no mesmo cliente.
+                      </label>
+                    </>
+                  ) : (
+                    <>
+                      <label>
+                        Nome do campo
+                        <input
+                          value={label}
+                          onChange={(e) => setLabel(e.target.value)}
                         />
                       </label>
-                    )}
-                  </>
-                )}
-                <Button
-                  disabled={mode === "reuse" && (!confirmed || !selected)}
-                  onClick={() => {
-                    try {
-                      let field: CustomFieldDefinition;
-                      if (mode === "reuse") {
-                        if (!confirmed) throw Error("Confirme a reutilização");
-                        field = fields.find((item) => item.id === selected) ?? (() => { throw Error("Campo não encontrado."); })();
-                      } else {
-                        field = FieldSchema.parse({
-                          id: crypto.randomUUID(),
-                          organizationId: client.organizationId,
-                          clientId,
-                          stableKey:
-                            stableKey ||
-                            `campo_${crypto.randomUUID().replaceAll("-", "")}`,
-                          label,
-                          type,
-                          sensitivity: "ordinary",
-                          options: options
-                            .split("\n")
-                            .map((s) => s.trim())
-                            .filter(Boolean)
-                            .map((s, i) => ({
-                              id: `option-${i + 1}`,
-                              label: s,
-                            })),
-                        });
-                        setFields((current) => [...current, field]);
-                        setDraft((current) => ({ ...current, fields: [...current.fields, field] }));
-                      }
-                      if (
-                        version.steps.some(
-                          (s) => s.question.fieldDefinitionId === field.id,
+                      <label>
+                        Tipo
+                        <select
+                          value={type}
+                          onChange={(e) => setType(e.target.value as FieldType)}
+                        >
+                          {FieldTypeSchema.options.map((t) => (
+                            <option value={t} key={t}>
+                              {typeLabels[t]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {[
+                        "single_select",
+                        "image_choice",
+                        "multi_select",
+                      ].includes(type) && (
+                        <label>
+                          Opções, uma por linha
+                          <textarea
+                            value={options}
+                            onChange={(e) => setOptions(e.target.value)}
+                          />
+                        </label>
+                      )}
+                    </>
+                  )}
+                  <Button
+                    disabled={mode === "reuse" && (!confirmed || !selected)}
+                    onClick={() => {
+                      try {
+                        let field: CustomFieldDefinition;
+                        if (mode === "reuse") {
+                          if (!confirmed)
+                            throw Error("Confirme a reutilização");
+                          field =
+                            fields.find((item) => item.id === selected) ??
+                            (() => {
+                              throw Error("Campo não encontrado.");
+                            })();
+                        } else {
+                          field = FieldSchema.parse({
+                            id: crypto.randomUUID(),
+                            organizationId: client.organizationId,
+                            clientId,
+                            stableKey: `campo_${crypto.randomUUID().replaceAll("-", "")}`,
+                            label,
+                            type,
+                            sensitivity: "ordinary",
+                            options: (
+                              options ||
+                              ([
+                                "single_select",
+                                "image_choice",
+                                "multi_select",
+                              ].includes(type)
+                                ? "Opção 1\nOpção 2"
+                                : "")
+                            )
+                              .split("\n")
+                              .map((s) => s.trim())
+                              .filter(Boolean)
+                              .map((s, i) => ({
+                                id: `option-${i + 1}`,
+                                label: s,
+                              })),
+                          });
+                        }
+                        if (
+                          version.steps.some(
+                            (s) => s.question.fieldDefinitionId === field.id,
+                          )
                         )
-                      )
-                        throw Error("Este campo já está no formulário");
-                      updateVersion({
-                        steps: [
-                          ...version.steps,
-                          newStep(field.id, field.label, version.steps.length),
-                        ],
-                      });
-                      setNotice(
-                        "Pergunta adicionada. Vínculo explícito preservado no catálogo.",
-                      );
-                      setConfirmed(false);
-                    } catch (e) {
-                      setNotice(
-                        e instanceof z.ZodError
-                          ? e.issues[0].message
-                          : e instanceof Error
-                            ? e.message
-                            : "Verifique o campo",
-                      );
-                    }
-                  }}
-                >
-                  <Plus size={16} />
-                  Adicionar pergunta
-                </Button>
-              </fieldset>
-            </Card>
-          </div>
-          <div className="actions editor-save-bar">
-            <Button disabled={frozen} onClick={() => save()}>
-              Salvar rascunho
-            </Button>
-            <Button
-              variant="outline"
+                          throw Error("Este campo já está no formulário");
+                        const step = newStep(
+                          field.id,
+                          field.label,
+                          version.steps.length,
+                        );
+                        setSaved(false);
+                        setDraft((current) => ({
+                          ...current,
+                          fields: current.fields.some((f) => f.id === field.id)
+                            ? current.fields
+                            : [...current.fields, field],
+                          versions: current.versions.map((v) =>
+                            v.id === current.activeVersionId
+                              ? { ...v, steps: [...v.steps, step] }
+                              : v,
+                          ),
+                        }));
+                        setActiveStep(step.id);
+                        setLabel("");
+                        setOptions("");
+                        setNotice(
+                          "Pergunta adicionada. Edite as opções acima; os caminhos ficam em Caminhos.",
+                        );
+                        setConfirmed(false);
+                      } catch (e) {
+                        setNotice(
+                          e instanceof z.ZodError
+                            ? e.issues[0].message
+                            : e instanceof Error
+                              ? e.message
+                              : "Verifique o campo",
+                        );
+                      }
+                    }}
+                  >
+                    <Plus size={16} />
+                    Adicionar pergunta
+                  </Button>
+                </fieldset>
+              </Card>
+            </div>
+          </EditorAccordion>
+          <EditorAccordion
+            id="tracking"
+            number="07"
+            title="Eventos e integrações"
+            description="Pixel e configurações avançadas"
+            color="#475569"
+            open={section === "tracking"}
+            onToggle={() =>
+              setSection(section === "tracking" ? "" : "tracking")
+            }
+          >
+            <SettingsEditor
+              value={version.settings}
+              onChange={(settings) => updateVersion({ settings })}
               disabled={frozen}
-              onClick={() => save(true)}
-            >
-              Ativar formulário
-            </Button>
-          </div>
-          <p role="status" className="notice">
-            {notice}
-          </p>
+              section="tracking"
+            />
+          </EditorAccordion>
           {saved && frozen && (
             <NavButton href={`/f/${draft.slug}`}>
               Abrir formulário ativo
@@ -648,18 +854,14 @@ function EditorWorkspace({ source, client }: { source?: FormDefinition; client: 
             </Button>
           </div>
           <div className="phone-frame">
-            {version.steps.length ? (
-              <FormWizard
-                key={`${previewKey}-${version.steps.map((s) => s.id).join()}`}
-                compact
-                form={draft}
-                version={version}
-                fields={fields}
-                clinicName={client.name}
-              />
-            ) : (
-              <p className="empty">Sua primeira pergunta aparecerá aqui.</p>
-            )}
+            <FormWizard
+              key={`${previewKey}-${settingsOf(version.settings).introduction.mode}-${version.steps.map((s) => s.id).join()}`}
+              compact
+              form={draft}
+              version={version}
+              fields={fields}
+              clinicName={client.name}
+            />
           </div>
         </aside>
       </div>

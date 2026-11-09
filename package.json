@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "format": "prettier --write .",
-    "atendhub:provision-admin": "node scripts/provision-atendhub-admin.mjs"
+    "atendhub:provision-admin": "node scripts/provision-atendhub-admin.mjs",
+    "test:editor": "playwright test --config=playwright.editor.config.ts"
   },
   "engines": {
     "node": ">=22.0.0"
