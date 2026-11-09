@@ -4414,3 +4414,21 @@ tbody tr:hover {
 .question-option-editor[open] > summary { margin-bottom: 12px; }
 .flow-advanced { margin-block: 16px; padding: 12px; border: 1px solid var(--border-subtle); border-radius: 10px; }
 .flow-advanced > summary { cursor: pointer; font-weight: 500; }
+
+/* Form routing: connected, keyboard-accessible branches. */
+.journey-map { display:grid; gap:16px; min-width:0; }
+.journey-origin { display:grid; gap:6px; padding:18px; text-align:center; border:1px solid #ddd6fe; background:#f5f3ff; border-radius:12px; }
+.journey-origin span { font-size:12px; color:#6d28d9; }
+.journey-branches { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr)); gap:16px; }
+.journey-branch { border:2px solid; border-radius:14px; padding:16px; min-width:0; display:flex; flex-direction:column; gap:12px; background:#fff; }
+.journey-answer { display:grid; gap:8px; }
+.journey-answer small { font-size:10px; letter-spacing:.1em; }
+.journey-connector { text-align:center; font-size:24px; color:#8b5cf6; }
+.journey-questions { padding-left:22px; display:grid; gap:10px; }
+.journey-questions li { padding:10px; background:#f5f3ff; border-radius:8px; overflow-wrap:anywhere; }
+.journey-questions small { display:block; font-size:11px; }
+.journey-branch details { border-top:1px solid #e5e7eb; padding-top:12px; }
+.journey-branch summary { cursor:pointer; font-weight:600; }
+.journey-branch .check-option { margin-top:12px; }
+.journey-common { border:1px dashed #94a3b8; background:#f8fafc; padding:16px; border-radius:12px; }
+.journey-branch select { width:100%; min-width:0; }
