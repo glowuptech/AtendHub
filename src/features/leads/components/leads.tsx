@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { LeadCreateDialog } from "./lead-create-dialog";
 import { useDemo } from "@/components/layout/demo-context";
 import { useClients } from "@/features/clients/hooks";
 import { useLeads } from "@/features/leads/hooks";
@@ -11,6 +12,7 @@ import {
   Badge,
   dateTime,
   stageLabels,
+  Empty,
 } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
 import { LeadTable } from "./lead-table";
@@ -21,15 +23,18 @@ export function Leads() {
   const { data: clients, error: clientsError } = useClients();
   const [search, setSearch] = useState(""),
     [stage, setStage] = useState("all");
-  const { data: leads = [], error: leadsError, isLoading } = useLeads({ clientId, search, stage });
   const c = clients?.find((client) => client.id === clientId);
+  const { data: leads = [], error: leadsError, isLoading, mutate } = useLeads({ clientId: c?.id ?? null, search, stage });
+  const [dialogOpen, setDialogOpen] = useState(false);
   return (
     <>
       <Heading
         title="Leads e CRM"
-        description={`${c?.name ?? "Cliente selecionado"} · CRM administrativo.`}
+        description={`${c?.name ?? "Nenhum cliente selecionado"} · CRM administrativo.`}
+        action={<Button disabled={!c} onClick={() => setDialogOpen(true)}>Novo lead</Button>}
       />
-      {(clientsError || leadsError) && <p role="alert">Não foi possível carregar os Leads reais.</p>}
+      {!c && <p role="status">Selecione um cliente no Workspace antes de cadastrar ou consultar Leads.</p>}
+      {(clientsError || leadsError) && <div role="alert"><p>Não foi possível carregar os Leads reais.</p><Button variant="outline" size="sm" onClick={() => { void mutate(); }}>Tentar novamente</Button></div>}
       {isLoading && <p role="status">Carregando Leads…</p>}
       <div className="toolbar">
         <label>
@@ -53,8 +58,11 @@ export function Leads() {
         </label>
       </div>
       <Card>
-        <LeadTable leads={leads} />
+        {leadsError ? null : leads.length === 0 ? (
+          search || stage !== "all" ? <Empty title="Nenhum resultado nos filtros" description="Ajuste a busca ou o estágio selecionado." /> : <Empty title="Nenhum lead cadastrado" description="Cadastre o primeiro lead manual deste cliente." />
+        ) : <LeadTable leads={leads} />}
       </Card>
+      {dialogOpen && c && <LeadCreateDialog client={c} onClose={() => setDialogOpen(false)} onCreated={() => { void mutate(); }} />}
     </>
   );
 }

@@ -38,10 +38,11 @@ export function useLead(leadId: string) {
   return useSWR<PersistedLead & { events?: Array<{ id: string; event_type: string; from_stage: string | null; to_stage: string | null; created_at: string }> }>(`/api/leads/${leadId}`, fetcher, { revalidateOnFocus: false });
 }
 
-export function useLeads(params: { clientId?: string; search?: string; stage?: string } = {}) {
+export function useLeads(params: { clientId?: string | null; search?: string; stage?: string } = {}) {
   const query = new URLSearchParams();
   if (params.clientId) query.set("clientId", params.clientId);
   if (params.search) query.set("search", params.search);
   if (params.stage && params.stage !== "all") query.set("stage", params.stage);
-  return useSWR<PersistedLead[]>(`/api/leads${query.size ? `?${query}` : ""}`, fetcher, { revalidateOnFocus: false, refreshInterval: 15000 });
+  const key = params.clientId === null ? null : `/api/leads${query.size ? `?${query}` : ""}`;
+  return useSWR<PersistedLead[]>(key, fetcher, { revalidateOnFocus: false, refreshInterval: 15000 });
 }
