@@ -3,10 +3,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useClients } from "@/features/clients/hooks";
 import { useLeads } from "@/features/leads/hooks";
-import { useDemo } from "@/components/layout/demo-context";
 import { Heading, Badge, stageLabels } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
 import { claimSla, clock, inBusinessTime } from "./calendar";
+import { useServiceCalendar } from "./use-service-calendar";
 const stages = [
   "new",
   "in_progress",
@@ -19,10 +19,8 @@ const stages = [
   "lost",
 ] as const;
 export function Queue() {
-  const {
-      calendar,
-    } = useDemo(),
-    router = useRouter();
+  const router = useRouter();
+  const { calendar, error: calendarError, isConfigured } = useServiceCalendar();
   const { data: clients = [], error: clientsError } = useClients();
   const { data: persistedLeads = [], error: leadsError, mutate: mutateLeads } = useLeads();
   function converse() {
@@ -54,7 +52,8 @@ export function Queue() {
         title="Fila de atendimento"
         description="Todos os clientes autorizados · prioridade para quem está aguardando"
       />
-      {(clientsError || leadsError) && <p role="alert">Não foi possível atualizar a fila real. Tente novamente.</p>}
+      {(clientsError || leadsError || calendarError) && <p role="alert">Não foi possível atualizar a fila real. Tente novamente.</p>}
+      {!isConfigured && !calendarError && <p role="status">O calendário de SLA ainda não foi configurado para esta organização.</p>}
       <div className="toolbar">
         <label>
           Buscar lead ou cliente
@@ -72,7 +71,7 @@ export function Queue() {
           </select>
         </label>
         <Badge>Prazo para assumir: 10 minutos úteis</Badge>
-        {now && !inBusinessTime(now, calendar) && (
+        {isConfigured && now && !inBusinessTime(now, calendar) && (
           <Badge>Relógio pausado · fora do expediente</Badge>
         )}
       </div>
@@ -101,7 +100,7 @@ export function Queue() {
             {leads
               .filter((l) => l.stage === stage)
               .map((l) => {
-                const sla = now ? claimSla(l.created_at, now, calendar) : null;
+                const sla = isConfigured && now ? claimSla(l.created_at, now, calendar) : null;
                 return (
                   <article className="queue-card" key={l.id}>
                     <small className="queue-client">{l.client.name}</small>
@@ -137,6 +136,7 @@ export function Queue() {
                           <small>Tempo útil para assumir</small>
                         </div>
                         <Button
+                          disabled={!isConfigured}
                           onClick={async () => {
                             const response = await fetch(`/api/leads/${l.id}/claim`, { method: "POST" });
                             if (response.ok) {
