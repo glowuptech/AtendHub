@@ -31,11 +31,16 @@ export function Shell({
   children: ReactNode;
   portal?: boolean;
 }) {
-  const { scope, repositories, clientId, setClientId } = useDemo();
+  const { clientId, setClientId, authorizedClients: remoteClients } = useDemo();
   const pathname = usePathname(),
     router = useRouter();
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    const match = pathname.match(/\/app\/clientes\/([^/]+)/);
+    const routeClientId = match?.[1];
+    if (routeClientId && remoteClients?.some((client) => client.id === routeClientId)) setClientId(routeClientId);
+  }, [pathname, remoteClients, setClientId]);
   const navigation = useRef<HTMLElement>(null);
   const menuTrigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -79,7 +84,7 @@ export function Shell({
       window.removeEventListener("resize", handleResize);
     };
   }, [open]);
-  const clinics = repositories.clients.list(scope);
+  const clinics = remoteClients;
   const links = portal
     ? ([
         ["/portal", "Visão geral", LayoutDashboard],
@@ -270,6 +275,7 @@ export function Shell({
                 <select
                   id="clinic"
                   value={clientId}
+                  disabled={clinics.length === 0}
                   onChange={(e) => {
                     const id = e.target.value;
                     setClientId(id);

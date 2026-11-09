@@ -1,8 +1,10 @@
 "use client";
 import Link from "next/link";
 import type { Lead } from "@/domain/schemas";
+import type { PersistedLead } from "@/features/leads/hooks";
 import { Badge, Empty, stageLabels } from "@/components/layout/shared";
-export function LeadTable({ leads }: { leads: Lead[] }) {
+type TableLead = PersistedLead | Lead;
+export function LeadTable({ leads }: { leads: TableLead[] }) {
   if (!leads.length) return <Empty />;
   return (
     <div className="table-scroll">
@@ -17,7 +19,12 @@ export function LeadTable({ leads }: { leads: Lead[] }) {
           </tr>
         </thead>
         <tbody>
-          {leads.map((l) => (
+          {leads.map((l) => {
+            const captureStatus = "capture_status" in l ? l.capture_status : l.captureStatus;
+            const owner = "owner_id" in l ? l.owner_id : l.owner;
+            const minutes = "created_at" in l ? 0 : l.minutesSinceContact;
+            const nextAction = "next_action" in l ? l.next_action : l.nextAction;
+            return (
             <tr key={l.id}>
               <td>
                 <Link className="person-link" href={`/app/leads/${l.id}`}>
@@ -27,9 +34,9 @@ export function LeadTable({ leads }: { leads: Lead[] }) {
                   <span>
                     {l.name}
                     <small>{l.source}</small>
-                    {l.captureStatus && l.captureStatus !== "completed" && (
+                    {captureStatus !== "completed" && (
                       <small>
-                        {l.captureStatus === "incomplete"
+                        {captureStatus === "incomplete"
                           ? "Cadastro incompleto"
                           : "Cadastro em andamento"}
                       </small>
@@ -50,13 +57,14 @@ export function LeadTable({ leads }: { leads: Lead[] }) {
                   {stageLabels[l.stage]}
                 </Badge>
               </td>
-              <td>{l.owner ?? "Não atribuído"}</td>
+              <td>{owner ? "Responsável atribuído" : "Não atribuído"}</td>
               <td>
-                {l.minutesSinceContact} min <small>tempo </small>
+                {minutes ? `${minutes} min` : "—"} <small>tempo </small>
               </td>
-              <td>{l.nextAction}</td>
+              <td>{nextAction}</td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

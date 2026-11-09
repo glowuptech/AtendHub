@@ -5,6 +5,8 @@ export const CalendarSchema = z
     end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
     days: z.array(z.number().int().min(0).max(6)).min(1),
     holidays: z.array(z.iso.date()),
+    timezone: z.string().default("America/Sao_Paulo"),
+    exceptions: z.record(z.string(), z.object({ start: z.string().nullable(), end: z.string().nullable() })).default({}),
   })
   .refine(
     (v) => v.end > v.start,
@@ -16,40 +18,44 @@ export const defaultCalendar: BusinessCalendar = {
   end: "17:00",
   days: [1, 2, 3, 4, 5],
   holidays: [],
+  timezone: "America/Sao_Paulo",
+  exceptions: {},
 };
-const localDate = (ms: number) =>
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(ms);
-// Modern São Paulo operation uses UTC-03 (no daylight saving since 2019).
-export function businessMs(
-  from: string,
-  to: string,
-  calendar: BusinessCalendar,
-) {
-  const begin = Date.parse(from),
-    finish = Date.parse(to);
-  if (!Number.isFinite(begin) || !Number.isFinite(finish) || finish <= begin)
-    return 0;
-  let day = Date.parse(localDate(begin) + "T00:00:00-03:00"),
-    total = 0;
-  const minutes = (s: string) => {
-    const [h, m] = s.split(":").map(Number);
-    return h * 60 + m;
-  };
-  while (day < finish) {
-    const date = localDate(day),
-      weekday = new Date(day).getUTCDay();
-    if (calendar.days.includes(weekday) && !calendar.holidays.includes(date))
-      total += Math.max(
-        0,
-        Math.min(finish, day + minutes(calendar.end) * 60000) -
-          Math.max(begin, day + minutes(calendar.start) * 60000),
-      );
-    day += 86400000;
+const localParts = (ms: number, timezone: string) =>
+  Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour: "2-digit", hourCycle: "h23", minute: "2-digit", second: "2-digit",
+  }).formatToParts(ms).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+const localDate = (ms: number, timezone: string) => {
+  const parts = localParts(ms, timezone) as { year: string; month: string; day: string };
+  return `${parts.year}-${parts.month}-${parts.day}`;
+};
+const zonedMidnight = (date: string, timezone: string) => {
+  const guess = Date.parse(`${date}T00:00:00Z`);
+  const parts = localParts(guess, timezone) as { year: string; month: string; day: string; hour: string; minute: string; second: string };
+  const localAsUtc = Date.parse(`${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}Z`);
+  const desiredLocalAsUtc = Date.parse(`${date}T00:00:00Z`);
+  return guess + (desiredLocalAsUtc - localAsUtc);
+};
+export function businessMs(from: string, to: string, calendar: BusinessCalendar) {
+  const begin = Date.parse(from), finish = Date.parse(to);
+  if (!Number.isFinite(begin) || !Number.isFinite(finish) || finish <= begin) return 0;
+  const minutes = (value: string) => { const [h, m] = value.split(":").map(Number); return h * 60 + m; };
+  let date = localDate(begin, calendar.timezone), total = 0;
+  for (let index = 0; index < 370 && zonedMidnight(date, calendar.timezone) < finish; index += 1) {
+    const noon = zonedMidnight(date, calendar.timezone) + 12 * 60 * 60000;
+    const weekday = new Date(noon).getUTCDay();
+    const exception = calendar.exceptions[date];
+    const isHoliday = calendar.holidays.includes(date) || exception?.start === null;
+    if (!isHoliday && (exception || calendar.days.includes(weekday))) {
+      const start = exception?.start ?? calendar.start;
+      const end = exception?.end ?? calendar.end;
+      const windowStart = zonedMidnight(date, calendar.timezone) + minutes(start) * 60000;
+      const windowEnd = zonedMidnight(date, calendar.timezone) + minutes(end) * 60000;
+      total += Math.max(0, Math.min(finish, windowEnd) - Math.max(begin, windowStart));
+    }
+    const next = new Date(`${date}T12:00:00Z`); next.setUTCDate(next.getUTCDate() + 1);
+    date = next.toISOString().slice(0, 10);
   }
   return total;
 }

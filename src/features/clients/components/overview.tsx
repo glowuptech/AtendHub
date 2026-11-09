@@ -136,7 +136,7 @@ export function ClientOverview({
     [draftRange, setDraftRange] = useState(range),
     [doctor, setDoctor] = useState("all"),
     [error, setError] = useState("");
-  const data = getClientOverview(repositories, client.id, range, doctor);
+  const data = getClientOverview(repositories, client.id, range, doctor, client);
   const known = data.appointments.filter(
       (a) => a.attendance !== "unknown",
     ).length,
@@ -414,6 +414,7 @@ export function ClientOverview({
         </Card>
       </div>
       <Card title="Conversão por formulário">
+        <div className="actions"><NavButton href={`/app/clientes/${client.id}/formularios`}>Gerenciar formulários</NavButton><NavButton href={`/app/clientes/${client.id}/formularios/novo`}>Novo formulário</NavButton></div>
         <div
           className="table-scroll"
           tabIndex={0}

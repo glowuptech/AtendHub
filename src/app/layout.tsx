@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { DemoProvider } from "@/components/layout/demo-context";
 import "./globals.css";
 export const metadata: Metadata = {
   title: {
@@ -16,9 +15,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR">
-      <body>
-        <DemoProvider>{children}</DemoProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

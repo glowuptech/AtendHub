@@ -49,14 +49,26 @@ export function partnershipSummary(
 }
 export const ratio = (n: number, d: number) =>
   d ? `${Math.round((n / d) * 100)}%` : "N/D";
+function scopedList<T>(list: () => T[]): T[] {
+  try {
+    return list();
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("fora do escopo")) return [];
+    throw error;
+  }
+}
+
 export function getClientOverview(
   repositories: RepositoryRegistry,
   clientId: string,
   range: { from: string; to: string },
   doctorId = "all",
+  clientOverride?: Client,
 ) {
   RangeSchema.parse(range);
-  const client = repositories.clients.get(clientId);
+  let client = clientOverride;
+  if (!client) client = repositories.clients.get(clientId);
+  if (!client) throw new Error("Cliente não encontrado.");
   if (
     doctorId !== "all" &&
     doctorId !== "unassigned" &&
@@ -66,11 +78,11 @@ export function getClientOverview(
   const doctorMatch = (id: string | null) =>
     doctorId === "all" || (doctorId === "unassigned" ? !id : id === doctorId);
   const inRange = (day: string) => day >= range.from && day <= range.to;
-  const allLeads = repositories.leads.list(clientId),
+  const allLeads = scopedList(() => repositories.leads.list(clientId)),
     leads = allLeads.filter(
       (l) => doctorMatch(l.doctorId) && inRange(localDay(l.createdAt)),
     );
-  const mirrors = repositories.appointments.list(clientId);
+  const mirrors = scopedList(() => repositories.appointments.list(clientId));
   const allIds = new Set(
     allLeads.filter((l) => doctorMatch(l.doctorId)).map((l) => l.id),
   );
@@ -93,8 +105,7 @@ export function getClientOverview(
     l.handlingMinutes === null ? [] : [l.handlingMinutes],
   );
   // Fixed anonymous demo aggregates, not generated leads or a production analytics API.
-  const formRows = repositories.forms
-    .list(clientId)
+  const formRows = scopedList(() => repositories.forms.list(clientId))
     .filter((f) => doctorMatch(f.doctorId))
     .map((f) => {
       const seeded = [uid(300), uid(400), uid(500)].includes(f.id);

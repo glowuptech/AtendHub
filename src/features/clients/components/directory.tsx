@@ -2,6 +2,7 @@
 import { BillingFields } from "./billing-fields";
 import { BillingSchema, monthlyFeeCents } from "@/domain/billing";
 import { useRef, useState } from "react";
+import { useClients } from "../hooks";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -89,6 +90,7 @@ function CopyButton({ value, label }: { value: string | null; label: string }) {
 }
 export function Clients() {
   const { repositories, scope, setClientId } = useDemo();
+  const { data: remoteClients, error: clientsError, isLoading } = useClients();
   const [search, setSearch] = useState(""),
     [status, setStatus] = useState("all"),
     [category, setCategory] = useState("all"),
@@ -96,7 +98,7 @@ export function Clients() {
     [showFilters, setShowFilters] = useState(false),
     [notice, setNotice] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
-  const clients = repositories.clients.list(scope);
+  const clients = remoteClients ?? [];
   const specialties = [
     ...new Set(
       clients.flatMap((c) => [
@@ -146,6 +148,8 @@ export function Clients() {
           </Button>
         }
       />
+      {isLoading && <p role="status">Carregando clientes persistidos…</p>}
+      {clientsError && <p role="alert" className="field-error">{clientsError.message}</p>}
       <div className="clinic-directory-summary">
         <span>
           <strong>{clients.length}</strong> cadastros
@@ -331,8 +335,8 @@ export function Clients() {
             </div>
             <div className="clinic-card-footer">
               <small>
-                {repositories.leads.list(c.id).length} leads ·{" "}
-                {repositories.forms.list(c.id).length} formulários
+                {scope.clientIds.includes(c.id) ? repositories.leads.list(c.id).length : 0} leads ·{" "}
+                {scope.clientIds.includes(c.id) ? repositories.forms.list(c.id).length : 0} formulários
               </small>
               <Link
                 className={buttonVariants({ variant: "outline", size: "sm" })}
@@ -379,7 +383,7 @@ function CreateClinic({
   onClose: () => void;
   onCreated: (name: string) => void;
 }) {
-  const { repositories, scope, refresh } = useDemo();
+  const { mutate } = useClients();
   const [name, setName] = useState(""),
     [category, setCategory] = useState<Client["category"]>("clinic"),
     [cnpj, setCnpj] = useState(""),
@@ -419,12 +423,12 @@ function CreateClinic({
   return (
     <form
       noValidate
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
         try {
           const client = ClientSchema.parse({
             id: crypto.randomUUID(),
-            organizationId: scope.organizationId,
+            organizationId: crypto.randomUUID(),
             billing: {
               ...billing,
               monthlyFeeCents: monthlyFeeCents(
@@ -449,8 +453,10 @@ function CreateClinic({
               specialties: parseList(d.specialties),
             })),
           });
-          repositories.clients.create(client);
-          refresh();
+          const response = await fetch("/api/clients", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(client) });
+          const body = await response.json();
+          if (!response.ok) throw new Error(body.error ?? "Não foi possível criar o cliente.");
+          await mutate();
           reset();
           onCreated(client.name);
         } catch (e) {

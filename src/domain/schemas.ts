@@ -110,7 +110,7 @@ export const ClientSchema = z.object({
   externalSchedulingUrl: z
     .string()
     .url()
-    .refine((v) => new URL(v).hostname === "example.com"),
+    .refine((v) => new URL(v).protocol === "https:", "A agenda deve usar HTTPS"),
   description: z.string(),
   category: z
     .enum(["clinic", "doctor_male", "doctor_female"])
@@ -145,6 +145,7 @@ export const FieldTypeSchema = z.enum([
   "phone",
   "email",
   "single_select",
+  "image_choice",
   "multi_select",
   "date",
   "boolean",
@@ -171,12 +172,17 @@ export const FieldSchema = z
     label: z.string().trim().min(2).max(100),
     type: FieldTypeSchema,
     sensitivity: z.literal("ordinary"),
-    options: z
-      .array(z.object({ id: z.string().min(1), label: z.string().min(1) }))
-      .max(20),
+    options: z.array(z.object({
+      id: z.string().min(1),
+      label: z.string().min(1),
+      description: z.string().max(240).default(""),
+      imageUrl: z.string().max(1500000).refine((value) => !value || /^https:\/\//.test(value) || /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(value), "Imagem inválida: use PNG, JPEG ou WebP.").default(""),
+      alt: z.string().max(180).default(""),
+      pathId: z.string().min(1).nullable().default(null),
+    })).max(20),
   })
   .superRefine((v, ctx) => {
-    if (["single_select", "multi_select"].includes(v.type) && !v.options.length)
+    if (["single_select", "image_choice", "multi_select"].includes(v.type) && !v.options.length)
       ctx.addIssue({
         code: "custom",
         message: "Informe opções para este campo",
@@ -185,11 +191,18 @@ export const FieldSchema = z
     if (new Set(v.options.map((o) => o.id)).size !== v.options.length)
       ctx.addIssue({ code: "custom", message: "Opções duplicadas" });
   });
+export const PathSchema = z.object({
+  id: z.string().regex(/^[a-z][a-z0-9_-]{0,39}$/),
+  letter: z.string().regex(/^[A-Z]$/),
+  name: z.string().trim().min(2).max(100),
+});
 export const QuestionSchema = z.object({
   id: Id,
   fieldDefinitionId: Id,
   label: z.string().min(2),
   required: z.boolean(),
+  pathIds: z.array(z.string().min(1)).default([]),
+  definesPath: z.boolean().default(false),
 });
 export const StepSchema = z.object({
   metaEvent: z
@@ -212,12 +225,15 @@ export const VersionSchema = z.object({
   number: z.number().int().positive(),
   state: z.enum(["draft", "snapshot"]),
   steps: z.array(StepSchema).min(1),
+  paths: z.array(PathSchema).max(26).default([]),
   theme: z.enum(["prescrita", "sage"]),
   successMessage: z.string().min(2),
   destination: z.literal("demo_success"),
 });
 export const FormSchema = z.object({
   doctorId: Id.nullable().default(null),
+  fields: z.array(z.lazy(() => FieldSchema)).default([]),
+  description: z.string().max(2000).default(""),
   ...scoped,
   name: z.string().trim().min(3),
   slug: z.string().regex(/^[a-z0-9-]+$/),
@@ -286,6 +302,7 @@ export const LeadSchema = z.object({
   minutesSinceContact: z.number(),
   nextAction: z.string(),
   source: z.string(),
+  journey: z.object({ pathId: z.string().nullable(), pathName: z.string().nullable() }).optional(),
   fields: z.array(
     z.object({
       fieldDefinitionId: Id,
@@ -416,6 +433,7 @@ export function validateAnswer(
     case "boolean":
       return z.boolean().parse(value);
     case "single_select":
+    case "image_choice":
       return z
         .string()
         .refine(

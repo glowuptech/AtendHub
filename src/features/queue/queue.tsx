@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
-import { LeadModal } from "./lead-modal";
 import { useRouter } from "next/navigation";
-import { useDemo } from "@/components/layout/demo-context";
+import { useClients } from "@/features/clients/hooks";
+import { useLeads } from "@/features/leads/hooks";
 import { Heading, Badge, stageLabels } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
 import { claimSla, clock, inBusinessTime } from "./calendar";
+import { useServiceCalendar } from "./use-service-calendar";
 const stages = [
   "new",
   "in_progress",
@@ -18,34 +19,12 @@ const stages = [
   "lost",
 ] as const;
 export function Queue() {
-  const {
-      scope,
-      attendant,
-      repositories,
-      refresh,
-      setClientId,
-      setInboxLeadId,
-      calendar,
-    } = useDemo(),
-    router = useRouter();
-  const [opened, setOpened] = useState<{ clientId: string; id: string } | null>(
-    null,
-  );
-  function converse(clientId: string, id: string) {
-    const lead = repositories.leads.get(clientId, id);
-    if (lead.owner !== attendant) {
-      setMessage(
-        lead.owner
-          ? "Este atendimento está atribuído a outra pessoa."
-          : "Assuma o atendimento para abrir a conversa no seu Inbox.",
-      );
-      return;
-    }
-    repositories.inbox.ensure(clientId, lead);
-    setClientId(clientId);
-    setInboxLeadId(id);
-    refresh();
-    router.push("/app/inbox");
+  const router = useRouter();
+  const { calendar, error: calendarError, isConfigured } = useServiceCalendar();
+  const { data: clients = [], error: clientsError } = useClients();
+  const { data: persistedLeads = [], error: leadsError, mutate: mutateLeads } = useLeads();
+  function converse() {
+    setMessage("O Inbox ainda não está conectado a um provedor de mensagens. Nenhuma mensagem foi simulada.");
   }
   const [now, setNow] = useState<number | null>(null),
     [message, setMessage] = useState(""),
@@ -55,26 +34,26 @@ export function Queue() {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
-  const clients = repositories.clients.list(scope);
-  const leads = clients
-    .flatMap((c) =>
-      repositories.leads.list(c.id).map((l) => ({ ...l, client: c })),
-    )
+  const leads = persistedLeads
+    .map((lead) => ({ ...lead, client: clients.find((client) => client.id === lead.client_id) }))
+    .filter((lead): lead is typeof lead & { client: (typeof clients)[number] } => Boolean(lead.client))
     .filter(
       (l) =>
-        (!filter || l.clientId === filter) &&
-        `${l.name} ${l.client.name} ${l.contact?.phone ?? ""}`
+        (!filter || l.client_id === filter) &&
+        `${l.name} ${l.client.name} ${l.phone}`
           .toLowerCase()
           .includes(search.toLowerCase()),
     )
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
   return (
     <>
       <Heading
         eyebrow="SISTEMA"
         title="Fila de atendimento"
-        description="Todos os clientes · prioridade para quem está aguardando"
+        description="Todos os clientes autorizados · prioridade para quem está aguardando"
       />
+      {(clientsError || leadsError || calendarError) && <p role="alert">Não foi possível atualizar a fila real. Tente novamente.</p>}
+      {!isConfigured && !calendarError && <p role="status">O calendário de SLA ainda não foi configurado para esta organização.</p>}
       <div className="toolbar">
         <label>
           Buscar lead ou cliente
@@ -92,7 +71,7 @@ export function Queue() {
           </select>
         </label>
         <Badge>Prazo para assumir: 10 minutos úteis</Badge>
-        {now && !inBusinessTime(now, calendar) && (
+        {isConfigured && now && !inBusinessTime(now, calendar) && (
           <Badge>Relógio pausado · fora do expediente</Badge>
         )}
       </div>
@@ -121,7 +100,7 @@ export function Queue() {
             {leads
               .filter((l) => l.stage === stage)
               .map((l) => {
-                const sla = now ? claimSla(l.createdAt, now, calendar) : null;
+                const sla = isConfigured && now ? claimSla(l.created_at, now, calendar) : null;
                 return (
                   <article className="queue-card" key={l.id}>
                     <small className="queue-client">{l.client.name}</small>
@@ -133,16 +112,16 @@ export function Queue() {
                           : "Médico · Saúde"}
                     </Badge>
                     <h3>{l.name}</h3>
-                    <p>{l.contact?.phone || "Telefone não informado"}</p>
+                    <p>{l.phone || "Telefone não informado"}</p>
                     <small>Origem: {l.source}</small>
-                    {l.captureStatus && l.captureStatus !== "completed" && (
+                    {l.capture_status && l.capture_status !== "completed" && (
                       <Badge>
-                        {l.captureStatus === "incomplete"
+                        {l.capture_status === "incomplete"
                           ? "Cadastro incompleto"
                           : "Cadastro em andamento"}
                       </Badge>
                     )}
-                    {!l.owner ? (
+                    {!l.owner_id ? (
                       <>
                         <div
                           className={`queue-clock ${sla?.overdue ? "late" : ""}`}
@@ -157,23 +136,16 @@ export function Queue() {
                           <small>Tempo útil para assumir</small>
                         </div>
                         <Button
-                          onClick={() => {
-                            try {
-                              repositories.leads.claim(
-                                l.clientId,
-                                l.id,
-                                calendar,
-                              );
-                              refresh();
-                              setMessage(
-                                `Atendimento de ${l.name} atribuído em memória à Operadora.`,
-                              );
-                            } catch (e) {
-                              setMessage(
-                                e instanceof Error
-                                  ? e.message
-                                  : "Não foi possível assumir",
-                              );
+                          disabled={!isConfigured}
+                          onClick={async () => {
+                            const response = await fetch(`/api/leads/${l.id}/claim`, { method: "POST" });
+                            if (response.ok) {
+                              await mutateLeads();
+                              setMessage(`Atendimento de ${l.name} assumido e salvo.`);
+                            } else {
+                              const body = await response.json().catch(() => null);
+                              setMessage(body?.error ?? "Este atendimento já foi assumido por outra pessoa.");
+                              await mutateLeads();
                             }
                           }}
                         >
@@ -183,30 +155,17 @@ export function Queue() {
                     ) : (
                       <>
                         <p>
-                          Responsável: <strong>{l.owner}</strong>
+                          Responsável: <strong>{l.owner_id}</strong>
                         </p>
-                        {l.claimAudit && (
-                          <Badge>
-                            {l.claimAudit.late
-                              ? "Assumido após o prazo"
-                              : "Assumido no prazo"}
-                          </Badge>
-                        )}
+                        {l.claimed_at && <Badge>Atendimento assumido</Badge>}
                         <label>
                           Mover {l.name}
                           <select
                             value={l.stage}
-                            onChange={(e) => {
-                              try {
-                                repositories.leads.setStage(
-                                  l.clientId,
-                                  l.id,
-                                  e.target.value as typeof l.stage,
-                                );
-                                refresh();
-                              } catch (e) {
-                                setMessage(String(e));
-                              }
+                            onChange={async (e) => {
+                              const response = await fetch(`/api/leads/${l.id}/stage`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ stage: e.target.value }) });
+                              if (!response.ok) setMessage("Não foi possível mover este atendimento.");
+                              await mutateLeads();
                             }}
                           >
                             {stages
@@ -223,15 +182,13 @@ export function Queue() {
                     <div className="queue-card-actions">
                       <Button
                         variant="ghost"
-                        onClick={() => {
-                          setOpened({ clientId: l.clientId, id: l.id });
-                        }}
+                        onClick={() => router.push(`/app/leads/${l.id}`)}
                       >
                         Abrir lead
                       </Button>
                       <Button
                         variant="outline"
-                        onClick={() => converse(l.clientId, l.id)}
+                        onClick={converse}
                       >
                         Conversar
                       </Button>
@@ -245,14 +202,6 @@ export function Queue() {
           </section>
         ))}
       </div>
-      {opened && (
-        <LeadModal
-          clientId={opened.clientId}
-          id={opened.id}
-          onClose={() => setOpened(null)}
-          onConverse={() => converse(opened.clientId, opened.id)}
-        />
-      )}
     </>
   );
 }

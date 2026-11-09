@@ -1,9 +1,11 @@
 "use client";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 const subscribe = () => () => {};
 import { z } from "zod";
 import { Plus, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
 import { useDemo } from "@/components/layout/demo-context";
+import { useClients } from "@/features/clients/hooks";
+import { useForms } from "../hooks";
 import {
   Heading,
   Card,
@@ -19,6 +21,7 @@ import {
   type FormDefinition,
   type FormVersion,
   type FormStep,
+  type CustomFieldDefinition,
 } from "@/domain/schemas";
 import { QuestionOptions } from "./question-options";
 import { SettingsEditor } from "./settings-editor";
@@ -30,6 +33,7 @@ const typeLabels: Record<FieldType, string> = {
   phone: "Telefone",
   email: "E-mail",
   single_select: "Seleção única",
+  image_choice: "Escolha por imagens",
   multi_select: "Múltipla seleção",
   date: "Data",
   boolean: "Sim / não",
@@ -48,8 +52,10 @@ function newStep(fieldId: string, label: string, order: number): FormStep {
       id: crypto.randomUUID(),
       fieldDefinitionId: fieldId,
       label,
-      required: true,
-    },
+          required: true,
+          pathIds: [],
+          definesPath: false,
+        },
   };
 }
 export function FormEditor({
@@ -59,23 +65,24 @@ export function FormEditor({
   clientId: string;
   formId?: string;
 }) {
-  const { repositories, clientId } = useDemo();
-  const mounted = useSyncExternalStore(
-    subscribe,
-    () => true,
-    () => false,
-  );
-  if (!mounted) return <p role="status">Carregando editor…</p>;
-  if (id !== clientId) return <Denied />;
-  const source = formId
-    ? repositories.forms.list(id).find((f) => f.id === formId)
-    : undefined;
+  const { setClientId } = useDemo();
+  const { data: clients, isLoading: clientsLoading, error: clientsError } = useClients();
+  const { data: forms, isLoading: formsLoading, error: formsError } = useForms(id);
+  useEffect(() => {
+    if (clients?.some((item) => item.id === id)) setClientId(id);
+  }, [clients, id, setClientId]);
+  const mounted = useSyncExternalStore(subscribe, () => true, () => false);
+  const client = clients?.find((item) => item.id === id);
+  if (!mounted || clientsLoading || formsLoading) return <p role="status">Carregando cliente e formulários…</p>;
+  if (clientsError) return <p role="alert">Não foi possível consultar os clientes autorizados. Tente novamente.</p>;
+  if (!client) return <Denied />;
+  if (formsError) return <p role="alert">Não foi possível consultar os formulários deste cliente.</p>;
+  const source = formId ? forms?.find((form) => form.id === formId) : undefined;
   if (formId && !source) return <Denied />;
-  return <EditorWorkspace key={`${id}-${formId ?? "new"}`} source={source} />;
+  return <EditorWorkspace key={`${id}-${formId ?? "new"}`} client={client} source={source} />;
 }
-function EditorWorkspace({ source }: { source?: FormDefinition }) {
-  const { repositories, clientId, refresh } = useDemo();
-  const client = repositories.clients.get(clientId);
+function EditorWorkspace({ source, client }: { source?: FormDefinition; client: import("@/domain/schemas").Client }) {
+  const clientId = client.id;
   const [draft, setDraft] = useState<FormDefinition>(() => {
     if (source) {
       const f = structuredClone(source),
@@ -107,6 +114,8 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
       organizationId: client.organizationId,
       clientId,
       doctorId: null,
+      description: "",
+      fields: [],
       name: "Novo formulário",
       slug: `formulario-${formId.slice(0, 8)}`,
       status: "draft",
@@ -120,6 +129,7 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
           number: 1,
           state: "draft",
           steps: [],
+          paths: [],
           theme: client.branding,
           destination: "demo_success",
           settings: settingsOf(),
@@ -128,6 +138,8 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
       ],
     };
   });
+  const [fields, setFields] = useState(source?.fields ?? []);
+  const [persistedId, setPersistedId] = useState(source?.id ?? "");
   const [mode, setMode] = useState("new"),
     [selected, setSelected] = useState(""),
     [label, setLabel] = useState(""),
@@ -140,7 +152,6 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
     [previewKey, setPreviewKey] = useState(0),
     [previewMode, setPreviewMode] = useState<"mobile" | "wide">("mobile");
   const version = draft.versions.find((v) => v.id === draft.activeVersionId)!;
-  const fields = repositories.fields.list(clientId);
   const frozen = version.state === "snapshot";
   function updateVersion(change: Partial<FormVersion>) {
     setSaved(false);
@@ -156,20 +167,20 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
       steps: version.steps.map((s) => (s.id === id ? { ...s, ...change } : s)),
     });
   }
-  function save(snapshot = false) {
+  async function save(snapshot = false) {
     try {
-      repositories.forms.save(clientId, draft);
-      if (snapshot) {
-        repositories.forms.snapshot(clientId, draft.id);
-        setDraft(repositories.forms.get(clientId, draft.id));
-      }
-      refresh();
+      const response = await fetch(persistedId ? `/api/forms/${persistedId}` : "/api/forms", {
+        method: persistedId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, form: draft, publish: snapshot }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Não foi possível salvar o formulário.");
+      setPersistedId(result.id);
+      setDraft(result);
+      setFields(result.fields ?? []);
       setSaved(true);
-      setNotice(
-        snapshot
-          ? "Formulário ativado nesta sessão. Abra o formulário para testar o cadastro."
-          : "Formulário salvo.",
-      );
+      setNotice(snapshot ? "Formulário publicado. A versão anterior permanece preservada." : "Formulário salvo como rascunho.");
     } catch (e) {
       setNotice(
         e instanceof z.ZodError
@@ -196,8 +207,9 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
         <a href="#editor-identity">01 · Identidade</a>
         <a href="#editor-contacts">02 · Contatos</a>
         <a href="#editor-appearance">03 · Aparência</a>
-        <a href="#editor-questions">04 · Perguntas ({version.steps.length})</a>
-        <a href="#editor-tracking">05 · Eventos</a>
+        <a href="#editor-paths">04 · Caminhos ({version.paths?.length ?? 0})</a>
+        <a href="#editor-questions">05 · Perguntas ({version.steps.length})</a>
+        <a href="#editor-tracking">06 · Eventos</a>
       </nav>
       <div className={`editor-grid preview-${previewMode}`}>
         <div className="editor-fields">
@@ -263,6 +275,13 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
             onChange={(settings) => updateVersion({ settings })}
             disabled={frozen}
           />
+          <div id="editor-paths">
+            <Card title="Caminhos">
+              <p className="muted">Defina caminhos antes de associar perguntas. Sem caminhos, o formulário continua linear.</p>
+              {(version.paths ?? []).map((path) => <div className="path-editor-row" key={path.id}><input aria-label="Letra do caminho" maxLength={1} value={path.letter} onChange={(e) => updateVersion({ paths: (version.paths ?? []).map((item) => item.id === path.id ? { ...item, letter: e.target.value.toUpperCase() } : item) })} /><input aria-label="Nome do caminho" value={path.name} onChange={(e) => updateVersion({ paths: (version.paths ?? []).map((item) => item.id === path.id ? { ...item, name: e.target.value } : item) })} /><Button type="button" variant="ghost" onClick={() => updateVersion({ paths: (version.paths ?? []).filter((item) => item.id !== path.id) })}>Remover</Button></div>)}
+              <Button type="button" variant="outline" onClick={() => { const paths = version.paths ?? []; const letter = String.fromCharCode(65 + paths.length); updateVersion({ paths: [...paths, { id: `caminho_${letter.toLowerCase()}`, letter, name: `Novo caminho ${letter}` }] }); }}>Adicionar caminho</Button>
+            </Card>
+          </div>
           <div id="editor-questions">
             <Card title="Etapas e perguntas">
               {!version.steps.length && (
@@ -319,15 +338,16 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
                       field={fields.find(
                         (f) => f.id === s.question.fieldDefinitionId,
                       )!}
+                      paths={version.paths ?? []}
                       onSave={(field) => {
-                        repositories.fields.create(clientId, field);
+                        setFields((current) => current.some((item) => item.id === field.id) ? current.map((item) => item.id === field.id ? field : item) : [...current, field]);
+                        setDraft((current) => ({ ...current, fields: current.fields.some((item) => item.id === field.id) ? current.fields.map((item) => item.id === field.id ? field : item) : [...current.fields, field] }));
                         updateStep(s.id, {
                           question: {
                             ...s.question,
                             fieldDefinitionId: field.id,
                           },
                         });
-                        refresh();
                       }}
                     />
                   )}
@@ -341,6 +361,10 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
                       }
                     />
                   </label>
+                  {!!(version.paths ?? []).length && <>
+                    <label>Disponível em caminhos (vazio = comum a todos)<select multiple value={s.question.pathIds} onChange={(e) => updateStep(s.id, { question: { ...s.question, pathIds: Array.from(e.target.selectedOptions, (option) => option.value) } })}>{(version.paths ?? []).map((path) => <option key={path.id} value={path.id}>{path.letter} — {path.name}</option>)}</select></label>
+                    <label className="check-option"><input type="checkbox" checked={s.question.definesPath} onChange={(e) => updateStep(s.id, { question: { ...s.question, definesPath: e.target.checked, pathIds: [] } })} /> Define o caminho</label>
+                  </>}
                   <label className="check-option">
                     <input
                       type="checkbox"
@@ -488,7 +512,7 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
                         ))}
                       </select>
                     </label>
-                    {["single_select", "multi_select"].includes(type) && (
+                    {["single_select", "image_choice", "multi_select"].includes(type) && (
                       <label>
                         Opções, uma por linha
                         <textarea
@@ -503,10 +527,10 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
                   disabled={mode === "reuse" && (!confirmed || !selected)}
                   onClick={() => {
                     try {
-                      let field;
+                      let field: CustomFieldDefinition;
                       if (mode === "reuse") {
                         if (!confirmed) throw Error("Confirme a reutilização");
-                        field = repositories.fields.get(clientId, selected);
+                        field = fields.find((item) => item.id === selected) ?? (() => { throw Error("Campo não encontrado."); })();
                       } else {
                         field = FieldSchema.parse({
                           id: crypto.randomUUID(),
@@ -527,8 +551,8 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
                               label: s,
                             })),
                         });
-                        repositories.fields.create(clientId, field);
-                        refresh();
+                        setFields((current) => [...current, field]);
+                        setDraft((current) => ({ ...current, fields: [...current.fields, field] }));
                       }
                       if (
                         version.steps.some(

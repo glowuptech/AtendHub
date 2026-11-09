@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { FieldInput } from "./field-input";
 import { settingsOf } from "../services/settings";
+import { eligibleSteps } from "../services/routing";
 import { useDemo } from "@/components/layout/demo-context";
 export function FormWizard({
   form,
@@ -42,16 +43,16 @@ export function FormWizard({
     ),
     [error, setError] = useState(""),
     [done, setDone] = useState(false),
-    [savedPartial, setSavedPartial] = useState(Boolean(progress));
+    [savedPartial, setSavedPartial] = useState(Boolean(progress)),
+    [introSeen, setIntroSeen] = useState(settings.introduction.mode !== "separate");
   const session = useRef(progress?.sessionId ?? "");
   const heading = useRef<HTMLHeadingElement>(null);
   const submitted = useRef(false);
   const hasContacts = Object.values(settings.contacts).some((c) => c.enabled);
+  const routedSteps = eligibleSteps(version, fields, answers);
   const sequence = [
-    ...(hasContacts && settings.contactPosition === "start"
-      ? ["contacts"]
-      : []),
-    ...version.steps.map((s) => s.id),
+    ...(hasContacts && settings.contactPosition === "start" ? ["contacts"] : []),
+    ...routedSteps.map((s) => s.id),
     ...(hasContacts && settings.contactPosition === "end" ? ["contacts"] : []),
   ];
   const current = sequence[index];
@@ -102,6 +103,9 @@ export function FormWizard({
     "--form-button": appearance.button,
     "--form-button-text": appearance.buttonText,
     "--form-bg": appearance.background,
+    "--form-panel-opacity": appearance.panelOpacity / 100,
+    "--form-overlay": appearance.overlay,
+    "--form-overlay-opacity": appearance.overlayOpacity / 100,
     "--form-text": appearance.text,
     "--form-border": appearance.border,
     "--form-radius": `${appearance.radius}px`,
@@ -131,8 +135,17 @@ export function FormWizard({
       style={style}
     >
       <div className="form-sheet">
+        <div className="form-image-overlay" aria-hidden="true" />
         {appearance.cover && (
           <img className="form-cover" src={appearance.cover} alt="" />
+        )}
+        {settings.introduction.mode === "separate" && !introSeen && (
+          <section className="form-intro" aria-labelledby="form-intro-title">
+            {settings.introduction.logo && <img src={settings.introduction.logo} alt="" className="form-intro-logo" />}
+            <h1 id="form-intro-title">{settings.introduction.title || form.name}</h1>
+            <div className="form-intro-copy">{(settings.introduction.blocks.length ? settings.introduction.blocks : settings.description ? [{ text: settings.description, style: "support" as const, align: "center", bold: false, italic: false }] : []).map((block, i) => <p key={i} style={{ textAlign: block.align as CSSProperties["textAlign"], fontWeight: block.bold ? 700 : 400, fontStyle: block.italic ? "italic" : "normal" }}>{block.text}</p>)}</div>
+            <Button type="button" onClick={() => setIntroSeen(true)}>{settings.introduction.buttonLabel}<ArrowRight size={16} /></Button>
+          </section>
         )}
         <div className="form-content">
           <header>
@@ -188,7 +201,7 @@ export function FormWizard({
                       else throw Error("Pergunta indisponível");
                       if (isLast) {
                         validateContacts();
-                        for (const s of version.steps) {
+                        for (const s of routedSteps) {
                           const f = fields.find(
                             (f) => f.id === s.question.fieldDefinitionId,
                           );
@@ -205,7 +218,7 @@ export function FormWizard({
                           repositories.capture.capture({
                             ...base(),
                             contacts,
-                            answers,
+                            answers: Object.fromEntries(routedSteps.map((s) => [s.question.id, answers[s.question.id]]).filter(([, value]) => value !== undefined)),
                             complete: true,
                           });
                           submitted.current = true;
@@ -300,7 +313,13 @@ export function FormWizard({
                         value={answers[step.question.id]}
                         errorId={error ? "form-error" : undefined}
                         onChange={(v) => {
-                          setAnswers((a) => ({ ...a, [step.question.id]: v }));
+                          setAnswers((a) => {
+                            const next = { ...a, [step.question.id]: v };
+                            const eligible = new Set(eligibleSteps(version, fields, next).map((item) => item.question.id));
+                            for (const key of Object.keys(next)) if (!eligible.has(key)) delete next[key];
+                            return next;
+                          });
+                          setIndex((currentIndex) => Math.min(currentIndex, Math.max(sequence.length - 1, 0)));
                           setError("");
                         }}
                       />
@@ -312,6 +331,7 @@ export function FormWizard({
                     </p>
                   )}
                   <div className="form-navigation">
+                    {settings.introduction.mode === "separate" && index > 0 && <Button type="button" variant="ghost" onClick={() => setIntroSeen(false)}>Apresentação</Button>}
                     <Button
                       type="button"
                       variant="ghost"

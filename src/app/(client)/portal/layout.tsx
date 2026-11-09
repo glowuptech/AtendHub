@@ -1,4 +1,8 @@
 import { Shell } from "@/components/layout/shell";
-export default function Layout({ children }: { children: React.ReactNode }) {
-  return <Shell portal={true}>{children}</Shell>;
+import { DemoProvider } from "@/components/layout/demo-context";
+import { requireAtendhubMembership } from "@/lib/supabase/access";
+
+export default async function Layout({ children }: { children: React.ReactNode }) {
+  await requireAtendhubMembership();
+  return <DemoProvider><Shell portal={true}>{children}</Shell></DemoProvider>;
 }

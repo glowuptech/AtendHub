@@ -5,8 +5,26 @@ const contact = z.object({
   required: z.boolean(),
   label: z.string().trim().min(1).max(80),
 });
+const introBlock = z.object({
+  text: z.string().max(2000),
+  style: z.enum(["title", "highlight", "support"]).default("support"),
+  align: z.enum(["left", "center", "right"]).default("left"),
+  bold: z.boolean().default(false),
+  italic: z.boolean().default(false),
+});
 export const FormSettingsSchema = z.object({
   description: z.string().max(1500).default(""),
+  introduction: z.object({
+    mode: z.enum(["separate", "integrated", "none"]).default("integrated"),
+    title: z.string().max(160).default(""),
+    blocks: z.array(introBlock).max(20).default([]),
+    buttonLabel: z.string().max(80).default("Começar"),
+    align: z.enum(["left", "center", "right"]).default("center"),
+    maxWidth: z.number().min(280).max(1000).default(620),
+    vertical: z.enum(["top", "center", "bottom"]).default("center"),
+    logo: z.string().max(1500000).default(""),
+    inheritAppearance: z.boolean().default(true),
+  }).prefault({}),
   enabled: z.boolean().default(true),
   contactPosition: z.enum(["start", "end"]).default("end"),
   contacts: z
@@ -22,6 +40,9 @@ export const FormSettingsSchema = z.object({
       button: color.default("#2459d3"),
       buttonText: color.default("#ffffff"),
       background: color.default("#ffffff"),
+      panelOpacity: z.number().int().min(0).max(100).default(100),
+      overlay: color.default("#000000"),
+      overlayOpacity: z.number().int().min(0).max(100).default(0),
       text: color.default("#172237"),
       border: color.default("#dce2ec"),
       radius: z.number().min(0).max(50).default(12),
@@ -70,6 +91,7 @@ export const settingsOf = (value?: unknown): FormSettings => {
     ...defaults,
     ...v,
     contacts: { ...defaults.contacts, ...v.contacts },
+    introduction: { ...defaults.introduction, ...v.introduction },
     appearance: { ...defaults.appearance, ...v.appearance },
     tracking: { ...defaults.tracking, ...v.tracking },
   };

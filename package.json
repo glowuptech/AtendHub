@@ -10,19 +10,24 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "atendhub:provision-admin": "node scripts/provision-atendhub-admin.mjs"
   },
   "engines": {
     "node": ">=22.0.0"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.5.0",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.119.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.67.0",
     "next": "^16.4.4",
+    "postgres": "^3.4.9",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "swr": "^2.5.1",
     "tailwind-merge": "^3.7.0",
     "zod": "^4.6.7"
   },

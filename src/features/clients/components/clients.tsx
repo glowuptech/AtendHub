@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useClients } from "../hooks";
 
 import { useDemo } from "@/components/layout/demo-context";
 
@@ -12,10 +13,14 @@ import { FormsList } from "@/features/forms/components/forms-list";
 import { KnowledgeBase } from "./knowledge-base";
 export { Clients } from "./directory";
 export function ClientProfile({ id }: { id: string }) {
-  const { repositories, clientId } = useDemo();
+  const { repositories, scope, clientId } = useDemo();
+  const { data: clients, error, isLoading } = useClients();
   const [tab, setTab] = useState("Visão geral");
   if (id !== clientId) return <Denied />;
-  const c = repositories.clients.get(id);
+  if (isLoading) return <Card><p role="status">Carregando cliente persistido…</p></Card>;
+  if (error) return <Card><p role="alert" className="field-error">{error.message}</p></Card>;
+  const c = clients?.find((client) => client.id === id);
+  if (!c) return <Denied />;
   return (
     <>
       <Heading
@@ -50,10 +55,10 @@ export function ClientProfile({ id }: { id: string }) {
         />
       ) : tab === "Informações" ? (
         <ClientInformation key={id} client={c} />
-      ) : tab === "Leads" ? (
-        <Card>
-          <LeadTable leads={repositories.leads.list(id)} />
-        </Card>
+  ) : tab === "Leads" ? (
+    <Card>
+      <LeadTable leads={scope.clientIds.includes(id) ? repositories.leads.list(id) : []} />
+    </Card>
       ) : tab === "Formulários" ? (
         <FormsList id={id} />
       ) : tab === "Agendamento externo" ? (

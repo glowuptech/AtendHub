@@ -14,7 +14,8 @@ import {
   type SetStateAction,
 } from "react";
 import { createMockRepositories } from "@/lib/mocks/repositories";
-import { clientA, demoScope } from "@/lib/mocks/fixtures";
+import { demoScope } from "@/lib/mocks/fixtures";
+import { useClients } from "@/features/clients/hooks";
 import {
   defaultCalendar,
   type BusinessCalendar,
@@ -35,6 +36,7 @@ interface Context {
   setCalendar: (value: BusinessCalendar) => void;
   repositories: RepositoryRegistry;
   scope: ClientScope;
+  authorizedClients: import("@/domain/schemas").Client[];
   clientId: string;
   setClientId: (id: string) => void;
   revision: number;
@@ -52,8 +54,18 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   const [calendar, setCalendar] = useState<BusinessCalendar>(defaultCalendar);
   const [scope] = useState<ClientScope>(() => structuredClone(demoScope));
   const [repositories] = useState(() => createMockRepositories(scope));
-  const [clientId, setClientId] = useState(clientA);
+  const [clientId, setClientId] = useState("");
+  const { data: authorizedClients } = useClients();
   const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    if (!authorizedClients) return;
+    const timer = window.setTimeout(() => {
+      const authorizedIds = new Set(authorizedClients.map((client) => client.id));
+      const nextId = authorizedClients[0]?.id ?? "";
+      setClientId((current) => (current && authorizedIds.has(current) ? current : nextId));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [authorizedClients, repositories, scope]);
   useEffect(() => {
     const timer = setInterval(() => {
       repositories.capture.sweep();
@@ -78,6 +90,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         setCalendar,
         repositories,
         scope,
+        authorizedClients: authorizedClients ?? [],
         clientId,
         setClientId,
         revision,

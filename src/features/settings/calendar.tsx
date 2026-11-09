@@ -1,15 +1,21 @@
 "use client";
-import { useState } from "react";
-import { useDemo } from "@/components/layout/demo-context";
+import { startTransition, useEffect, useState } from "react";
+import { useServiceCalendar } from "@/features/queue/use-service-calendar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/layout/shared";
 import { CalendarSchema } from "@/features/queue/calendar";
 export function ServiceCalendar() {
-  const { calendar, setCalendar } = useDemo();
+  const { calendar, error: calendarError, isLoading } = useServiceCalendar();
   const [draft, setDraft] = useState(calendar),
     [holidays, setHolidays] = useState(calendar.holidays.join("\n")),
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
+  useEffect(() => {
+    startTransition(() => {
+      setDraft(calendar);
+      setHolidays(calendar.holidays.join("\n"));
+    });
+  }, [calendar]);
   return (
     <>
       <div className="section-caption">
@@ -17,11 +23,13 @@ export function ServiceCalendar() {
           <h2>Calendário de atendimento</h2>
           <p>Defina quando a equipe atende e o prazo da fila é contado.</p>
         </div>
-        <Badge>America/Sao_Paulo</Badge>
+        <Badge>{draft.timezone}</Badge>
       </div>
+      {isLoading && <p role="status">Carregando configuração persistida…</p>}
+      {calendarError && <p role="alert">Não foi possível carregar o calendário persistido.</p>}
       <form
         noValidate
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           const parsed = CalendarSchema.safeParse({
             ...draft,
@@ -35,11 +43,15 @@ export function ServiceCalendar() {
             setMessage("");
             return;
           }
-          setCalendar(parsed.data);
+          const response = await fetch("/api/settings/calendar", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ timezone: parsed.data.timezone, weekdays: parsed.data.days, workStart: parsed.data.start, workEnd: parsed.data.end, holidays: parsed.data.holidays, exceptions: parsed.data.exceptions }) });
+          if (!response.ok) {
+            const body = await response.json().catch(() => null);
+            setError(body?.error ?? "Não foi possível salvar o calendário.");
+            setMessage("");
+            return;
+          }
           setError("");
-          setMessage(
-            "Calendário salvo. Os prazos abertos da fila foram recalculados.",
-          );
+          setMessage("Calendário salvo. Os prazos da fila serão recalculados a partir do horário persistido.");
         }}
       >
         <div className="settings-time-fields">

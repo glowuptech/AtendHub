@@ -811,7 +811,14 @@ tr:last-child td {
   box-shadow: var(--shadow-soft);
   border-radius: 24px;
 }
-.step-editor {
+  .appearance-control-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+  }
+  .appearance-control-grid input[type="range"] { width: 100%; }
+  .step-editor {
   border: 1px solid var(--border-subtle);
   padding: 18px;
   border-radius: 10px;
@@ -1569,16 +1576,48 @@ footer {
   min-height: 600px;
   padding: 12px;
 }
-.form-sheet {
+  .form-sheet {
+  position: relative;
   width: min(100%, 700px);
   align-self: center;
-  background: var(--form-bg);
+  background: color-mix(in srgb, var(--form-bg) calc(var(--form-panel-opacity) * 100%), transparent);
   border-radius: 20px;
   overflow: hidden;
 }
-.form-content {
+  .form-image-overlay {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--form-overlay) calc(var(--form-overlay-opacity) * 100%), transparent);
+  pointer-events: none;
+  z-index: 1;
+  }
+  .form-content, .form-intro { position: relative; z-index: 2; }
+  .form-intro {
+  min-height: min(100dvh, 720px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  padding: 48px 24px;
+  text-align: center;
+  }
+  .form-intro h1 { margin: 0; }
+  .form-intro-copy { width: min(100%, 620px); }
+  .form-intro-copy p { white-space: pre-wrap; }
+  .form-intro-logo { max-width: 180px; max-height: 100px; object-fit: contain; }
+  .choice-cards { display: flex; flex-direction: column; gap: 12px; border: 0; padding: 0; margin: 18px 0; }
+  .choice-card { position: relative; display: flex; align-items: center; gap: 14px; padding: 14px; border: 1px solid var(--form-border); border-radius: var(--form-radius); cursor: pointer; background: color-mix(in srgb, var(--form-bg) 84%, transparent); transition: border-color .15s ease, transform .15s ease; }
+  .choice-card:hover, .choice-card:focus-within, .choice-card.selected { border-color: var(--form-primary); transform: translateY(-1px); }
+  .choice-card input { position: absolute; opacity: 0; }
+  .choice-card img { width: 92px; height: 76px; object-fit: cover; border-radius: calc(var(--form-radius) * .7); flex: 0 0 auto; }
+  .choice-card span:not(.choice-card-check) { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .choice-card small { line-height: 1.4; }
+  .choice-card-check { margin-left: auto; color: var(--form-primary); font-weight: 700; }
+  @media (min-width: 620px) { .choice-cards-image { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .choice-cards-image .choice-card { flex-direction: column; align-items: stretch; } .choice-cards-image .choice-card img { width: 100%; height: 150px; } }
+  .form-content {
   padding: clamp(20px, 4cqw, 48px);
-}
+  }
 .form-content header {
   margin-bottom: 30px;
 }
@@ -1596,7 +1635,8 @@ footer {
 .form-content label {
   font-family: inherit;
 }
-.form-cover {
+  .form-cover {
+  object-position: var(--form-cover-position, center);
   width: 100%;
   height: clamp(100px, 20vh, 190px);
   object-fit: cover;
@@ -3826,6 +3866,30 @@ tbody tr:hover {
 }
 .schedule-dialog select {
   width: 100%;
+}
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+.error-text {
+  color: var(--danger, #b42318);
+}
+@media (max-width: 700px) {
+  .form-grid-2 {
+    grid-template-columns: 1fr;
+  }
 }
 .schedule-dialog .actions {
   margin-top: 18px;
