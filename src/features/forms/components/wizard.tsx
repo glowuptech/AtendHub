@@ -44,14 +44,18 @@ export function FormWizard({
     [error, setError] = useState(""),
     [done, setDone] = useState(false),
     [savedPartial, setSavedPartial] = useState(Boolean(progress)),
-    [introSeen, setIntroSeen] = useState(settings.introduction.mode !== "separate");
+    [introSeen, setIntroSeen] = useState(
+      settings.introduction.mode !== "separate",
+    );
   const session = useRef(progress?.sessionId ?? "");
   const heading = useRef<HTMLHeadingElement>(null);
   const submitted = useRef(false);
   const hasContacts = Object.values(settings.contacts).some((c) => c.enabled);
   const routedSteps = eligibleSteps(version, fields, answers);
   const sequence = [
-    ...(hasContacts && settings.contactPosition === "start" ? ["contacts"] : []),
+    ...(hasContacts && settings.contactPosition === "start"
+      ? ["contacts"]
+      : []),
     ...routedSteps.map((s) => s.id),
     ...(hasContacts && settings.contactPosition === "end" ? ["contacts"] : []),
   ];
@@ -98,6 +102,12 @@ export function FormWizard({
     heading.current?.focus({ preventScroll: true });
   }, [index, done]);
   const appearance = settings.appearance;
+  const introVisible = settings.introduction.mode === "separate" && !introSeen;
+  const overlay = `${appearance.overlay}${Math.round(
+    appearance.overlayOpacity * 2.55,
+  )
+    .toString(16)
+    .padStart(2, "0")}`;
   const style = {
     "--form-primary": appearance.primary,
     "--form-button": appearance.button,
@@ -109,12 +119,24 @@ export function FormWizard({
     "--form-text": appearance.text,
     "--form-border": appearance.border,
     "--form-radius": `${appearance.radius}px`,
+    "--intro-align": settings.introduction.align,
+    "--intro-items": {
+      left: "flex-start",
+      center: "center",
+      right: "flex-end",
+    }[settings.introduction.align],
+    "--intro-vertical": {
+      top: "flex-start",
+      center: "center",
+      bottom: "flex-end",
+    }[settings.introduction.vertical],
+    "--intro-width": `${settings.introduction.maxWidth}px`,
     fontFamily:
       appearance.font === "system"
         ? "ui-sans-serif, system-ui, sans-serif"
         : `"${appearance.font}", ${["Georgia", "Palatino"].includes(appearance.font) ? "serif" : "sans-serif"}`,
     backgroundImage: appearance.backgroundImage
-      ? `url("${appearance.backgroundImage}")`
+      ? `linear-gradient(${overlay}, ${overlay}), url("${appearance.backgroundImage}")`
       : undefined,
   } as CSSProperties;
   const validateContacts = () => {
@@ -135,232 +157,300 @@ export function FormWizard({
       style={style}
     >
       <div className="form-sheet">
-        <div className="form-image-overlay" aria-hidden="true" />
         {appearance.cover && (
           <img className="form-cover" src={appearance.cover} alt="" />
         )}
-        {settings.introduction.mode === "separate" && !introSeen && (
+        {introVisible && (
           <section className="form-intro" aria-labelledby="form-intro-title">
-            {settings.introduction.logo && <img src={settings.introduction.logo} alt="" className="form-intro-logo" />}
-            <h1 id="form-intro-title">{settings.introduction.title || form.name}</h1>
-            <div className="form-intro-copy">{(settings.introduction.blocks.length ? settings.introduction.blocks : settings.description ? [{ text: settings.description, style: "support" as const, align: "center", bold: false, italic: false }] : []).map((block, i) => <p key={i} style={{ textAlign: block.align as CSSProperties["textAlign"], fontWeight: block.bold ? 700 : 400, fontStyle: block.italic ? "italic" : "normal" }}>{block.text}</p>)}</div>
-            <Button type="button" onClick={() => setIntroSeen(true)}>{settings.introduction.buttonLabel}<ArrowRight size={16} /></Button>
-          </section>
-        )}
-        <div className="form-content">
-          <header>
-            <small>{clinicName}</small>
-            <h1>{form.name}</h1>
-            {settings.description && <p>{settings.description}</p>}
-            {!live && <span className="form-preview-label">Prévia</span>}
-          </header>
-          {done ? (
-            <div className="form-success" role="status">
-              <Check size={42} />
-              <h2 ref={heading} tabIndex={-1}>
-                Cadastro concluído
-              </h2>
-              <p>{version.successMessage}</p>
-              <progress
-                max={100}
-                value={100}
-                aria-label="Progresso do formulário"
+            {settings.introduction.logo && (
+              <img
+                src={settings.introduction.logo}
+                alt=""
+                className="form-intro-logo"
               />
-            </div>
-          ) : (
-            <>
-              <div className="form-progress">
-                <span>
-                  Etapa {index + 1} de {sequence.length}
-                </span>
-                <span>
-                  {Math.round((index / Math.max(sequence.length, 1)) * 100)}%
-                </span>
-              </div>
-              <progress
-                value={index}
-                max={Math.max(sequence.length, 1)}
-                aria-label="Progresso do formulário"
-              />
-              {!sequence.length ? (
-                <p>Adicione perguntas para visualizar o formulário.</p>
-              ) : (
-                <form
-                  noValidate
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (submitted.current) return;
-                    try {
-                      if (current === "contacts") validateContacts();
-                      else if (step && field)
-                        validateAnswer(
-                          field,
-                          step.question.required,
-                          answers[step.question.id],
-                        );
-                      else throw Error("Pergunta indisponível");
-                      if (isLast) {
-                        validateContacts();
-                        for (const s of routedSteps) {
-                          const f = fields.find(
-                            (f) => f.id === s.question.fieldDefinitionId,
-                          );
-                          if (!f) throw Error("Campo indisponível");
-                          validateAnswer(
-                            f,
-                            s.question.required,
-                            answers[s.question.id],
-                          );
-                        }
-                      }
-                      if (live) {
-                        if (isLast) {
-                          repositories.capture.capture({
-                            ...base(),
-                            contacts,
-                            answers: Object.fromEntries(routedSteps.map((s) => [s.question.id, answers[s.question.id]]).filter(([, value]) => value !== undefined)),
-                            complete: true,
-                          });
-                          submitted.current = true;
-                        } else if (
-                          (current === "contacts" &&
-                            settings.contactPosition === "start") ||
-                          savedPartial
-                        ) {
-                          const id = repositories.capture.capture({
-                            ...base(),
-                            contacts,
-                            answers,
-                            complete: false,
-                            nextIndex: index + 1,
-                          });
-                          setSavedPartial(Boolean(id));
-                        }
-                        if (step)
-                          repositories.capture.action(base(), step.actionId);
-                        refresh();
-                      }
-                      setError("");
-                      if (isLast) setDone(true);
-                      else setIndex((i) => i + 1);
-                    } catch (err) {
-                      setError(
-                        err instanceof Error
-                          ? err.message
-                          : "Confira os campos",
-                      );
-                    }
+            )}
+            <h1 id="form-intro-title">
+              {settings.introduction.title || form.name}
+            </h1>
+            <div className="form-intro-copy">
+              {(settings.introduction.blocks.length
+                ? settings.introduction.blocks
+                : settings.description
+                  ? [
+                      {
+                        text: settings.description,
+                        style: "support" as const,
+                        align: "center",
+                        bold: false,
+                        italic: false,
+                      },
+                    ]
+                  : []
+              ).map((block, i) => (
+                <p
+                  key={i}
+                  style={{
+                    textAlign: block.align as CSSProperties["textAlign"],
+                    fontWeight: block.bold ? 700 : 400,
+                    fontStyle: block.italic ? "italic" : "normal",
                   }}
                 >
-                  <h2 ref={heading} tabIndex={-1}>
-                    {current === "contacts"
-                      ? "Como podemos falar com você?"
-                      : step?.question.label}
-                  </h2>
-                  {current === "contacts" ? (
-                    <>
-                      {(["name", "phone", "email"] as const)
-                        .filter((k) => settings.contacts[k].enabled)
-                        .map((k) => (
-                          <label key={k}>
-                            {settings.contacts[k].label}
-                            {settings.contacts[k].required
-                              ? " *"
-                              : " (opcional)"}
-                            <input
-                              autoComplete={
-                                { name: "name", phone: "tel", email: "email" }[
-                                  k
-                                ]
-                              }
-                              type={
-                                { name: "text", phone: "tel", email: "email" }[
-                                  k
-                                ]
-                              }
-                              maxLength={200}
-                              value={contacts[k]}
-                              aria-invalid={Boolean(error)}
-                              onChange={(e) => {
-                                setContacts((c) => ({
-                                  ...c,
-                                  [k]: e.target.value,
-                                }));
-                                setError("");
-                              }}
-                            />
-                          </label>
-                        ))}
-                      <p className="form-privacy">
-                        Ao avançar, seus contatos e respostas serão registrados
-                        para atendimento, mesmo se você não concluir as próximas
-                        etapas.
+                  {block.text}
+                </p>
+              ))}
+            </div>
+            <Button type="button" onClick={() => setIntroSeen(true)}>
+              {settings.introduction.buttonLabel}
+              <ArrowRight size={16} />
+            </Button>
+          </section>
+        )}
+        {!introVisible && (
+          <div className="form-content">
+            <header>
+              <small>{clinicName}</small>
+              <h1>{form.name}</h1>
+              {settings.description && <p>{settings.description}</p>}
+              {!live && <span className="form-preview-label">Prévia</span>}
+            </header>
+            {done ? (
+              <div className="form-success" role="status">
+                <Check size={42} />
+                <h2 ref={heading} tabIndex={-1}>
+                  Cadastro concluído
+                </h2>
+                <p>{version.successMessage}</p>
+                <progress
+                  max={100}
+                  value={100}
+                  aria-label="Progresso do formulário"
+                />
+              </div>
+            ) : (
+              <>
+                <div className="form-progress">
+                  <span>
+                    Etapa {index + 1} de {sequence.length}
+                  </span>
+                  <span>
+                    {Math.round((index / Math.max(sequence.length, 1)) * 100)}%
+                  </span>
+                </div>
+                <progress
+                  value={index}
+                  max={Math.max(sequence.length, 1)}
+                  aria-label="Progresso do formulário"
+                />
+                {!sequence.length ? (
+                  <p>Adicione perguntas para visualizar o formulário.</p>
+                ) : (
+                  <form
+                    noValidate
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (submitted.current) return;
+                      try {
+                        if (current === "contacts") validateContacts();
+                        else if (step && field)
+                          validateAnswer(
+                            field,
+                            step.question.required,
+                            answers[step.question.id],
+                          );
+                        else throw Error("Pergunta indisponível");
+                        if (isLast) {
+                          validateContacts();
+                          for (const s of routedSteps) {
+                            const f = fields.find(
+                              (f) => f.id === s.question.fieldDefinitionId,
+                            );
+                            if (!f) throw Error("Campo indisponível");
+                            validateAnswer(
+                              f,
+                              s.question.required,
+                              answers[s.question.id],
+                            );
+                          }
+                        }
+                        if (live) {
+                          if (isLast) {
+                            repositories.capture.capture({
+                              ...base(),
+                              contacts,
+                              answers: Object.fromEntries(
+                                routedSteps
+                                  .map((s) => [
+                                    s.question.id,
+                                    answers[s.question.id],
+                                  ])
+                                  .filter(([, value]) => value !== undefined),
+                              ),
+                              complete: true,
+                            });
+                            submitted.current = true;
+                          } else if (
+                            (current === "contacts" &&
+                              settings.contactPosition === "start") ||
+                            savedPartial
+                          ) {
+                            const id = repositories.capture.capture({
+                              ...base(),
+                              contacts,
+                              answers,
+                              complete: false,
+                              nextIndex: index + 1,
+                            });
+                            setSavedPartial(Boolean(id));
+                          }
+                          if (step)
+                            repositories.capture.action(base(), step.actionId);
+                          refresh();
+                        }
+                        setError("");
+                        if (isLast) setDone(true);
+                        else setIndex((i) => i + 1);
+                      } catch (err) {
+                        setError(
+                          err instanceof Error
+                            ? err.message
+                            : "Confira os campos",
+                        );
+                      }
+                    }}
+                  >
+                    <h2 ref={heading} tabIndex={-1}>
+                      {current === "contacts"
+                        ? "Como podemos falar com você?"
+                        : step?.question.label}
+                    </h2>
+                    {current === "contacts" ? (
+                      <>
+                        {(["name", "phone", "email"] as const)
+                          .filter((k) => settings.contacts[k].enabled)
+                          .map((k) => (
+                            <label key={k}>
+                              {settings.contacts[k].label}
+                              {settings.contacts[k].required
+                                ? " *"
+                                : " (opcional)"}
+                              <input
+                                autoComplete={
+                                  {
+                                    name: "name",
+                                    phone: "tel",
+                                    email: "email",
+                                  }[k]
+                                }
+                                type={
+                                  {
+                                    name: "text",
+                                    phone: "tel",
+                                    email: "email",
+                                  }[k]
+                                }
+                                maxLength={200}
+                                value={contacts[k]}
+                                aria-invalid={Boolean(error)}
+                                onChange={(e) => {
+                                  setContacts((c) => ({
+                                    ...c,
+                                    [k]: e.target.value,
+                                  }));
+                                  setError("");
+                                }}
+                              />
+                            </label>
+                          ))}
+                        <p className="form-privacy">
+                          Ao avançar, seus contatos e respostas serão
+                          registrados para atendimento, mesmo se você não
+                          concluir as próximas etapas.
+                        </p>
+                      </>
+                    ) : step && field ? (
+                      <>
+                        {step.description && <p>{step.description}</p>}
+                        <label
+                          className="sr-only"
+                          htmlFor={`answer-${step.question.id}`}
+                        >
+                          {step.question.label}
+                        </label>
+                        <FieldInput
+                          choiceCards
+                          id={`answer-${step.question.id}`}
+                          field={{ ...field, label: step.question.label }}
+                          value={answers[step.question.id]}
+                          errorId={error ? "form-error" : undefined}
+                          onChange={(v) => {
+                            setAnswers((a) => {
+                              const next = { ...a, [step.question.id]: v };
+                              const eligible = new Set(
+                                eligibleSteps(version, fields, next).map(
+                                  (item) => item.question.id,
+                                ),
+                              );
+                              for (const key of Object.keys(next))
+                                if (!eligible.has(key)) delete next[key];
+                              return next;
+                            });
+                            setIndex((currentIndex) =>
+                              Math.min(
+                                currentIndex,
+                                Math.max(sequence.length - 1, 0),
+                              ),
+                            );
+                            setError("");
+                          }}
+                        />
+                      </>
+                    ) : null}
+                    {error && (
+                      <p id="form-error" role="alert" className="field-error">
+                        {error}
                       </p>
-                    </>
-                  ) : step && field ? (
-                    <>
-                      {step.description && <p>{step.description}</p>}
-                      <label
-                        className="sr-only"
-                        htmlFor={`answer-${step.question.id}`}
-                      >
-                        {step.question.label}
-                      </label>
-                      <FieldInput
-                        choiceCards
-                        id={`answer-${step.question.id}`}
-                        field={{ ...field, label: step.question.label }}
-                        value={answers[step.question.id]}
-                        errorId={error ? "form-error" : undefined}
-                        onChange={(v) => {
-                          setAnswers((a) => {
-                            const next = { ...a, [step.question.id]: v };
-                            const eligible = new Set(eligibleSteps(version, fields, next).map((item) => item.question.id));
-                            for (const key of Object.keys(next)) if (!eligible.has(key)) delete next[key];
-                            return next;
-                          });
-                          setIndex((currentIndex) => Math.min(currentIndex, Math.max(sequence.length - 1, 0)));
+                    )}
+                    <div className="form-navigation">
+                      {settings.introduction.mode === "separate" &&
+                        index > 0 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setIntroSeen(false)}
+                          >
+                            Apresentação
+                          </Button>
+                        )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={index === 0}
+                        onClick={() => {
+                          setIndex((i) => i - 1);
                           setError("");
                         }}
-                      />
-                    </>
-                  ) : null}
-                  {error && (
-                    <p id="form-error" role="alert" className="field-error">
-                      {error}
-                    </p>
-                  )}
-                  <div className="form-navigation">
-                    {settings.introduction.mode === "separate" && index > 0 && <Button type="button" variant="ghost" onClick={() => setIntroSeen(false)}>Apresentação</Button>}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      disabled={index === 0}
-                      onClick={() => {
-                        setIndex((i) => i - 1);
-                        setError("");
-                      }}
-                    >
-                      Voltar
-                    </Button>
-                    <Button
-                      type="submit"
-                      data-action-id={
-                        step?.actionId ?? `contacts-${version.id}`
-                      }
-                      data-step-id={current}
-                    >
-                      {isLast
-                        ? "Enviar cadastro"
-                        : step?.buttonLabel || "Continuar"}
-                      <ArrowRight size={16} />
-                    </Button>
-                  </div>
-                </form>
-              )}
-            </>
-          )}
-        </div>
+                      >
+                        Voltar
+                      </Button>
+                      <Button
+                        type="submit"
+                        data-action-id={
+                          step?.actionId ?? `contacts-${version.id}`
+                        }
+                        data-step-id={current}
+                      >
+                        {isLast
+                          ? "Enviar cadastro"
+                          : step?.buttonLabel || "Continuar"}
+                        <ArrowRight size={16} />
+                      </Button>
+                    </div>
+                  </form>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );

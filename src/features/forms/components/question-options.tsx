@@ -26,6 +26,7 @@ export function QuestionOptions({
   const setType = (type: FieldType) => onSave({ ...field, type });
   const setOptions = (update: (options: Option[]) => Option[]) =>
     onSave({ ...field, options: update(field.options) });
+  const [expanded, setExpanded] = useState("");
   const [error, setError] = useState("");
   const imageMode = type === "image_choice";
 
@@ -35,11 +36,12 @@ export function QuestionOptions({
         option.id === id ? { ...option, ...patch } : option,
       ),
     );
-  const addOption = () =>
+  const addOption = () => {
+    const id = crypto.randomUUID();
     setOptions((current) => [
       ...current,
       {
-        id: crypto.randomUUID(),
+        id,
         label: "Nova opção",
         description: "",
         imageUrl: "",
@@ -47,6 +49,8 @@ export function QuestionOptions({
         pathId: null,
       },
     ]);
+    setExpanded(id);
+  };
 
   return (
     <div className="question-options-panel">
@@ -71,8 +75,19 @@ export function QuestionOptions({
       {selectable.includes(type) && (
         <div className="question-options-editor">
           {options.map((option, index) => (
-            <article className="question-option-editor" key={option.id}>
-              <strong>Opção {index + 1}</strong>
+            <details
+              className="question-option-editor"
+              key={option.id}
+              open={expanded === option.id}
+            >
+              <summary
+                onClick={(e) => {
+                  e.preventDefault();
+                  setExpanded(expanded === option.id ? "" : option.id);
+                }}
+              >
+                Opção {index + 1} · {option.label || "Sem título"}
+              </summary>
               <label>
                 Título
                 <input
@@ -167,7 +182,7 @@ export function QuestionOptions({
               >
                 Remover opção
               </Button>
-            </article>
+            </details>
           ))}
           <Button type="button" variant="outline" onClick={addOption}>
             Adicionar opção

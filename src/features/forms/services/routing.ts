@@ -96,7 +96,14 @@ export function addPath(paths: FormVersion["paths"]): FormVersion["paths"] {
     .split("")
     .find((l) => !paths.some((p) => p.letter === l));
   return letter
-    ? [...paths, { id: `path_${crypto.randomUUID().replaceAll("-", "")}`, letter, name: `Caminho ${letter}` }]
+    ? [
+        ...paths,
+        {
+          id: `path_${crypto.randomUUID().replaceAll("-", "")}`,
+          letter,
+          name: `Caminho ${letter}`,
+        },
+      ]
     : paths;
 }
 export function removePath(
@@ -159,5 +166,41 @@ export function selectRouter(
         pathId: id && f.id === field?.id ? o.pathId : null,
       })),
     })),
+  ];
+}
+
+/** Complete missing destinations without changing any existing path IDs or answers. */
+export function pathsFromOptions(
+  version: FormVersion,
+  fields: CustomFieldDefinition[],
+): [FormVersion, CustomFieldDefinition[]] {
+  const router = version.steps.find((s) => s.question.definesPath);
+  const field = fields.find((f) => f.id === router?.question.fieldDefinitionId);
+  if (
+    !field ||
+    !["single_select", "image_choice"].includes(field.type) ||
+    !field.options.length
+  )
+    throw new Error("Adicione opções à pergunta que escolhe o caminho.");
+  let paths = [...version.paths];
+  const options = field.options.map((option) => {
+    if (option.pathId && paths.some((p) => p.id === option.pathId))
+      return option;
+    const next = addPath(paths);
+    if (next.length === paths.length)
+      throw new Error(
+        "O limite é de 26 caminhos. Revise os caminhos existentes.",
+      );
+    paths = next;
+    const path = paths.at(-1)!;
+    path.name =
+      option.label.trim().length >= 2
+        ? option.label.trim().slice(0, 100)
+        : `Caminho ${path.letter}`;
+    return { ...option, pathId: path.id };
+  });
+  return [
+    { ...version, paths },
+    fields.map((f) => (f.id === field.id ? { ...f, options } : f)),
   ];
 }

@@ -11,14 +11,14 @@ test("persiste o fluxo centralizado no Supabase autenticado", async ({
     "Defina cliente de desenvolvimento e storageState autenticado. O harness isolado não comprova RLS.",
   );
   await page.goto(`/app/clientes/${clientId}/formularios/novo`);
-  await page.getByRole("button", { name: "Geral", exact: true }).click();
+  await page.getByRole("button", { name: /01 Identidade/ }).click();
   await page
     .getByLabel("Nome do formulário", { exact: true })
     .fill("Teste de integração do editor");
   await page
     .getByLabel("Slug", { exact: true })
     .fill(`teste-editor-${Date.now()}`);
-  await page.getByRole("button", { name: "Perguntas", exact: true }).click();
+  await page.getByRole("button", { name: /06 Perguntas/ }).click();
   await page
     .getByLabel("Nome do campo", { exact: true })
     .fill("Qual atendimento?");
@@ -31,14 +31,24 @@ test("persiste o fluxo centralizado no Supabase autenticado", async ({
   await page
     .locator(".question-option-editor")
     .nth(0)
+    .locator("summary")
+    .click();
+  await page
+    .locator(".question-option-editor")
+    .nth(0)
     .getByLabel("Título", { exact: true })
     .fill("Ginecológica");
   await page
     .locator(".question-option-editor")
     .nth(1)
+    .locator("summary")
+    .click();
+  await page
+    .locator(".question-option-editor")
+    .nth(1)
     .getByLabel("Título", { exact: true })
     .fill("Obstétrica");
-  await page.getByRole("button", { name: "Fluxo", exact: true }).click();
+  await page.getByRole("button", { name: /05 Caminhos/ }).click();
   await page
     .getByRole("combobox", {
       name: "Pergunta que escolhe o atendimento",
@@ -46,10 +56,10 @@ test("persiste o fluxo centralizado no Supabase autenticado", async ({
     })
     .selectOption({ label: "Qual atendimento?" });
   await page
-    .getByRole("button", { name: "Adicionar caminho", exact: true })
-    .click();
-  await page
-    .getByRole("button", { name: "Adicionar caminho", exact: true })
+    .getByRole("button", {
+      name: "Criar caminhos a partir das respostas",
+      exact: true,
+    })
     .click();
   const a = await page
     .getByLabel("Destino de Ginecológica")
@@ -73,7 +83,7 @@ test("persiste o fluxo centralizado no Supabase autenticado", async ({
   expect(response.ok()).toBe(true);
   const form = await response.json();
   await page.goto(`/app/clientes/${clientId}/formularios/${form.id}/editar`);
-  await page.getByRole("button", { name: "Fluxo", exact: true }).click();
+  await page.getByRole("button", { name: /05 Caminhos/ }).click();
   await expect(page.getByLabel("Destino de Ginecológica")).toHaveValue(a!);
   await expect(page.getByLabel("Destino de Obstétrica")).toHaveValue(b!);
 });

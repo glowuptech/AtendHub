@@ -4,6 +4,10 @@ test("editor conserva opções sem Aplicar e concentra caminhos em Fluxo", async
 }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/tests/editor-harness/index.html");
+  await expect(
+    page.locator('.form-editor-block-toggle[aria-expanded="false"]'),
+  ).toHaveCount(7);
+  await page.getByRole("button", { name: /06 Perguntas/ }).click();
   await page
     .getByLabel("Nome do campo", { exact: true })
     .fill("Qual atendimento?");
@@ -16,13 +20,28 @@ test("editor conserva opções sem Aplicar e concentra caminhos em Fluxo", async
   await page
     .locator(".question-option-editor")
     .nth(0)
+    .locator("summary")
+    .click();
+  await page
+    .locator(".question-option-editor")
+    .nth(0)
     .getByLabel("Título", { exact: true })
     .fill("Ginecológica");
   await page
     .locator(".question-option-editor")
     .nth(1)
+    .locator("summary")
+    .click();
+  await page
+    .locator(".question-option-editor")
+    .nth(1)
     .getByLabel("Título", { exact: true })
     .fill("Obstétrica");
+  await page
+    .locator(".question-option-editor")
+    .nth(0)
+    .locator("summary")
+    .click();
   await page
     .locator(".question-option-editor")
     .nth(0)
@@ -50,7 +69,7 @@ test("editor conserva opções sem Aplicar e concentra caminhos em Fluxo", async
     page.getByRole("button", { name: "Aplicar tipo e opções" }),
   ).toHaveCount(0);
   await expect(page.getByLabel("Caminho de destino")).toHaveCount(0);
-  await page.getByRole("button", { name: "Fluxo", exact: true }).click();
+  await page.getByRole("button", { name: /05 Caminhos/ }).click();
   await page
     .getByRole("combobox", {
       name: "Pergunta que escolhe o atendimento",
@@ -58,17 +77,11 @@ test("editor conserva opções sem Aplicar e concentra caminhos em Fluxo", async
     })
     .selectOption({ label: "Qual atendimento?" });
   await page
-    .getByRole("button", { name: "Adicionar caminho", exact: true })
+    .getByRole("button", {
+      name: "Criar caminhos a partir das respostas",
+      exact: true,
+    })
     .click();
-  await page
-    .getByRole("button", { name: "Adicionar caminho", exact: true })
-    .click();
-  await page
-    .getByLabel("Nome do caminho A", { exact: true })
-    .fill("Ginecologia");
-  await page
-    .getByLabel("Nome do caminho B", { exact: true })
-    .fill("Obstetrícia");
   const a = await page
     .getByLabel("Destino de Ginecológica")
     .locator("option")
@@ -83,18 +96,18 @@ test("editor conserva opções sem Aplicar e concentra caminhos em Fluxo", async
   await page.getByLabel("Destino de Obstétrica").selectOption(b!);
   await page
     .getByRole("group", { name: "Pergunta exclusiva A", exact: true })
-    .getByRole("checkbox", { name: "A — Ginecologia", exact: true })
+    .getByRole("checkbox", { name: "A — Ginecológica", exact: true })
     .check();
   await page
     .getByRole("group", { name: "Pergunta exclusiva B", exact: true })
-    .getByRole("checkbox", { name: "B — Obstetrícia", exact: true })
+    .getByRole("checkbox", { name: "B — Obstétrica", exact: true })
     .check();
   await page
     .getByRole("button", { name: "Salvar rascunho", exact: true })
     .click();
   await expect(page.getByRole("status")).toContainText("salvo");
   await page.reload();
-  await page.getByRole("button", { name: "Fluxo", exact: true }).click();
+  await page.getByRole("button", { name: /05 Caminhos/ }).click();
   await expect(page.getByLabel("Destino de Ginecológica")).toHaveValue(a!);
   await expect(page.getByLabel("Destino de Obstétrica")).toHaveValue(b!);
   const preview = page.getByRole("complementary");
@@ -121,4 +134,139 @@ test("editor conserva opções sem Aplicar e concentra caminhos em Fluxo", async
     ),
   ).toBe(true);
   await page.screenshot({ path: "test-results/editor-flow-mobile.png" });
+});
+
+test("aparência funciona antes das perguntas e permanece após salvar", async ({
+  page,
+}) => {
+  await page.goto("/tests/editor-harness/index.html");
+  const preview = page.getByRole("complementary");
+  await expect(preview.locator(".form-experience")).toBeVisible();
+  await page.getByRole("button", { name: /04 Aparência/ }).click();
+  await page.getByLabel("Imagem de fundo opcional").setInputFiles({
+    name: "fundo.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6ioAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
+  await expect(page.getByAltText("Prévia da imagem de fundo")).toBeVisible();
+  await expect(preview.locator(".form-experience")).toHaveCSS(
+    "background-image",
+    /data:image\/png;base64/,
+  );
+  await page
+    .getByRole("button", {
+      name: "Usar foto escura com texto claro",
+      exact: true,
+    })
+    .click();
+  await expect(preview.locator(".form-experience h1")).toHaveCSS(
+    "color",
+    "rgb(255, 255, 255)",
+  );
+  await expect(preview.locator(".form-experience")).toHaveCSS(
+    "background-image",
+    /linear-gradient/,
+  );
+  // Native color inputs use input/change events; assert the rendered styles, not only state.
+  async function color(label: string, value: string) {
+    await page.getByLabel(label, { exact: true }).evaluate((input, value) => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }, value);
+  }
+  await color("Botão", "#e11d48");
+  await color("Texto do botão", "#fef08a");
+  await color("Texto", "#16a34a");
+  await expect(
+    preview.locator(".form-navigation button[type=submit]"),
+  ).toHaveCSS("background-color", "rgb(225, 29, 72)");
+  await expect(
+    preview.locator(".form-navigation button[type=submit]"),
+  ).toHaveCSS("color", "rgb(254, 240, 138)");
+  await expect(preview.locator(".form-experience h1")).toHaveCSS(
+    "color",
+    "rgb(22, 163, 74)",
+  );
+  await page.getByRole("button", { name: /02 Apresentação/ }).click();
+  await page
+    .getByRole("combobox", { name: "Como apresentar", exact: true })
+    .selectOption("separate");
+  await page
+    .getByLabel("Texto do botão", { exact: true })
+    .fill("Começar triagem");
+  await expect(preview.locator(".form-intro")).toBeVisible();
+  await expect(preview.locator(".form-content")).toHaveCount(0);
+  await expect(
+    preview.getByRole("button", { name: /Começar triagem/ }),
+  ).toHaveCSS("background-color", "rgb(225, 29, 72)");
+  await page.getByRole("button", { name: /06 Perguntas/ }).click();
+  await page
+    .getByLabel("Nome do campo", { exact: true })
+    .fill("Pergunta inicial");
+  await page
+    .getByRole("button", { name: "Adicionar pergunta", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Salvar rascunho", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("salvo");
+  await page.reload();
+  await expect(preview.locator(".form-experience")).toHaveCSS(
+    "background-image",
+    /data:image\/png;base64/,
+  );
+  await expect(
+    preview.getByRole("button", { name: /Começar triagem/ }),
+  ).toHaveCSS("background-color", "rgb(225, 29, 72)");
+  await expect(preview.locator(".form-intro h1")).toHaveCSS(
+    "color",
+    "rgb(22, 163, 74)",
+  );
+  await page.screenshot({ path: "test-results/editor-accordion-desktop.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({ path: "test-results/editor-accordion-mobile.png" });
+});
+
+test("arquivar pede confirmação e desarquivar recupera como rascunho", async ({
+  page,
+}) => {
+  const { forms } = await import("../../src/lib/mocks/fixtures");
+  await page.addInitScript(
+    (form) => localStorage.setItem("editor-test-draft", JSON.stringify(form)),
+    forms[0],
+  );
+  await page.goto("/tests/editor-harness/index.html?list");
+  const name = forms[0].name;
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await page.getByRole("button", { name: "Arquivar", exact: true }).click();
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Arquivar", exact: true }).click();
+  await expect(page.getByRole("heading", { name, exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: /Arquivados \(1\)/ }).click();
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Desarquivar", exact: true }).click();
+  await expect(
+    page.getByText(/^Formulário desarquivado como rascunho/),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Em uso \(1\)/ }).click();
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  await expect(page.locator(".cards-grid .badge").filter({ hasText: /^Rascunho$/ })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Abrir formulário", exact: true }),
+  ).toHaveCount(0);
+  await page.screenshot({ path: "test-results/forms-restored.png" });
 });

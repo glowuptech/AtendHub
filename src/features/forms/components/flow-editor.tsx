@@ -1,8 +1,14 @@
 "use client";
+import { useState } from "react";
 import type { CustomFieldDefinition, FormVersion } from "@/domain/schemas";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/layout/shared";
-import { addPath, removePath, selectRouter } from "../services/routing";
+import {
+  addPath,
+  removePath,
+  selectRouter,
+  pathsFromOptions,
+} from "../services/routing";
 
 type Props = {
   version: FormVersion;
@@ -10,6 +16,7 @@ type Props = {
   onChange: (version: FormVersion, fields: CustomFieldDefinition[]) => void;
 };
 export function FlowEditor({ version, fields, onChange }: Props) {
+  const [error, setError] = useState("");
   const paths = version.paths ?? [];
   const router = version.steps.find((s) => s.question.definesPath);
   const field = fields.find((f) => f.id === router?.question.fieldDefinitionId);
@@ -52,62 +59,90 @@ export function FlowEditor({ version, fields, onChange }: Props) {
       </label>
       {!candidates.length && (
         <p>
-          Adicione uma pergunta de seleção única ou por imagens em “Perguntas”
-          para criar caminhos.
+          Adicione uma pergunta de seleção única ou por imagens no bloco
+          “Perguntas” para criar caminhos.
         </p>
       )}
       {router && (
         <>
-          <h3>1. Nomeie os caminhos</h3>
-          {paths.map((path) => (
-            <div className="flow-path-row" key={path.id}>
-              <span className="badge">{path.letter}</span>
-              <label>
-                Nome do caminho {path.letter}
-                <input
-                  value={path.name}
-                  onChange={(e) =>
-                    onChange(
-                      {
-                        ...version,
-                        paths: paths.map((p) =>
-                          p.id === path.id ? { ...p, name: e.target.value } : p,
-                        ),
-                      },
-                      fields,
-                    )
-                  }
-                />
-              </label>
+          {!!field?.options.length &&
+            field.options.some(
+              (o) => !o.pathId || !paths.some((p) => p.id === o.pathId),
+            ) && (
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 onClick={() => {
-                  if (
-                    window.confirm(
-                      `Remover “${path.name}”? Perguntas exclusivas ficarão comuns e destinos precisarão de revisão.`,
-                    )
-                  )
-                    onChange(...removePath(version, fields, path.id));
+                  try {
+                    onChange(...pathsFromOptions(version, fields));
+                    setError("");
+                  } catch (cause) {
+                    setError(
+                      cause instanceof Error
+                        ? cause.message
+                        : "Revise as opções.",
+                    );
+                  }
                 }}
               >
-                Remover caminho {path.letter}
+                Criar caminhos a partir das respostas
               </Button>
-            </div>
-          ))}
-          <Button
-            type="button"
-            variant="outline"
-            disabled={paths.length >= 26}
-            onClick={() =>
-              onChange({ ...version, paths: addPath(paths) }, fields)
-            }
-          >
-            Adicionar caminho
-          </Button>
-          <h3>2. Direcione cada resposta</h3>
+            )}
+          {error && <p role="alert">{error}</p>}
+          <details className="flow-advanced">
+            <summary>Editar nomes e caminhos manualmente</summary>
+            {paths.map((path) => (
+              <div className="flow-path-row" key={path.id}>
+                <span className="badge">{path.letter}</span>
+                <label>
+                  Nome do caminho {path.letter}
+                  <input
+                    value={path.name}
+                    onChange={(e) =>
+                      onChange(
+                        {
+                          ...version,
+                          paths: paths.map((p) =>
+                            p.id === path.id
+                              ? { ...p, name: e.target.value }
+                              : p,
+                          ),
+                        },
+                        fields,
+                      )
+                    }
+                  />
+                </label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `Remover “${path.name}”? Perguntas exclusivas ficarão comuns e destinos precisarão de revisão.`,
+                      )
+                    )
+                      onChange(...removePath(version, fields, path.id));
+                  }}
+                >
+                  Remover caminho {path.letter}
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={paths.length >= 26}
+              onClick={() =>
+                onChange({ ...version, paths: addPath(paths) }, fields)
+              }
+            >
+              Adicionar caminho
+            </Button>
+          </details>
+          <h3>1. Confira o destino de cada resposta</h3>
           {!field?.options.length && (
-            <p>Adicione opções a essa pergunta na aba “Perguntas”.</p>
+            <p>Adicione opções a essa pergunta no bloco “Perguntas”.</p>
           )}
           {field?.options.map((option) => (
             <label key={option.id}>
@@ -142,7 +177,7 @@ export function FlowEditor({ version, fields, onChange }: Props) {
               </select>
             </label>
           ))}
-          <h3>3. Escolha quais perguntas aparecem</h3>
+          <h3>2. Escolha quais perguntas aparecem</h3>
           <p className="muted">
             Marque “Todos” para perguntas comuns, ou os caminhos desejados. A
             ordem é a mesma da aba Perguntas.

@@ -7,6 +7,7 @@ import {
   selectRouter,
   validateRouting,
   eligibleSteps,
+  pathsFromOptions,
 } from "@/features/forms/services/routing";
 function setup() {
   const version = structuredClone(forms[0].versions[0]);
@@ -72,5 +73,30 @@ describe("Fluxo do editor", () => {
     const { version, fields } = setup();
     version.paths = [];
     expect(() => validateRouting(version, fields)).toThrow("inexistente");
+  });
+});
+
+describe("Caminhos criados pelas respostas", () => {
+  it("associa automaticamente e preserva IDs existentes em retentativas", () => {
+    const { version, fields, field } = setup();
+    field.options[0].pathId = null;
+    const [v, f] = pathsFromOptions(version, fields);
+    const options = f.find((item) => item.id === field.id)!.options;
+    expect(options[1].pathId).toBe(field.options[1].pathId);
+    expect(v.paths.find((p) => p.id === options[0].pathId)!.name).toBe(
+      field.options[0].label,
+    );
+    expect(() => validateRouting(v, f)).not.toThrow();
+    const [again, same] = pathsFromOptions(v, f);
+    expect(again.paths).toEqual(v.paths);
+    expect(same).toEqual(f);
+  });
+  it("não altera o rascunho original se não houver mais caminhos disponíveis", () => {
+    const { version, fields, field } = setup();
+    while (version.paths.length < 26) version.paths = addPath(version.paths);
+    field.options[0].pathId = null;
+    const original = structuredClone({ version, fields });
+    expect(() => pathsFromOptions(version, fields)).toThrow("26");
+    expect({ version, fields }).toEqual(original);
   });
 });
