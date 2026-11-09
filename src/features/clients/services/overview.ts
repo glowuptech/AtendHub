@@ -67,14 +67,7 @@ export function getClientOverview(
 ) {
   RangeSchema.parse(range);
   let client = clientOverride;
-  if (!client) {
-    try {
-      client = repositories.clients.get(clientId);
-    } catch (error) {
-      if (!(error instanceof Error && error.message.includes("fora do escopo"))) throw error;
-      throw new Error("Cliente persistido exige um perfil carregado pelo Supabase.");
-    }
-  }
+  if (!client) client = repositories.clients.get(clientId);
   if (!client) throw new Error("Cliente não encontrado.");
   if (
     doctorId !== "all" &&

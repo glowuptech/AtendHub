@@ -176,7 +176,7 @@ export const FieldSchema = z
       id: z.string().min(1),
       label: z.string().min(1),
       description: z.string().max(240).default(""),
-      imageUrl: z.string().max(1500000).default(""),
+      imageUrl: z.string().max(1500000).refine((value) => !value || /^https:\/\//.test(value) || /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(value), "Imagem inválida: use PNG, JPEG ou WebP.").default(""),
       alt: z.string().max(180).default(""),
       pathId: z.string().min(1).nullable().default(null),
     })).max(20),

@@ -7,8 +7,12 @@ import { validateRouting } from "@/features/forms/services/routing";
 
 const inputSchema = z.object({ clientId: z.string().uuid(), form: z.unknown(), publish: z.boolean().default(false) });
 
-function toDefinition(row: { id: string; organization_id: string; client_id: string; doctor_id: string | null; name: string; description: string; slug: string; status: string; active_version_id: string | null }, versions: Array<{ id: string; form_id: string; organization_id: string; client_id: string; number: number; state: string; definition: { version?: unknown; fields?: unknown } }>) {
-  const mapped = versions.map((version) => ({ ...(version.definition.version as object), id: version.id, formId: version.form_id, organizationId: version.organization_id, clientId: version.client_id, number: version.number, state: version.state, fields: version.definition.fields ?? [] }));
+function toDefinition(row: { id: string; organization_id: string; client_id: string; doctor_id: string | null; name: string; description: string; slug: string; status: string; active_version_id: string | null }, versions: Array<{ id: string; form_id: string; organization_id: string; client_id: string; number: number; state: string; paths?: unknown; choice_assets?: Array<{ id: string; imageUrl?: string; alt?: string }>; definition: { version?: unknown; fields?: Array<{ options?: Array<{ id: string; imageUrl?: string; alt?: string }> }> } }>) {
+  const mapped = versions.map((version) => {
+    const assets = new Map((version.choice_assets ?? []).map((asset) => [asset.id, asset]));
+    const fields = (version.definition.fields ?? []).map((field) => ({ ...field, options: (field.options ?? []).map((option) => ({ ...option, ...(assets.get(option.id) ?? {}) })) }));
+    return { ...(version.definition.version as object), id: version.id, formId: version.form_id, organizationId: version.organization_id, clientId: version.client_id, number: version.number, state: version.state, paths: (version.definition.version as { paths?: unknown })?.paths ?? version.paths ?? [], fields };
+  });
   return { id: row.id, organizationId: row.organization_id, clientId: row.client_id, doctorId: row.doctor_id, name: row.name, description: row.description, slug: row.slug, status: row.status, activeVersionId: row.active_version_id ?? mapped.at(-1)?.id, versions: mapped, fields: mapped.at(-1)?.fields ?? [] };
 }
 
@@ -19,7 +23,7 @@ async function listForms(auth: Awaited<ReturnType<typeof sessionOrganizationCont
   const { data: rows, error } = await query;
   if (error) throw error;
   const ids = (rows ?? []).map((row) => row.id);
-  const { data: versions, error: versionError } = ids.length ? await auth.supabase.from("atendhub_form_versions").select("id,form_id,organization_id,client_id,number,state,definition").in("form_id", ids).order("number") : { data: [], error: null };
+  const { data: versions, error: versionError } = ids.length ? await auth.supabase.from("atendhub_form_versions").select("id,form_id,organization_id,client_id,number,state,definition,paths,choice_assets").in("form_id", ids).order("number") : { data: [], error: null };
   if (versionError) throw versionError;
   return (rows ?? []).map((row) => toDefinition(row, (versions ?? []).filter((version) => version.form_id === row.id)));
 }

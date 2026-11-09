@@ -338,6 +338,7 @@ function EditorWorkspace({ source, client }: { source?: FormDefinition; client: 
                       field={fields.find(
                         (f) => f.id === s.question.fieldDefinitionId,
                       )!}
+                      paths={version.paths ?? []}
                       onSave={(field) => {
                         setFields((current) => current.some((item) => item.id === field.id) ? current.map((item) => item.id === field.id ? field : item) : [...current, field]);
                         setDraft((current) => ({ ...current, fields: current.fields.some((item) => item.id === field.id) ? current.fields.map((item) => item.id === field.id ? field : item) : [...current.fields, field] }));

@@ -24,7 +24,7 @@ export const defaultCalendar: BusinessCalendar = {
 const localParts = (ms: number, timezone: string) =>
   Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
-    year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour: "2-digit", minute: "2-digit", second: "2-digit",
+    year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour: "2-digit", hourCycle: "h23", minute: "2-digit", second: "2-digit",
   }).formatToParts(ms).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
 const localDate = (ms: number, timezone: string) => {
   const parts = localParts(ms, timezone) as { year: string; month: string; day: string };
@@ -32,9 +32,10 @@ const localDate = (ms: number, timezone: string) => {
 };
 const zonedMidnight = (date: string, timezone: string) => {
   const guess = Date.parse(`${date}T00:00:00Z`);
-  const formatted = localParts(guess, timezone) as { hour?: string; minute?: string; second?: string };
-  const offset = (Number(formatted.hour ?? 0) * 3600 + Number(formatted.minute ?? 0) * 60 + Number(formatted.second ?? 0)) * 1000;
-  return guess - offset;
+  const parts = localParts(guess, timezone) as { year: string; month: string; day: string; hour: string; minute: string; second: string };
+  const localAsUtc = Date.parse(`${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}Z`);
+  const desiredLocalAsUtc = Date.parse(`${date}T00:00:00Z`);
+  return guess + (desiredLocalAsUtc - localAsUtc);
 };
 export function businessMs(from: string, to: string, calendar: BusinessCalendar) {
   const begin = Date.parse(from), finish = Date.parse(to);
