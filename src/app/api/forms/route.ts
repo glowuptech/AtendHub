@@ -13,7 +13,7 @@ function toDefinition(row: { id: string; organization_id: string; client_id: str
     const fields = (version.definition.fields ?? []).map((field) => ({ ...field, options: (field.options ?? []).map((option) => ({ ...option, ...(assets.get(option.id) ?? {}) })) }));
     return { ...(version.definition.version as object), id: version.id, formId: version.form_id, organizationId: version.organization_id, clientId: version.client_id, number: version.number, state: version.state, paths: (version.definition.version as { paths?: unknown })?.paths ?? version.paths ?? [], fields };
   });
-  return { id: row.id, organizationId: row.organization_id, clientId: row.client_id, doctorId: row.doctor_id, name: row.name, description: row.description, slug: row.slug, status: row.status, activeVersionId: row.active_version_id ?? mapped.at(-1)?.id, versions: mapped, fields: (mapped.find((v) => v.id === row.active_version_id) ?? mapped.at(-1))?.fields ?? [] };
+  return { id: row.id, organizationId: row.organization_id, clientId: row.client_id, doctorId: row.doctor_id, name: row.name, description: row.description, slug: row.slug, status: row.status, activeVersionId: row.active_version_id ?? mapped.at(-1)?.id, versions: mapped, fields: mapped.at(-1)?.fields ?? [] };
 }
 
 async function listForms(auth: Awaited<ReturnType<typeof sessionOrganizationContext>>, clientId: string | null) {

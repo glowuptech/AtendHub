@@ -76,9 +76,7 @@ function mapForm(
     status: row.status,
     activeVersionId: row.active_version_id ?? mapped.at(-1)?.id,
     versions: mapped,
-    fields:
-      (mapped.find((v) => v.id === row.active_version_id) ?? mapped.at(-1))
-        ?.fields ?? [],
+    fields: mapped.at(-1)?.fields ?? [],
   };
 }
 
@@ -190,7 +188,7 @@ export async function PUT(
         });
       if (error) throw error;
     } else {
-      const { data: updatedVersion, error } = await auth.supabase
+      const { error } = await auth.supabase
         .from("atendhub_form_versions")
         .update({
           state: versionState,
@@ -207,14 +205,8 @@ export async function PUT(
           ),
         })
         .eq("id", currentVersion.id)
-        .eq("state", "draft")
-        .select("id")
-        .maybeSingle();
+        .eq("state", "draft");
       if (error) throw error;
-      if (!updatedVersion)
-        throw new Error(
-          "A versão foi alterada ou não pode ser editada. Recarregue antes de salvar.",
-        );
     }
     const { data: row, error: formError } = await auth.supabase
       .from("atendhub_forms")
