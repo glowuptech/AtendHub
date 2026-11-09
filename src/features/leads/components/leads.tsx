@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { useDemo } from "@/components/layout/demo-context";
+import { useClients } from "@/features/clients/hooks";
+import { useLeads } from "@/features/leads/hooks";
 import {
   Heading,
   Card,
@@ -15,23 +17,20 @@ import { LeadTable } from "./lead-table";
 import { FieldInput } from "@/features/forms/components/field-input";
 import type { FieldValue } from "@/domain/schemas";
 export function Leads() {
-  const { repositories, clientId } = useDemo();
+  const { clientId } = useDemo();
+  const { data: clients, error: clientsError } = useClients();
   const [search, setSearch] = useState(""),
     [stage, setStage] = useState("all");
-  const c = repositories.clients.get(clientId);
-  const leads = repositories.leads
-    .list(clientId)
-    .filter(
-      (l) =>
-        l.name.toLowerCase().includes(search.toLowerCase()) &&
-        (stage === "all" || l.stage === stage),
-    );
+  const { data: leads = [], error: leadsError, isLoading } = useLeads({ clientId, search, stage });
+  const c = clients?.find((client) => client.id === clientId);
   return (
     <>
       <Heading
         title="Leads e CRM"
-        description={`${c.name} · CRM administrativo .`}
+        description={`${c?.name ?? "Cliente selecionado"} · CRM administrativo.`}
       />
+      {(clientsError || leadsError) && <p role="alert">Não foi possível carregar os Leads reais.</p>}
+      {isLoading && <p role="status">Carregando Leads…</p>}
       <div className="toolbar">
         <label>
           Buscar lead
