@@ -59,14 +59,13 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!authorizedClients) return;
     const timer = window.setTimeout(() => {
-      setClientId((current) =>
-        current && authorizedClients.some((client) => client.id === current)
-          ? current
-          : (authorizedClients[0]?.id ?? ""),
-      );
+      const scopedClients = repositories.clients.list(scope);
+      const scopedIds = new Set(scopedClients.map((client) => client.id));
+      const nextId = authorizedClients.find((client) => scopedIds.has(client.id))?.id ?? scopedClients[0]?.id ?? "";
+      setClientId((current) => (current && scopedIds.has(current) ? current : nextId));
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [authorizedClients]);
+  }, [authorizedClients, repositories, scope]);
   useEffect(() => {
     const timer = setInterval(() => {
       repositories.capture.sweep();

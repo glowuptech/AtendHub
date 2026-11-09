@@ -20,11 +20,13 @@ import {
 import { LeadTable } from "@/features/leads/components/lead-table";
 import { Button } from "@/components/ui/button";
 export function Dashboard() {
-  const { repositories, clientId } = useDemo();
+  const { repositories, scope, clientId } = useDemo();
   const [period, setPeriod] = useState("month"),
     [stage, setStage] = useState("all"),
     [state, setState] = useState("ready");
-  const client = repositories.clients.get(clientId);
+  const scopedClients = repositories.clients.list(scope);
+  const client = scopedClients.find((item) => item.id === clientId);
+  if (!client) return <LoadingState label="Carregando clínica…" />;
   const leads = repositories.leads
     .list(clientId)
     .filter(
