@@ -30,7 +30,7 @@ export function Shell({
   portal?: boolean;
 }) {
   const { clientId, setClientId } = useDemo();
-  const { data: remoteClients } = useClients();
+  const { data: remoteClients, isLoading: clientsLoading } = useClients();
   const pathname = usePathname(),
     router = useRouter();
   const [open, setOpen] = useState(false);
@@ -266,6 +266,7 @@ export function Shell({
                 <select
                   id="clinic"
                   value={clientId}
+                  disabled={clientsLoading || clinics.length === 0}
                   onChange={(e) => {
                     const id = e.target.value;
                     setClientId(id);

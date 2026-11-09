@@ -14,7 +14,8 @@ import {
   type SetStateAction,
 } from "react";
 import { createMockRepositories } from "@/lib/mocks/repositories";
-import { clientA, demoScope } from "@/lib/mocks/fixtures";
+import { demoScope } from "@/lib/mocks/fixtures";
+import { useClients } from "@/features/clients/hooks";
 import {
   defaultCalendar,
   type BusinessCalendar,
@@ -52,8 +53,20 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   const [calendar, setCalendar] = useState<BusinessCalendar>(defaultCalendar);
   const [scope] = useState<ClientScope>(() => structuredClone(demoScope));
   const [repositories] = useState(() => createMockRepositories(scope));
-  const [clientId, setClientId] = useState(clientA);
+  const [clientId, setClientId] = useState("");
+  const { data: authorizedClients } = useClients();
   const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    if (!authorizedClients) return;
+    const timer = window.setTimeout(() => {
+      setClientId((current) =>
+        current && authorizedClients.some((client) => client.id === current)
+          ? current
+          : (authorizedClients[0]?.id ?? ""),
+      );
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [authorizedClients]);
   useEffect(() => {
     const timer = setInterval(() => {
       repositories.capture.sweep();

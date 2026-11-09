@@ -9,5 +9,8 @@ const fetcher = async (url: string): Promise<Client[]> => {
 };
 
 export function useClients() {
-  return useSWR<Client[]>("/api/clients", fetcher, { revalidateOnFocus: false });
+  return useSWR<Client[]>("/api/clients", fetcher, {
+    revalidateOnFocus: false,
+    keepPreviousData: false,
+  });
 }

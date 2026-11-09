@@ -20,7 +20,7 @@ import { FieldInput } from "@/features/forms/components/field-input";
 import type { FieldValue } from "@/domain/schemas";
 export function Leads() {
   const { clientId } = useDemo();
-  const { data: clients, error: clientsError } = useClients();
+  const { data: clients, error: clientsError, isLoading: clientsLoading } = useClients();
   const [search, setSearch] = useState(""),
     [stage, setStage] = useState("all");
   const c = clients?.find((client) => client.id === clientId);
@@ -33,9 +33,11 @@ export function Leads() {
         description={`${c?.name ?? "Nenhum cliente selecionado"} · CRM administrativo.`}
         action={<Button disabled={!c} onClick={() => setDialogOpen(true)}>Novo lead</Button>}
       />
-      {!c && <p role="status">Selecione um cliente no Workspace antes de cadastrar ou consultar Leads.</p>}
-      {(clientsError || leadsError) && <div role="alert"><p>Não foi possível carregar os Leads reais.</p><Button variant="outline" size="sm" onClick={() => { void mutate(); }}>Tentar novamente</Button></div>}
-      {isLoading && <p role="status">Carregando Leads…</p>}
+      {clientsLoading && <p role="status">Carregando clientes autorizados…</p>}
+      {!clientsLoading && !clientsError && clients?.length === 0 && <p role="status">Nenhum cliente autorizado neste contexto.</p>}
+      {!clientsLoading && !clientsError && clients?.length && !c && <p role="status">Selecione um cliente autorizado no Workspace antes de consultar Leads.</p>}
+      {(clientsError || leadsError) && <div role="alert"><p>Não foi possível carregar os dados reais.</p><Button variant="outline" size="sm" onClick={() => { void mutate(); }}>Tentar novamente</Button></div>}
+      {c && isLoading && <p role="status">Carregando Leads…</p>}
       <div className="toolbar">
         <label>
           Buscar lead
@@ -58,7 +60,7 @@ export function Leads() {
         </label>
       </div>
       <Card>
-        {leadsError ? null : leads.length === 0 ? (
+        {!c || clientsLoading || clientsError || leadsError || isLoading ? null : leads.length === 0 ? (
           search || stage !== "all" ? <Empty title="Nenhum resultado nos filtros" description="Ajuste a busca ou o estágio selecionado." /> : <Empty title="Nenhum lead cadastrado" description="Cadastre o primeiro lead manual deste cliente." />
         ) : <LeadTable leads={leads} />}
       </Card>

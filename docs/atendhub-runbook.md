@@ -38,7 +38,8 @@ Nenhum registro foi inserido ou removido.
 - `npm run build`: aprovado; rotas `/api/settings/calendar`, `/api/leads`, `/api/leads/[leadId]`, `/claim` e `/stage` compiladas.
 - Navegador desktop 1103x671: `/app/fila` redirecionou corretamente para login sem sessão.
 - `GET /api/leads` sem sessão: protegido por 401; fluxos autenticados de cadastro, persistência após reload, CRM/fila, isolamento, permissão e retentativa idempotente continuam pendentes de sessão/test users nesta sessão.
-- Proteção sem sessão: `GET /api/leads` retornou `401 {"error":"Não autorizado."}`.
+  - Proteção sem sessão: `GET /api/leads` retornou `401 {"error":"Não autorizado."}`.
+  - Correção de sincronização do Workspace: `DemoProvider` inicia sem fixture, valida o UUID contra `/api/clients` autorizados e seleciona o primeiro cliente somente após o carregamento. O seletor, Leads, filtros e cadastro manual compartilham esse UUID; o GET de clientes usa sessão/RLS e acesso por cliente, sem Service Role. Sem sessão, `/app/leads` redirecionou corretamente para login.
 - Testes autenticados de CRUD, isolamento entre duas organizações, usuário inativo/sem vínculo e concorrência de duas sessões: preparados pelas APIs/RPCs, mas não aprovados nesta sessão porque não havia sessão autenticada/test users disponíveis.
 - Nenhum registro de produção foi criado, alterado ou removido durante os testes.
 

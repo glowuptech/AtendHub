@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ClientSchema, type Client } from "@/domain/schemas";
 import { apiError, organizationContext } from "@/lib/supabase/organization-admin";
+import { sessionOrganizationContext } from "@/lib/supabase/organization-session";
 
 const clientInput = ClientSchema.omit({ id: true, organizationId: true });
 const serialize = (row: { id: string; organization_id: string; name: string; status: string; metadata: unknown }, doctors: Client["doctors"]): Client => ClientSchema.parse({ ...(row.metadata as object), id: row.id, organizationId: row.organization_id, name: row.name, status: row.status, doctors });
@@ -13,20 +14,34 @@ const resolveOperation = async (admin: any, organizationId: string, client: Clie
   return data.id as string;
 };
 
-async function readClients(auth: Extract<Awaited<ReturnType<typeof organizationContext>>, { admin: unknown }>) {
-  const { data: rows, error } = await auth.admin.from("atendhub_clients").select("id, organization_id, operation_id, name, status, metadata").eq("organization_id", auth.organizationId).order("name");
-  if (error) throw error;
-  const ids = (rows ?? []).map((row) => row.id);
-  const { data: doctors, error: doctorError } = ids.length ? await auth.admin.from("atendhub_professionals").select("id, client_id, name, crm, professional_type, specialties, status").in("client_id", ids).order("name") : { data: [] as { id: string; client_id: string; name: string; crm: string | null; professional_type: string; specialties: string[]; status: string }[], error: null };
-  if (doctorError) throw doctorError;
-  const visibleIds = auth.role === "super_admin" ? new Set(ids) : new Set((await auth.admin.from("atendhub_team_client_access").select("client_id").eq("team_member_id", auth.userId).eq("organization_id", auth.organizationId)).data?.map((item) => item.client_id) ?? []);
-  return (rows ?? []).filter((row) => visibleIds.has(row.id)).map((row) => serialize(row, (doctors ?? []).filter((doctor) => doctor.client_id === row.id).map((doctor) => ({ id: doctor.id, name: doctor.name, crm: doctor.crm, uf: "SP", specialties: doctor.specialties ?? [] }))));
-}
-
 export async function GET() {
-  const auth = await organizationContext();
+  const auth = await sessionOrganizationContext();
   if ("error" in auth) return auth.error;
-  try { return NextResponse.json(await readClients(auth)); } catch (error) { return apiError(error, 500); }
+  try {
+    let query = auth.supabase
+      .from("atendhub_clients")
+      .select("id, organization_id, name, status, metadata")
+      .eq("organization_id", auth.organizationId)
+      .order("name");
+    if (auth.role !== "super_admin") {
+      const { data: access, error: accessError } = await auth.supabase
+        .from("atendhub_team_client_access")
+        .select("client_id")
+        .eq("organization_id", auth.organizationId)
+        .eq("team_member_id", auth.userId);
+      if (accessError) throw accessError;
+      const allowedIds = (access ?? []).map((item) => item.client_id);
+      query = query.in("id", allowedIds.length ? allowedIds : ["00000000-0000-0000-0000-000000000000"]);
+    }
+    const { data: rows, error } = await query;
+    if (error) throw error;
+    const ids = (rows ?? []).map((row) => row.id);
+    const { data: doctors, error: doctorError } = ids.length
+      ? await auth.supabase.from("atendhub_professionals").select("id, client_id, name, crm, specialties").in("client_id", ids).order("name")
+      : { data: [], error: null };
+    if (doctorError) throw doctorError;
+    return NextResponse.json((rows ?? []).map((row) => serialize(row, (doctors ?? []).filter((doctor) => doctor.client_id === row.id).map((doctor) => ({ id: doctor.id, name: doctor.name, crm: doctor.crm, uf: "SP", specialties: doctor.specialties ?? [] })))));
+  } catch (error) { return apiError(error, 500); }
 }
 
 export async function POST(request: Request) {
