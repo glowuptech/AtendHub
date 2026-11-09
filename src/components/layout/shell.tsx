@@ -21,7 +21,6 @@ import { useState, useRef, useEffect, type ReactNode } from "react";
 import { useDemo } from "./demo-context";
 
 import { DemoNotice } from "./shared";
-import { useClients } from "@/features/clients/hooks";
 export function Shell({
   children,
   portal = false,
@@ -29,8 +28,7 @@ export function Shell({
   children: ReactNode;
   portal?: boolean;
 }) {
-  const { clientId, setClientId } = useDemo();
-  const { data: remoteClients, isLoading: clientsLoading } = useClients();
+  const { clientId, setClientId, authorizedClients: remoteClients } = useDemo();
   const pathname = usePathname(),
     router = useRouter();
   const [open, setOpen] = useState(false);
@@ -83,7 +81,7 @@ export function Shell({
       window.removeEventListener("resize", handleResize);
     };
   }, [open]);
-  const clinics = remoteClients ?? [];
+  const clinics = remoteClients;
   const links = portal
     ? ([
         ["/portal", "Visão geral", LayoutDashboard],
@@ -271,7 +269,7 @@ export function Shell({
                 <select
                   id="clinic"
                   value={clientId}
-                  disabled={clientsLoading || clinics.length === 0}
+                  disabled={clinics.length === 0}
                   onChange={(e) => {
                     const id = e.target.value;
                     setClientId(id);

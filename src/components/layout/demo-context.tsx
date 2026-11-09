@@ -36,6 +36,7 @@ interface Context {
   setCalendar: (value: BusinessCalendar) => void;
   repositories: RepositoryRegistry;
   scope: ClientScope;
+  authorizedClients: import("@/domain/schemas").Client[];
   clientId: string;
   setClientId: (id: string) => void;
   revision: number;
@@ -88,6 +89,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         setCalendar,
         repositories,
         scope,
+        authorizedClients: authorizedClients ?? [],
         clientId,
         setClientId,
         revision,
