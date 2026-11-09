@@ -8,6 +8,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useDemo } from "@/components/layout/demo-context";
+import { useLeads } from "@/features/leads/hooks";
 import {
   Heading,
   Card,
@@ -20,20 +21,18 @@ import {
 import { LeadTable } from "@/features/leads/components/lead-table";
 import { Button } from "@/components/ui/button";
 export function Dashboard() {
-  const { repositories, scope, clientId } = useDemo();
+  const { authorizedClients, clientId } = useDemo();
+  const { data: persistedLeads, error: leadsError, isLoading: leadsLoading } = useLeads({ clientId: clientId || null });
   const [period, setPeriod] = useState("month"),
     [stage, setStage] = useState("all"),
     [state, setState] = useState("ready");
-  const scopedClients = repositories.clients.list(scope);
-  const client = scopedClients.find((item) => item.id === clientId);
-  if (!client) return <LoadingState label="Carregando clínica…" />;
-  const leads = repositories.leads
-    .list(clientId)
-    .filter(
-      (l) =>
-        (period !== "today" || l.createdAt.startsWith("2026-11-03")) &&
-        (stage === "all" || l.stage === stage),
-    );
+  const client = authorizedClients.find((item) => item.id === clientId);
+  if (!client || leadsLoading) return <LoadingState label="Carregando indicadores reais…" />;
+  if (leadsError) return <Card><p role="alert">Não foi possível carregar os indicadores desta clínica.</p><Button onClick={() => window.location.reload()}>Tentar novamente</Button></Card>;
+  const leads = (persistedLeads ?? []).filter((lead) =>
+    (period !== "today" || lead.created_at.slice(0, 10) === new Date().toISOString().slice(0, 10)) &&
+    (stage === "all" || lead.stage === stage),
+  );
   const scheduled = leads.filter((l) =>
     ["scheduled", "confirmed"].includes(l.stage),
   ).length;
@@ -130,7 +129,7 @@ export function Dashboard() {
               <div className="section-caption">Funil operacional</div>
               {[
                 ["Leads recebidos", leads.length],
-                ["Em atendimento", leads.filter((l) => l.owner).length],
+                ["Em atendimento", leads.filter((l) => l.owner_id).length],
                 ["Agendados", scheduled],
               ].map(([label, count], i) => (
                 <div className="funnel-row" data-series={i % 5} key={label}>
@@ -159,7 +158,7 @@ export function Dashboard() {
             <Card title="Prioridade de atendimento" className="bento-priority">
               <div className="priority-value">
                 <Clock3 size={20} />
-                <strong>{leads.filter((l) => !l.owner).length}</strong>
+                <strong>{leads.filter((l) => !l.owner_id).length}</strong>
                 <span>leads sem responsável</span>
               </div>
               <NavButton href="/app/fila">Acessar fila</NavButton>
@@ -184,7 +183,7 @@ export function Dashboard() {
               </div>
               <NavButton href="/app/leads">Ver todos os leads</NavButton>
             </div>
-            <LeadTable leads={leads} />
+            <LeadTable leads={leads.map((lead) => ({ ...lead, createdAt: lead.created_at, owner: lead.owner_id, name: lead.name }))} />
           </Card>
         </>
       )}
