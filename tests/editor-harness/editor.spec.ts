@@ -94,25 +94,14 @@ test("editor conserva opções sem Aplicar e concentra caminhos em Fluxo", async
     .getAttribute("value");
   await page.getByLabel("Destino de Ginecológica").selectOption(a!);
   await page.getByLabel("Destino de Obstétrica").selectOption(b!);
-  for (const [answer, path] of [
-    ["Ginecológica", "A"],
-    ["Obstétrica", "B"],
-  ]) {
-    const branch = page.getByRole("region", {
-      name: `Resposta ${answer}`,
-      exact: true,
-    });
-    await branch.locator("summary").click();
-    await branch
-      .getByRole("checkbox", {
-        name: `Pergunta exclusiva ${path}`,
-        exact: true,
-      })
-      .check();
-    await expect(branch.locator(".journey-questions")).toContainText(
-      `Pergunta exclusiva ${path}`,
-    );
-  }
+  await page
+    .getByRole("group", { name: "Pergunta exclusiva A", exact: true })
+    .getByRole("checkbox", { name: "A — Ginecológica", exact: true })
+    .check();
+  await page
+    .getByRole("group", { name: "Pergunta exclusiva B", exact: true })
+    .getByRole("checkbox", { name: "B — Obstétrica", exact: true })
+    .check();
   await page
     .getByRole("button", { name: "Salvar rascunho", exact: true })
     .click();
@@ -137,9 +126,7 @@ test("editor conserva opções sem Aplicar e concentra caminhos em Fluxo", async
   await expect(
     preview.getByRole("heading", { name: "Pergunta exclusiva A", exact: true }),
   ).toHaveCount(0);
-  await page
-    .locator(".journey-map")
-    .screenshot({ path: "test-results/editor-flow-desktop.png" });
+  await page.screenshot({ path: "test-results/editor-flow-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
@@ -277,9 +264,7 @@ test("arquivar pede confirmação e desarquivar recupera como rascunho", async (
   ).toBeVisible();
   await page.getByRole("button", { name: /Em uso \(1\)/ }).click();
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
-  await expect(
-    page.locator(".cards-grid .badge").filter({ hasText: /^Rascunho$/ }),
-  ).toBeVisible();
+  await expect(page.locator(".cards-grid .badge").filter({ hasText: /^Rascunho$/ })).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Abrir formulário", exact: true }),
   ).toHaveCount(0);

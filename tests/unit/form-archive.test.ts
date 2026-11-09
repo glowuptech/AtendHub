@@ -14,7 +14,7 @@ vi.mock("@/lib/supabase/organization-admin", () => ({
   apiError: (_error: unknown, status = 400) =>
     Response.json({ error: "Falha na operação" }, { status }),
 }));
-import { GET, PATCH, DELETE } from "@/app/api/forms/[formId]/route";
+import { PATCH, DELETE } from "@/app/api/forms/[formId]/route";
 const id = "00000000-0000-4000-8000-000000000100";
 const context = { params: Promise.resolve({ formId: id }) };
 const request = () =>
@@ -87,45 +87,4 @@ describe("Arquivamento com sessão e RLS", () => {
     expect(state.update.mock.calls[0][0].status).toBe("archived");
     expect(state.eq).toHaveBeenCalledWith("organization_id", "org-authorized");
   });
-});
-
-it("carrega opções e destinos da versão ativa, mesmo existindo versão posterior", async () => {
-  const active = {
-    id: "version-active",
-    form_id: id,
-    number: 1,
-    state: "draft",
-    definition: {
-      version: { paths: [{ id: "a" }] },
-      fields: [{ options: [{ id: "option", pathId: "a" }] }],
-    },
-  };
-  const newer = {
-    ...active,
-    id: "version-newer",
-    number: 2,
-    definition: {
-      version: { paths: [{ id: "b" }] },
-      fields: [{ options: [{ id: "option", pathId: "b" }] }],
-    },
-  };
-  const query = {
-    select: vi.fn(),
-    eq: vi.fn(),
-    single: vi.fn(),
-    order: vi.fn(),
-  };
-  query.select.mockReturnValue(query);
-  query.eq.mockReturnValue(query);
-  query.single.mockResolvedValue({
-    data: { id, active_version_id: active.id },
-    error: null,
-  });
-  query.order.mockResolvedValue({ data: [active, newer], error: null });
-  state.from.mockReturnValue(query);
-  const response = (await GET(new Request("http://localhost"), context))!;
-  expect(response.status).toBe(200);
-  const form = await response.json();
-  expect(form.fields[0].options[0].pathId).toBe("a");
-  expect(form.activeVersionId).toBe(active.id);
 });

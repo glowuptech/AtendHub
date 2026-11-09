@@ -5,7 +5,6 @@ import { z } from "zod";
 import { Plus, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
 import { useDemo } from "@/components/layout/demo-context";
 import { useClients } from "@/features/clients/hooks";
-import { mutate } from "swr";
 import { useForms } from "../hooks";
 import {
   Heading,
@@ -228,14 +227,6 @@ export function EditorWorkspace({
         );
       setPersistedId(result.id);
       setDraft(result);
-      await mutate(
-        `/api/forms?clientId=${encodeURIComponent(clientId)}`,
-        (cached: FormDefinition[] | undefined) =>
-          cached
-            ? [...cached.filter((item) => item.id !== result.id), result]
-            : [result],
-        { revalidate: false },
-      );
       setSaved(true);
       setNotice(
         snapshot
