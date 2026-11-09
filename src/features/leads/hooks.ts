@@ -17,6 +17,10 @@ export type PersistedLead = {
   form_version_id: string | null;
   origin_submission_id: string | null;
   field_values: unknown[];
+  notes: string;
+  original_captured_at: string | null;
+  queue_entered_at: string;
+  created_by_id: string | null;
   next_action: string;
   created_at: string;
   updated_at: string;
@@ -35,7 +39,7 @@ const fetcher = async <T,>(url: string): Promise<T> => {
 };
 
 export function useLead(leadId: string) {
-  return useSWR<PersistedLead & { events?: Array<{ id: string; event_type: string; from_stage: string | null; to_stage: string | null; created_at: string }> }>(`/api/leads/${leadId}`, fetcher, { revalidateOnFocus: false });
+  return useSWR<PersistedLead & { events?: Array<{ id: string; event_type: string; from_stage: string | null; to_stage: string | null; created_at: string }>; responses?: Array<{ id: string; question_id: string; question_snapshot: { label?: string; options?: Array<{ id: string; label: string }> }; value: unknown; captured_at: string }> }>(`/api/leads/${leadId}`, fetcher, { revalidateOnFocus: false });
 }
 
 export function useLeads(params: { clientId?: string | null; search?: string; stage?: string } = {}) {

@@ -218,6 +218,8 @@ export const VersionSchema = z.object({
 });
 export const FormSchema = z.object({
   doctorId: Id.nullable().default(null),
+  fields: z.array(z.lazy(() => FieldSchema)).default([]),
+  description: z.string().max(2000).default(""),
   ...scoped,
   name: z.string().trim().min(3),
   slug: z.string().regex(/^[a-z0-9-]+$/),

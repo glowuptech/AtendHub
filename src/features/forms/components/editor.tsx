@@ -4,6 +4,8 @@ const subscribe = () => () => {};
 import { z } from "zod";
 import { Plus, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
 import { useDemo } from "@/components/layout/demo-context";
+import { useClients } from "@/features/clients/hooks";
+import { useForms } from "../hooks";
 import {
   Heading,
   Card,
@@ -19,6 +21,7 @@ import {
   type FormDefinition,
   type FormVersion,
   type FormStep,
+  type CustomFieldDefinition,
 } from "@/domain/schemas";
 import { QuestionOptions } from "./question-options";
 import { SettingsEditor } from "./settings-editor";
@@ -59,23 +62,19 @@ export function FormEditor({
   clientId: string;
   formId?: string;
 }) {
-  const { repositories, clientId } = useDemo();
-  const mounted = useSyncExternalStore(
-    subscribe,
-    () => true,
-    () => false,
-  );
-  if (!mounted) return <p role="status">Carregando editor…</p>;
-  if (id !== clientId) return <Denied />;
-  const source = formId
-    ? repositories.forms.list(id).find((f) => f.id === formId)
-    : undefined;
+  const { clientId } = useDemo();
+  const { data: clients, isLoading: clientsLoading } = useClients();
+  const { data: forms, isLoading: formsLoading, error: formsError } = useForms(id);
+  const mounted = useSyncExternalStore(subscribe, () => true, () => false);
+  const client = clients?.find((item) => item.id === id);
+  if (!mounted || clientsLoading || formsLoading) return <p role="status">Carregando editor…</p>;
+  if (id !== clientId || !client || formsError) return <Denied />;
+  const source = formId ? forms?.find((form) => form.id === formId) : undefined;
   if (formId && !source) return <Denied />;
-  return <EditorWorkspace key={`${id}-${formId ?? "new"}`} source={source} />;
+  return <EditorWorkspace key={`${id}-${formId ?? "new"}`} client={client} source={source} />;
 }
-function EditorWorkspace({ source }: { source?: FormDefinition }) {
-  const { repositories, clientId, refresh } = useDemo();
-  const client = repositories.clients.get(clientId);
+function EditorWorkspace({ source, client }: { source?: FormDefinition; client: import("@/domain/schemas").Client }) {
+  const clientId = client.id;
   const [draft, setDraft] = useState<FormDefinition>(() => {
     if (source) {
       const f = structuredClone(source),
@@ -107,6 +106,8 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
       organizationId: client.organizationId,
       clientId,
       doctorId: null,
+      description: "",
+      fields: [],
       name: "Novo formulário",
       slug: `formulario-${formId.slice(0, 8)}`,
       status: "draft",
@@ -128,6 +129,8 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
       ],
     };
   });
+  const [fields, setFields] = useState(source?.fields ?? []);
+  const [persistedId, setPersistedId] = useState(source?.id ?? "");
   const [mode, setMode] = useState("new"),
     [selected, setSelected] = useState(""),
     [label, setLabel] = useState(""),
@@ -140,7 +143,6 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
     [previewKey, setPreviewKey] = useState(0),
     [previewMode, setPreviewMode] = useState<"mobile" | "wide">("mobile");
   const version = draft.versions.find((v) => v.id === draft.activeVersionId)!;
-  const fields = repositories.fields.list(clientId);
   const frozen = version.state === "snapshot";
   function updateVersion(change: Partial<FormVersion>) {
     setSaved(false);
@@ -156,20 +158,20 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
       steps: version.steps.map((s) => (s.id === id ? { ...s, ...change } : s)),
     });
   }
-  function save(snapshot = false) {
+  async function save(snapshot = false) {
     try {
-      repositories.forms.save(clientId, draft);
-      if (snapshot) {
-        repositories.forms.snapshot(clientId, draft.id);
-        setDraft(repositories.forms.get(clientId, draft.id));
-      }
-      refresh();
+      const response = await fetch(persistedId ? `/api/forms/${persistedId}` : "/api/forms", {
+        method: persistedId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, form: draft, publish: snapshot }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Não foi possível salvar o formulário.");
+      setPersistedId(result.id);
+      setDraft(result);
+      setFields(result.fields ?? []);
       setSaved(true);
-      setNotice(
-        snapshot
-          ? "Formulário ativado nesta sessão. Abra o formulário para testar o cadastro."
-          : "Formulário salvo.",
-      );
+      setNotice(snapshot ? "Formulário publicado. A versão anterior permanece preservada." : "Formulário salvo como rascunho.");
     } catch (e) {
       setNotice(
         e instanceof z.ZodError
@@ -320,14 +322,14 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
                         (f) => f.id === s.question.fieldDefinitionId,
                       )!}
                       onSave={(field) => {
-                        repositories.fields.create(clientId, field);
+                        setFields((current) => current.some((item) => item.id === field.id) ? current.map((item) => item.id === field.id ? field : item) : [...current, field]);
+                        setDraft((current) => ({ ...current, fields: current.fields.some((item) => item.id === field.id) ? current.fields.map((item) => item.id === field.id ? field : item) : [...current.fields, field] }));
                         updateStep(s.id, {
                           question: {
                             ...s.question,
                             fieldDefinitionId: field.id,
                           },
                         });
-                        refresh();
                       }}
                     />
                   )}
@@ -503,10 +505,10 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
                   disabled={mode === "reuse" && (!confirmed || !selected)}
                   onClick={() => {
                     try {
-                      let field;
+                      let field: CustomFieldDefinition;
                       if (mode === "reuse") {
                         if (!confirmed) throw Error("Confirme a reutilização");
-                        field = repositories.fields.get(clientId, selected);
+                        field = fields.find((item) => item.id === selected) ?? (() => { throw Error("Campo não encontrado."); })();
                       } else {
                         field = FieldSchema.parse({
                           id: crypto.randomUUID(),
@@ -527,8 +529,8 @@ function EditorWorkspace({ source }: { source?: FormDefinition }) {
                               label: s,
                             })),
                         });
-                        repositories.fields.create(clientId, field);
-                        refresh();
+                        setFields((current) => [...current, field]);
+                        setDraft((current) => ({ ...current, fields: [...current.fields, field] }));
                       }
                       if (
                         version.steps.some(

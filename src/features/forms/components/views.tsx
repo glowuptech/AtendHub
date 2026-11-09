@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { useDemo } from "@/components/layout/demo-context";
+import { useClients } from "@/features/clients/hooks";
+import { useForms } from "../hooks";
 import {
   Heading,
   Card,
@@ -18,32 +20,17 @@ export function FormPreview({
   clientId: string;
   formId: string;
 }) {
-  const { repositories, clientId } = useDemo();
+  const { clientId } = useDemo();
+  const { data: clients, isLoading: clientsLoading } = useClients();
+  const { data: forms, isLoading: formsLoading } = useForms(id);
+  if (clientsLoading || formsLoading) return <p role="status">Carregando prévia…</p>;
   if (id !== clientId) return <Denied />;
-  const form = repositories.forms.list(id).find((f) => f.id === formId);
-  if (!form) return <Denied />;
-  return (
-    <>
-      <Heading
-        title="Prévia do formulário"
-        description={`${repositories.clients.get(id).name} · não publicado.`}
-        action={
-          <NavButton href={`/app/clientes/${id}/formularios`}>Voltar</NavButton>
-        }
-      />
-      <div className="preview-center">
-        <FormWizard
-          form={form}
-          version={form.versions.find((v) => v.id === form.activeVersionId)!}
-          fields={repositories.fields.list(id)}
-          clinicName={repositories.clients.get(id).name}
-        />
-      </div>
-      <div className="preview-center">
-        <NavButton href={`/f/${form.slug}`}>Abrir rota pública</NavButton>
-      </div>
-    </>
-  );
+  const form = forms?.find((item) => item.id === formId);
+  const client = clients?.find((item) => item.id === id);
+  if (!form || !client) return <Denied />;
+  const version = form.versions.find((item) => item.id === form.activeVersionId) ?? form.versions.at(-1);
+  if (!version) return <Denied />;
+  return <><Heading title="Prévia do formulário" description={`${client.name} · persistido no Supabase.`} action={<NavButton href={`/app/clientes/${id}/formularios`}>Voltar</NavButton>} /><div className="preview-center"><FormWizard form={form} version={version} fields={form.fields ?? []} clinicName={client.name} /></div><div className="preview-center"><p>O formulário público ainda não está conectado ao fluxo persistido.</p></div></>;
 }
 export function PublicForm({ slug }: { slug: string }) {
   const { scope, repositories } = useDemo();

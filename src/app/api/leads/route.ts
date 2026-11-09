@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { apiError } from "@/lib/supabase/organization-admin";
 import { sessionOrganizationContext } from "@/lib/supabase/organization-session";
+import { validateAnswer, type FieldValue, type FormDefinition } from "@/domain/schemas";
 
 const createLeadSchema = z.object({
   clientId: z.string().uuid(),
@@ -17,10 +18,11 @@ const createLeadSchema = z.object({
   formId: z.string().uuid().nullable().optional(),
   formVersionId: z.string().uuid().nullable().optional(),
   originSubmissionId: z.string().uuid().nullable().optional(),
-  fieldValues: z.array(z.unknown()).default([]),
+  fieldValues: z.array(z.object({ questionId: z.string().uuid(), fieldDefinitionId: z.string().uuid(), value: z.unknown(), questionSnapshot: z.record(z.string(), z.unknown()).default({}) })).default([]),
+  originalCapturedAt: z.string().datetime().nullable().optional(),
 }).refine((value) => Boolean(value.phone || value.email), { message: "Informe telefone ou e-mail.", path: ["phone"] });
 
-const select = "id, organization_id, client_id, professional_id, contact_id, name, phone, email, source, capture_status, stage, owner_id, form_id, form_version_id, origin_submission_id, field_values, notes, next_action, idempotency_key, created_at, updated_at, assigned_at, claimed_at, first_response_at, client:atendhub_clients!atendhub_leads_client_id_fkey(id,name,operation_id), professional:atendhub_professionals!atendhub_leads_professional_id_fkey(id,name)";
+const select = "id, organization_id, client_id, professional_id, contact_id, name, phone, email, source, capture_status, stage, owner_id, form_id, form_version_id, origin_submission_id, field_values, notes, next_action, idempotency_key, original_captured_at, queue_entered_at, created_by_id, created_at, updated_at, assigned_at, claimed_at, first_response_at, client:atendhub_clients!atendhub_leads_client_id_fkey(id,name,operation_id), professional:atendhub_professionals!atendhub_leads_professional_id_fkey(id,name)";
 
 export async function GET(request: Request) {
   const auth = await sessionOrganizationContext();
@@ -44,34 +46,30 @@ export async function POST(request: Request) {
   const parsed = createLeadSchema.safeParse(await request.json());
   if (!parsed.success) return apiError(new Error(parsed.error.issues[0]?.message ?? "Dados inválidos."));
   const input = parsed.data;
+  const originalCapturedAt = input.originalCapturedAt ? new Date(input.originalCapturedAt) : new Date();
+  if (Number.isNaN(originalCapturedAt.getTime()) || originalCapturedAt.getTime() > Date.now()) return apiError(new Error("Data original inválida ou futura."), 400);
+  let persistedForm: FormDefinition | null = null;
+  if (input.formId || input.formVersionId) {
+    if (!input.formId || !input.formVersionId) return apiError(new Error("Formulário e versão devem ser informados juntos."), 400);
+    const { data: versionRow, error: versionError } = await auth.supabase.from("atendhub_form_versions").select("id, form_id, client_id, definition").eq("id", input.formVersionId).eq("form_id", input.formId).eq("client_id", input.clientId).single();
+    if (versionError || !versionRow) return apiError(new Error("Versão de formulário não pertence ao cliente selecionado."), 403);
+    const raw = versionRow.definition as { version?: unknown; fields?: unknown };
+    persistedForm = { ...(raw.version as FormDefinition), fields: (raw.fields ?? []) as FormDefinition["fields"] };
+    for (const step of persistedForm.versions.find((item) => item.id === input.formVersionId)?.steps ?? []) {
+      const field = persistedForm.fields?.find((item) => item.id === step.question.fieldDefinitionId);
+      const answer = input.fieldValues.find((item) => item.questionId === step.question.id)?.value;
+      if (field && input.captureStatus === "completed") {
+        try { validateAnswer(field, step.question.required, answer as FieldValue); } catch { return apiError(new Error(`Resposta inválida para: ${step.question.label}`), 400); }
+      }
+    }
+  } else if (input.fieldValues.length) return apiError(new Error("Respostas só podem ser enviadas com uma versão de formulário."), 400);
   const idempotencyKey = request.headers.get("idempotency-key")?.trim();
   if (!idempotencyKey || idempotencyKey.length > 160) return apiError(new Error("Idempotency-Key obrigatório."), 400);
   const { data: previous } = await auth.supabase.from("atendhub_leads").select(select).eq("organization_id", auth.organizationId).eq("idempotency_key", idempotencyKey).maybeSingle();
   if (previous) return NextResponse.json(previous, { status: 200 });
-  const { data: lead, error } = await auth.supabase.from("atendhub_leads").insert({
-    organization_id: auth.organizationId,
-    client_id: input.clientId,
-    professional_id: input.professionalId ?? null,
-    name: input.name,
-    phone: input.phone,
-    email: input.email,
-    notes: input.notes,
-    idempotency_key: idempotencyKey,
-    source: "manual",
-    capture_status: "completed",
-    stage: "new",
-    next_action: input.nextAction,
-    form_id: input.formId ?? null,
-    form_version_id: input.formVersionId ?? null,
-    origin_submission_id: input.originSubmissionId ?? null,
-    field_values: input.fieldValues,
-  }).select(select).single();
-  if (error?.code === "23505") {
-    const { data: concurrent } = await auth.supabase.from("atendhub_leads").select(select).eq("organization_id", auth.organizationId).eq("idempotency_key", idempotencyKey).maybeSingle();
-    if (concurrent) return NextResponse.json(concurrent, { status: 200 });
-  }
-  if (error || !lead) return apiError(error ?? new Error("Lead não foi criado."), error?.code === "42501" ? 403 : 409);
-  const event = await auth.supabase.from("atendhub_lead_events").insert({ organization_id: auth.organizationId, lead_id: lead.id, actor_id: auth.userId, event_type: "created", to_stage: lead.stage, metadata: { source: input.source } });
-  if (event.error) return apiError(event.error, 500);
+  const { data: leadId, error } = await auth.supabase.rpc("atendhub_create_manual_lead", { p_organization_id: auth.organizationId, p_client_id: input.clientId, p_professional_id: input.professionalId ?? null, p_name: input.name, p_phone: input.phone, p_email: input.email, p_source: "manual", p_capture_status: input.captureStatus, p_next_action: input.nextAction, p_notes: input.notes, p_form_id: input.formId ?? null, p_form_version_id: input.formVersionId ?? null, p_original_captured_at: originalCapturedAt.toISOString(), p_field_values: input.fieldValues, p_idempotency_key: idempotencyKey, p_actor_id: auth.userId });
+  if (error || !leadId) return apiError(error ?? new Error("Lead não foi criado."), error?.code === "42501" ? 403 : 409);
+  const { data: lead, error: loadError } = await auth.supabase.from("atendhub_leads").select(select).eq("id", leadId).single();
+  if (loadError || !lead) return apiError(loadError ?? new Error("Lead criado, mas não pôde ser lido."), 500);
   return NextResponse.json(lead, { status: 201 });
 }

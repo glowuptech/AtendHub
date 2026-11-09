@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { apiError, organizationContext } from "@/lib/supabase/organization-admin";
+import { apiError } from "@/lib/supabase/organization-admin";
+import { sessionOrganizationContext } from "@/lib/supabase/organization-session";
 
 const updateSchema = z.object({
   name: z.string().trim().min(2).max(160).optional(),
@@ -14,7 +15,7 @@ const updateSchema = z.object({
 });
 
 export async function PATCH(request: Request, context: { params: Promise<{ leadId: string }> }) {
-  const auth = await organizationContext();
+  const auth = await sessionOrganizationContext();
   if ("error" in auth) return auth.error;
   const { leadId } = await context.params;
   const parsed = updateSchema.safeParse(await request.json());
@@ -39,10 +40,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
 }
 
 export async function GET(_request: Request, context: { params: Promise<{ leadId: string }> }) {
-  const auth = await organizationContext();
+  const auth = await sessionOrganizationContext();
   if ("error" in auth) return auth.error;
   const { leadId } = await context.params;
-  const { data, error } = await auth.supabase.from("atendhub_leads").select("*, client:atendhub_clients!inner(id,name,operation_id), professional:atendhub_professionals(id,name), events:atendhub_lead_events(*)").eq("id", leadId).eq("organization_id", auth.organizationId).single();
+  const { data, error } = await auth.supabase.from("atendhub_leads").select("id,organization_id,client_id,professional_id,contact_id,name,phone,email,source,capture_status,stage,owner_id,form_id,form_version_id,origin_submission_id,field_values,notes,next_action,original_captured_at,queue_entered_at,created_by_id,created_at,updated_at,assigned_at,claimed_at,first_response_at,client:atendhub_clients!atendhub_leads_client_id_fkey(id,name,operation_id),professional:atendhub_professionals!atendhub_leads_professional_id_fkey(id,name),events:atendhub_lead_events(*),responses:atendhub_lead_responses(*)").eq("id", leadId).eq("organization_id", auth.organizationId).single();
   if (error || !data) return apiError(error ?? new Error("Lead não encontrado."), 404);
   return NextResponse.json(data);
 }
