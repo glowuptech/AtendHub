@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { FieldInput } from "./field-input";
 import { settingsOf } from "../services/settings";
+import { eligibleSteps } from "../services/routing";
 import { useDemo } from "@/components/layout/demo-context";
 export function FormWizard({
   form,
@@ -48,11 +49,10 @@ export function FormWizard({
   const heading = useRef<HTMLHeadingElement>(null);
   const submitted = useRef(false);
   const hasContacts = Object.values(settings.contacts).some((c) => c.enabled);
+  const routedSteps = eligibleSteps(version, fields, answers);
   const sequence = [
-    ...(hasContacts && settings.contactPosition === "start"
-      ? ["contacts"]
-      : []),
-    ...version.steps.map((s) => s.id),
+    ...(hasContacts && settings.contactPosition === "start" ? ["contacts"] : []),
+    ...routedSteps.map((s) => s.id),
     ...(hasContacts && settings.contactPosition === "end" ? ["contacts"] : []),
   ];
   const current = sequence[index];
@@ -201,7 +201,7 @@ export function FormWizard({
                       else throw Error("Pergunta indisponível");
                       if (isLast) {
                         validateContacts();
-                        for (const s of version.steps) {
+                        for (const s of routedSteps) {
                           const f = fields.find(
                             (f) => f.id === s.question.fieldDefinitionId,
                           );
@@ -218,7 +218,7 @@ export function FormWizard({
                           repositories.capture.capture({
                             ...base(),
                             contacts,
-                            answers,
+                            answers: Object.fromEntries(routedSteps.map((s) => [s.question.id, answers[s.question.id]]).filter(([, value]) => value !== undefined)),
                             complete: true,
                           });
                           submitted.current = true;
@@ -313,7 +313,13 @@ export function FormWizard({
                         value={answers[step.question.id]}
                         errorId={error ? "form-error" : undefined}
                         onChange={(v) => {
-                          setAnswers((a) => ({ ...a, [step.question.id]: v }));
+                          setAnswers((a) => {
+                            const next = { ...a, [step.question.id]: v };
+                            const eligible = new Set(eligibleSteps(version, fields, next).map((item) => item.question.id));
+                            for (const key of Object.keys(next)) if (!eligible.has(key)) delete next[key];
+                            return next;
+                          });
+                          setIndex((currentIndex) => Math.min(currentIndex, Math.max(sequence.length - 1, 0)));
                           setError("");
                         }}
                       />

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { apiError } from "@/lib/supabase/organization-admin";
 import { sessionOrganizationContext } from "@/lib/supabase/organization-session";
 import { FormSchema } from "@/domain/schemas";
+import { validateRouting } from "@/features/forms/services/routing";
 
 const inputSchema = z.object({ clientId: z.string().uuid(), form: z.unknown(), publish: z.boolean().default(false) });
 
@@ -37,10 +38,11 @@ export async function POST(request: Request) {
   const form = FormSchema.parse(parsed.data.form);
   const version = form.versions.find((item) => item.id === form.activeVersionId) ?? form.versions.at(-1);
   if (!version) return apiError(new Error("Versão do formulário ausente."), 400);
+  if (parsed.data.publish) validateRouting(version, form.fields);
   try {
     const { data: created, error } = await auth.supabase.from("atendhub_forms").insert({ organization_id: auth.organizationId, client_id: parsed.data.clientId, doctor_id: form.doctorId, name: form.name, description: form.description ?? "", slug: form.slug, status: parsed.data.publish ? "demo" : "draft" }).select("id,organization_id,client_id,doctor_id,name,description,slug,status,active_version_id").single();
     if (error || !created) throw error ?? new Error("Formulário não criado.");
-    const { data: savedVersion, error: versionError } = await auth.supabase.from("atendhub_form_versions").insert({ id: version.id, form_id: created.id, organization_id: auth.organizationId, client_id: parsed.data.clientId, number: version.number, state: parsed.data.publish ? "snapshot" : "draft", definition: { version: { ...version, id: version.id, formId: created.id }, fields: form.fields ?? [] }, created_by_id: auth.userId }).select("id,form_id,organization_id,client_id,number,state,definition").single();
+    const { data: savedVersion, error: versionError } = await auth.supabase.from("atendhub_form_versions").insert({ id: version.id, form_id: created.id, organization_id: auth.organizationId, client_id: parsed.data.clientId, number: version.number, state: parsed.data.publish ? "snapshot" : "draft", definition: { version: { ...version, id: version.id, formId: created.id }, fields: form.fields ?? [] }, paths: version.paths ?? [], choice_assets: form.fields.flatMap((field) => field.options.filter((option) => option.imageUrl).map((option) => ({ id: option.id, imageUrl: option.imageUrl, alt: option.alt }))), created_by_id: auth.userId }).select("id,form_id,organization_id,client_id,number,state,definition").single();
     if (versionError || !savedVersion) throw versionError ?? new Error("Versão não criada.");
     const { data: updated, error: updateError } = await auth.supabase.from("atendhub_forms").update({ active_version_id: savedVersion.id, status: parsed.data.publish ? "demo" : "draft", updated_at: new Date().toISOString() }).eq("id", created.id).select("id,organization_id,client_id,doctor_id,name,description,slug,status,active_version_id").single();
     if (updateError || !updated) throw updateError ?? new Error("Formulário não atualizado.");

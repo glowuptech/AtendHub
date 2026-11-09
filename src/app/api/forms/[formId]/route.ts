@@ -3,6 +3,7 @@ import { z } from "zod";
 import { apiError } from "@/lib/supabase/organization-admin";
 import { sessionOrganizationContext } from "@/lib/supabase/organization-session";
 import { FormSchema } from "@/domain/schemas";
+import { validateRouting } from "@/features/forms/services/routing";
 
 const inputSchema = z.object({ form: z.unknown(), publish: z.boolean().default(false) });
 
@@ -14,7 +15,7 @@ function mapForm(row: { id: string; organization_id: string; client_id: string; 
 async function load(auth: Exclude<Awaited<ReturnType<typeof sessionOrganizationContext>>, { error: unknown }>, formId: string) {
   const { data: row, error } = await auth.supabase.from("atendhub_forms").select("id,organization_id,client_id,doctor_id,name,description,slug,status,active_version_id").eq("id", formId).eq("organization_id", auth.organizationId).single();
   if (error || !row) throw error ?? new Error("Formulário não encontrado.");
-  const { data: versions, error: versionError } = await auth.supabase.from("atendhub_form_versions").select("id,form_id,organization_id,client_id,number,state,definition").eq("form_id", formId).order("number");
+  const { data: versions, error: versionError } = await auth.supabase.from("atendhub_form_versions").select("id,form_id,organization_id,client_id,number,state,definition,paths,choice_assets").eq("form_id", formId).order("number");
   if (versionError) throw versionError;
   return { row, versions: versions ?? [] };
 }
@@ -36,15 +37,16 @@ export async function PUT(request: Request, context: { params: Promise<{ formId:
     const current = await load(auth, formId);
     const currentVersion = current.versions.find((version) => version.id === form.activeVersionId) ?? current.versions.at(-1);
     if (!currentVersion) throw new Error("Versão ausente.");
+    if (parsed.data.publish) validateRouting(form.versions.find((version) => version.id === form.activeVersionId) ?? form.versions.at(-1)!, form.fields);
     const nextNumber = Math.max(...current.versions.map((version) => version.number), 0) + (currentVersion.state === "snapshot" ? 1 : 0);
     const versionId = currentVersion.state === "snapshot" ? crypto.randomUUID() : currentVersion.id;
     const versionState = parsed.data.publish ? "snapshot" : "draft";
     const versionPayload = { ...(currentVersion.definition.version as object), ...currentVersion.definition.version, ...form.versions.find((version) => version.id === form.activeVersionId), id: versionId, formId, organizationId: auth.organizationId, clientId: form.clientId, number: nextNumber, state: versionState };
     if (currentVersion.state === "snapshot") {
-      const { error } = await auth.supabase.from("atendhub_form_versions").insert({ id: versionId, form_id: formId, organization_id: auth.organizationId, client_id: form.clientId, number: nextNumber, state: versionState, definition: { version: versionPayload, fields: form.fields ?? [] }, created_by_id: auth.userId });
+      const { error } = await auth.supabase.from("atendhub_form_versions").insert({ id: versionId, form_id: formId, organization_id: auth.organizationId, client_id: form.clientId, number: nextNumber, state: versionState, definition: { version: versionPayload, fields: form.fields ?? [] }, paths: versionPayload.paths ?? [], choice_assets: form.fields.flatMap((field) => field.options.filter((option) => option.imageUrl).map((option) => ({ id: option.id, imageUrl: option.imageUrl, alt: option.alt }))), created_by_id: auth.userId });
       if (error) throw error;
     } else {
-      const { error } = await auth.supabase.from("atendhub_form_versions").update({ state: versionState, definition: { version: versionPayload, fields: form.fields ?? [] } }).eq("id", currentVersion.id).eq("state", "draft");
+      const { error } = await auth.supabase.from("atendhub_form_versions").update({ state: versionState, definition: { version: versionPayload, fields: form.fields ?? [] }, paths: versionPayload.paths ?? [], choice_assets: form.fields.flatMap((field) => field.options.filter((option) => option.imageUrl).map((option) => ({ id: option.id, imageUrl: option.imageUrl, alt: option.alt }))) }).eq("id", currentVersion.id).eq("state", "draft");
       if (error) throw error;
     }
     const { data: row, error: formError } = await auth.supabase.from("atendhub_forms").update({ client_id: form.clientId, doctor_id: form.doctorId, name: form.name, description: form.description ?? "", slug: form.slug, status: parsed.data.publish ? "demo" : "draft", active_version_id: versionId, updated_at: new Date().toISOString() }).eq("id", formId).eq("organization_id", auth.organizationId).select("id,organization_id,client_id,doctor_id,name,description,slug,status,active_version_id").single();

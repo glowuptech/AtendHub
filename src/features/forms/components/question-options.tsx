@@ -15,7 +15,7 @@ export function QuestionOptions({
 }) {
   const [type, setType] = useState<FieldType>(field.type),
     [options, setOptions] = useState(
-      field.options.map((o) => o.label).join("\n"),
+      field.options.map((o) => [o.label, o.description, o.imageUrl, o.alt].join(" | ")).join("\n"),
     ),
     [error, setError] = useState("");
   return (
@@ -30,6 +30,7 @@ export function QuestionOptions({
           <option value="short_text">Texto curto</option>
           <option value="long_text">Texto longo</option>
           <option value="single_select">Seleção única</option>
+          <option value="image_choice">Escolha por imagens</option>
           <option value="multi_select">Múltipla seleção</option>
           <option value="phone">Telefone</option>
           <option value="email">E-mail</option>
@@ -38,9 +39,9 @@ export function QuestionOptions({
           <option value="consent">Aceite</option>
         </select>
       </label>
-      {["single_select", "multi_select"].includes(type) && (
+      {["single_select", "image_choice", "multi_select"].includes(type) && (
         <label>
-          Alternativas, uma por linha
+          {type === "image_choice" ? "Cartões: título | descrição | URL da imagem | texto alternativo (um por linha)" : "Alternativas, uma por linha"}
           <textarea
             value={options}
             onChange={(e) => setOptions(e.target.value)}
@@ -58,12 +59,11 @@ export function QuestionOptions({
                 id: crypto.randomUUID(),
                 stableKey: `campo_${crypto.randomUUID().replaceAll("-", "")}`,
                 type,
-                options: ["single_select", "multi_select"].includes(type)
-                  ? options
-                      .split("\n")
-                      .map((s) => s.trim())
-                      .filter(Boolean)
-                      .map((label) => ({ id: crypto.randomUUID(), label }))
+                options: ["single_select", "image_choice", "multi_select"].includes(type)
+                  ? options.split("\n").map((s) => s.trim()).filter(Boolean).map((line) => {
+                      const [label, description = "", imageUrl = "", alt = ""] = line.split("|").map((part) => part.trim());
+                      return { id: crypto.randomUUID(), label, description, imageUrl, alt, pathId: null };
+                    })
                   : [],
               }),
             );

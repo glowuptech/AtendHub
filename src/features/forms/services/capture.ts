@@ -10,6 +10,7 @@ import {
   type FieldValue,
 } from "@/domain/schemas";
 import { settingsOf } from "./settings";
+import { eligibleSteps, pathForAnswer } from "./routing";
 export interface CaptureInput {
   clientId: string;
   formId: string;
@@ -185,8 +186,13 @@ export class MemoryCaptureRepository {
         !contact.phone.trim())
     )
       return null;
-    const values = v.steps.flatMap((s) => {
-      const answer = input.answers[s.question.id];
+    const routedSteps = eligibleSteps(v, this.fields.list(f.clientId), input.answers);
+    const allowedAnswers = new Set(routedSteps.map((step) => step.question.id));
+    const sanitizedAnswers = Object.fromEntries(Object.entries(input.answers).filter(([questionId]) => allowedAnswers.has(questionId)));
+    const selectedPathId = pathForAnswer(v, this.fields.list(f.clientId), sanitizedAnswers);
+    const selectedPath = v.paths?.find((path) => path.id === selectedPathId) ?? null;
+    const values = routedSteps.flatMap((s) => {
+      const answer = sanitizedAnswers[s.question.id];
       const field = this.fields.get(f.clientId, s.question.fieldDefinitionId);
       if (input.complete || answer !== undefined)
         validateAnswer(field, s.question.required, answer);
@@ -230,6 +236,7 @@ export class MemoryCaptureRepository {
         ? "Iniciar atendimento"
         : "Aguardando conclusão do formulário",
       source: f.name,
+      journey: { pathId: selectedPath?.id ?? null, pathName: selectedPath?.name ?? null },
       fields: values.map((x) => ({ ...x, submissionId: id })),
       history: [
         ...(old?.history ?? []),
@@ -245,7 +252,7 @@ export class MemoryCaptureRepository {
     if (old) this.leads[this.leads.indexOf(old)] = lead;
     else this.leads.push(lead);
     const session = {
-      input: structuredClone({ ...input, contacts: contact }),
+      input: structuredClone({ ...input, answers: sanitizedAnswers, contacts: contact }),
       leadId: id,
       lastActivity: now,
       completed: input.complete,

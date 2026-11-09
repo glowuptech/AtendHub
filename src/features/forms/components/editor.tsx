@@ -33,6 +33,7 @@ const typeLabels: Record<FieldType, string> = {
   phone: "Telefone",
   email: "E-mail",
   single_select: "Seleção única",
+  image_choice: "Escolha por imagens",
   multi_select: "Múltipla seleção",
   date: "Data",
   boolean: "Sim / não",
@@ -51,8 +52,10 @@ function newStep(fieldId: string, label: string, order: number): FormStep {
       id: crypto.randomUUID(),
       fieldDefinitionId: fieldId,
       label,
-      required: true,
-    },
+          required: true,
+          pathIds: [],
+          definesPath: false,
+        },
   };
 }
 export function FormEditor({
@@ -121,6 +124,7 @@ function EditorWorkspace({ source, client }: { source?: FormDefinition; client: 
           number: 1,
           state: "draft",
           steps: [],
+          paths: [],
           theme: client.branding,
           destination: "demo_success",
           settings: settingsOf(),
@@ -198,8 +202,9 @@ function EditorWorkspace({ source, client }: { source?: FormDefinition; client: 
         <a href="#editor-identity">01 · Identidade</a>
         <a href="#editor-contacts">02 · Contatos</a>
         <a href="#editor-appearance">03 · Aparência</a>
-        <a href="#editor-questions">04 · Perguntas ({version.steps.length})</a>
-        <a href="#editor-tracking">05 · Eventos</a>
+        <a href="#editor-paths">04 · Caminhos ({version.paths?.length ?? 0})</a>
+        <a href="#editor-questions">05 · Perguntas ({version.steps.length})</a>
+        <a href="#editor-tracking">06 · Eventos</a>
       </nav>
       <div className={`editor-grid preview-${previewMode}`}>
         <div className="editor-fields">
@@ -265,6 +270,13 @@ function EditorWorkspace({ source, client }: { source?: FormDefinition; client: 
             onChange={(settings) => updateVersion({ settings })}
             disabled={frozen}
           />
+          <div id="editor-paths">
+            <Card title="Caminhos">
+              <p className="muted">Defina caminhos antes de associar perguntas. Sem caminhos, o formulário continua linear.</p>
+              {(version.paths ?? []).map((path) => <div className="path-editor-row" key={path.id}><input aria-label="Letra do caminho" maxLength={1} value={path.letter} onChange={(e) => updateVersion({ paths: (version.paths ?? []).map((item) => item.id === path.id ? { ...item, letter: e.target.value.toUpperCase() } : item) })} /><input aria-label="Nome do caminho" value={path.name} onChange={(e) => updateVersion({ paths: (version.paths ?? []).map((item) => item.id === path.id ? { ...item, name: e.target.value } : item) })} /><Button type="button" variant="ghost" onClick={() => updateVersion({ paths: (version.paths ?? []).filter((item) => item.id !== path.id) })}>Remover</Button></div>)}
+              <Button type="button" variant="outline" onClick={() => { const paths = version.paths ?? []; const letter = String.fromCharCode(65 + paths.length); updateVersion({ paths: [...paths, { id: `caminho_${letter.toLowerCase()}`, letter, name: `Novo caminho ${letter}` }] }); }}>Adicionar caminho</Button>
+            </Card>
+          </div>
           <div id="editor-questions">
             <Card title="Etapas e perguntas">
               {!version.steps.length && (
@@ -343,6 +355,10 @@ function EditorWorkspace({ source, client }: { source?: FormDefinition; client: 
                       }
                     />
                   </label>
+                  {!!(version.paths ?? []).length && <>
+                    <label>Disponível em caminhos (vazio = comum a todos)<select multiple value={s.question.pathIds} onChange={(e) => updateStep(s.id, { question: { ...s.question, pathIds: Array.from(e.target.selectedOptions, (option) => option.value) } })}>{(version.paths ?? []).map((path) => <option key={path.id} value={path.id}>{path.letter} — {path.name}</option>)}</select></label>
+                    <label className="check-option"><input type="checkbox" checked={s.question.definesPath} onChange={(e) => updateStep(s.id, { question: { ...s.question, definesPath: e.target.checked, pathIds: [] } })} /> Define o caminho</label>
+                  </>}
                   <label className="check-option">
                     <input
                       type="checkbox"
@@ -490,7 +506,7 @@ function EditorWorkspace({ source, client }: { source?: FormDefinition; client: 
                         ))}
                       </select>
                     </label>
-                    {["single_select", "multi_select"].includes(type) && (
+                    {["single_select", "image_choice", "multi_select"].includes(type) && (
                       <label>
                         Opções, uma por linha
                         <textarea

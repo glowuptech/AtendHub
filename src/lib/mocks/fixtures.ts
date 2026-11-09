@@ -119,8 +119,8 @@ export const fields = [
   field(101, clientA, "nome", "Nome completo", "short_text"),
   field(102, clientA, "telefone", "Telefone", "phone"),
   field(103, clientA, "periodo", "Período desejado", "single_select", [
-    { id: "morning", label: "Manhã" },
-    { id: "afternoon", label: "Tarde" },
+    { id: "morning", label: "Manhã", description: "", imageUrl: "", alt: "", pathId: null },
+    { id: "afternoon", label: "Tarde", description: "", imageUrl: "", alt: "", pathId: null },
   ]),
   field(
     104,
@@ -131,14 +131,14 @@ export const fields = [
   ),
   field(105, clientA, "aviso", "Li as informações do formulário", "consent"),
   field(106, clientA, "retorno", "Preferência de retorno", "single_select", [
-    { id: "message", label: "Mensagem" },
-    { id: "call", label: "Ligação" },
+    { id: "message", label: "Mensagem", description: "", imageUrl: "", alt: "", pathId: null },
+    { id: "call", label: "Ligação", description: "", imageUrl: "", alt: "", pathId: null },
   ]),
   field(201, clientB, "nome_horizonte", "Nome completo", "short_text"),
   field(202, clientB, "telefone_horizonte", "Telefone", "phone"),
   field(203, clientB, "unidade", "Unidade de preferência", "single_select", [
-    { id: "center", label: "Centro" },
-    { id: "north", label: "Norte" },
+    { id: "center", label: "Centro", description: "", imageUrl: "", alt: "", pathId: null },
+    { id: "north", label: "Norte", description: "", imageUrl: "", alt: "", pathId: null },
   ]),
   field(204, clientB, "dia", "Dia preferido", "date"),
   field(
