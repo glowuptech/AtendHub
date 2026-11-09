@@ -811,7 +811,14 @@ tr:last-child td {
   box-shadow: var(--shadow-soft);
   border-radius: 24px;
 }
-.step-editor {
+  .appearance-control-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+  }
+  .appearance-control-grid input[type="range"] { width: 100%; }
+  .step-editor {
   border: 1px solid var(--border-subtle);
   padding: 18px;
   border-radius: 10px;
@@ -1569,16 +1576,39 @@ footer {
   min-height: 600px;
   padding: 12px;
 }
-.form-sheet {
+  .form-sheet {
+  position: relative;
   width: min(100%, 700px);
   align-self: center;
-  background: var(--form-bg);
+  background: color-mix(in srgb, var(--form-bg) calc(var(--form-panel-opacity) * 100%), transparent);
   border-radius: 20px;
   overflow: hidden;
 }
-.form-content {
+  .form-image-overlay {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--form-overlay) calc(var(--form-overlay-opacity) * 100%), transparent);
+  pointer-events: none;
+  z-index: 1;
+  }
+  .form-content, .form-intro { position: relative; z-index: 2; }
+  .form-intro {
+  min-height: min(100dvh, 720px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  padding: 48px 24px;
+  text-align: center;
+  }
+  .form-intro h1 { margin: 0; }
+  .form-intro-copy { width: min(100%, 620px); }
+  .form-intro-copy p { white-space: pre-wrap; }
+  .form-intro-logo { max-width: 180px; max-height: 100px; object-fit: contain; }
+  .form-content {
   padding: clamp(20px, 4cqw, 48px);
-}
+  }
 .form-content header {
   margin-bottom: 30px;
 }
