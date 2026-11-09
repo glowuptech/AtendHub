@@ -182,6 +182,9 @@ test("aparência funciona antes das perguntas e permanece após salvar", async (
     }, value);
   }
   await color("Botão", "#e11d48");
+  await expect(page.getByLabel("Botão", { exact: true })).toHaveCSS("height", "44px");
+  await expect(page.getByText("#E11D48", { exact: true })).toBeVisible();
+  await page.screenshot({ path: "test-results/color-picker.png" });
   await color("Texto do botão", "#fef08a");
   await color("Texto", "#16a34a");
   await expect(

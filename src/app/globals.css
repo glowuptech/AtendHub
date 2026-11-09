@@ -4414,3 +4414,16 @@ tbody tr:hover {
 .question-option-editor[open] > summary { margin-bottom: 12px; }
 .flow-advanced { margin-block: 16px; padding: 12px; border: 1px solid var(--border-subtle); border-radius: 10px; }
 .flow-advanced > summary { cursor: pointer; font-weight: 500; }
+
+/* Native color inputs need room for their swatch, unlike text inputs. */
+input.form-color-picker[type="color"] {
+  height: 44px;
+  min-height: 44px;
+  padding: 4px;
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+input.form-color-picker::-webkit-color-swatch-wrapper { padding: 0; }
+input.form-color-picker::-webkit-color-swatch { border: 1px solid #cbd5e1; border-radius: 4px; }
+input.form-color-picker::-moz-color-swatch { border: 1px solid #cbd5e1; border-radius: 4px; }
+.form-color-code { display:block; font-family:monospace; font-size:12px; margin-bottom:14px; color:var(--text-secondary); }

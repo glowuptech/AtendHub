@@ -306,7 +306,18 @@ export function SettingsEditor({
                     }[k]
                   }
                   <input
+                    className="form-color-picker"
                     type="color"
+                    aria-label={
+                      {
+                        primary: "Cor principal",
+                        button: "Botão",
+                        buttonText: "Texto do botão",
+                        background: "Fundo",
+                        text: "Texto",
+                        border: "Borda",
+                      }[k]
+                    }
                     value={s.appearance[k]}
                     onChange={(e) =>
                       patch({
@@ -314,6 +325,9 @@ export function SettingsEditor({
                       })
                     }
                   />
+                  <span className="form-color-code">
+                    {s.appearance[k].toUpperCase()}
+                  </span>
                 </label>
               ))}
               <label>
@@ -437,7 +451,9 @@ export function SettingsEditor({
               <label>
                 Cor da sobreposição
                 <input
+                  className="form-color-picker"
                   type="color"
+                  aria-label="Cor da sobreposição"
                   value={s.appearance.overlay}
                   onChange={(e) =>
                     patch({
