@@ -35,6 +35,11 @@ export function Shell({
     router = useRouter();
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    const match = pathname.match(/\/app\/clientes\/([^/]+)/);
+    const routeClientId = match?.[1];
+    if (routeClientId && remoteClients?.some((client) => client.id === routeClientId)) setClientId(routeClientId);
+  }, [pathname, remoteClients, setClientId]);
   const navigation = useRef<HTMLElement>(null);
   const menuTrigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
