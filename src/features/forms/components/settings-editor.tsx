@@ -1,4 +1,5 @@
 "use client";
+import { prepareFormImage } from "../services/prepare-image";
 import { Card } from "@/components/layout/shared";
 import { settingsOf, type FormSettings } from "../services/settings";
 import { useState, useRef, useEffect } from "react";
@@ -19,7 +20,9 @@ export function SettingsEditor({
     latest.current = s;
   }, [s]);
   const [error, setError] = useState("");
-  const [uploading, setUploading] = useState<"cover" | "backgroundImage" | "">("");
+  const [uploading, setUploading] = useState<"cover" | "backgroundImage" | "">(
+    "",
+  );
   const uploadGeneration = useRef<Record<"cover" | "backgroundImage", number>>({
     cover: 0,
     backgroundImage: 0,
@@ -31,38 +34,28 @@ export function SettingsEditor({
   ) {
     const generation = ++uploadGeneration.current[key];
     if (!file) return;
-    if (
-      !["image/png", "image/jpeg", "image/webp"].includes(file.type) ||
-      file.size > 1000000
-    ) {
-      setError("Escolha uma imagem PNG, JPEG ou WebP de até 1 MB.");
-      return;
-    }
     setError("");
     setUploading(key);
-    const reader = new FileReader();
-    reader.onload = () => {
+    try {
+      const result = await prepareFormImage(file);
       if (uploadGeneration.current[key] !== generation) return;
-      const result = typeof reader.result === "string" ? reader.result : "";
-      if (!result) {
-        setUploading("");
-        setError("Não foi possível ler a imagem.");
-        return;
-      }
       const current = latest.current;
       onChange({
         ...current,
         appearance: { ...current.appearance, [key]: result },
       });
-      setUploading("");
-    };
-    reader.onerror = () => {
+    } catch (cause) {
       if (uploadGeneration.current[key] !== generation) return;
-      setUploading("");
-      setError("Não foi possível ler a imagem.");
-    };
-    reader.readAsDataURL(file);
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Não foi possível preparar a imagem.",
+      );
+    } finally {
+      if (uploadGeneration.current[key] === generation) setUploading("");
+    }
   }
+
   return (
     <fieldset disabled={disabled}>
       {(!section || section === "presentation") && (
@@ -407,7 +400,9 @@ export function SettingsEditor({
                       onChange={(e) => void upload(e.target.files?.[0], k)}
                     />
                     <span id={`${k}-upload-status`} className="muted">
-                      {uploading === k ? "Lendo imagem…" : "PNG, JPEG ou WebP até 1 MB"}
+                      {uploading === k
+                        ? "Preparando imagem…"
+                        : "PNG, JPEG ou WebP até 10 MB; fotos grandes são otimizadas automaticamente"}
                     </span>
                   </label>
                   {s.appearance[k] && (
