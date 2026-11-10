@@ -4475,3 +4475,9 @@ input.form-color-picker::-moz-color-swatch { border: 1px solid #cbd5e1; border-r
 .journey-branch .check-option { margin-top:12px; }
 .journey-common { border:1px dashed #94a3b8; background:#f8fafc; padding:16px; border-radius:12px; }
 .journey-branch select { width:100%; min-width:0; }
+
+.form-experience .choice-card { background:var(--choice-bg,#fff); color:var(--choice-text,#172237); }
+.form-experience .choice-card.selected { background:var(--choice-selected-bg,#ede9fe); color:var(--choice-selected-text,#172237); }
+.form-experience .choice-card strong, .form-experience .choice-card small { color:inherit; }
+.form-experience .choice-card-check { color:inherit; }
+.form-experience .field-error { background:#fff1f2; color:#9f1239; border:1px solid #fda4af; border-radius:8px; padding:12px; }

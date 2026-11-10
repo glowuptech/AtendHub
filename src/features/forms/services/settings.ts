@@ -14,17 +14,19 @@ const introBlock = z.object({
 });
 export const FormSettingsSchema = z.object({
   description: z.string().max(1500).default(""),
-  introduction: z.object({
-    mode: z.enum(["separate", "integrated", "none"]).default("integrated"),
-    title: z.string().max(160).default(""),
-    blocks: z.array(introBlock).max(20).default([]),
-    buttonLabel: z.string().max(80).default("Começar"),
-    align: z.enum(["left", "center", "right"]).default("center"),
-    maxWidth: z.number().min(280).max(1000).default(620),
-    vertical: z.enum(["top", "center", "bottom"]).default("center"),
-    logo: z.string().max(1500000).default(""),
-    inheritAppearance: z.boolean().default(true),
-  }).prefault({}),
+  introduction: z
+    .object({
+      mode: z.enum(["separate", "integrated", "none"]).default("integrated"),
+      title: z.string().max(160).default(""),
+      blocks: z.array(introBlock).max(20).default([]),
+      buttonLabel: z.string().max(80).default("Começar"),
+      align: z.enum(["left", "center", "right"]).default("center"),
+      maxWidth: z.number().min(280).max(1000).default(620),
+      vertical: z.enum(["top", "center", "bottom"]).default("center"),
+      logo: z.string().max(1500000).default(""),
+      inheritAppearance: z.boolean().default(true),
+    })
+    .prefault({}),
   enabled: z.boolean().default(true),
   contactPosition: z.enum(["start", "end"]).default("end"),
   contacts: z
@@ -36,6 +38,10 @@ export const FormSettingsSchema = z.object({
     }),
   appearance: z
     .object({
+      optionBackground: color.default("#ffffff"),
+      optionText: color.default("#172237"),
+      optionSelectedBackground: color.default("#ede9fe"),
+      optionSelectedText: color.default("#172237"),
       primary: color.default("#2459d3"),
       button: color.default("#2459d3"),
       buttonText: color.default("#ffffff"),

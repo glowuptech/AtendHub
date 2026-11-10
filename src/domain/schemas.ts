@@ -410,6 +410,11 @@ export function validateAnswer(
       (Array.isArray(value) && value.length === 0))
   )
     return ValueSchema.nullable().parse(value ?? null);
+  if (required && (value === undefined || value === null || value === "" || (Array.isArray(value) && !value.length))) {
+    throw new Error(["single_select", "image_choice", "multi_select"].includes(field.type)
+      ? "Selecione uma opção para continuar."
+      : field.type === "consent" ? "Marque o aceite para continuar." : "Preencha este campo para continuar.");
+  }
   switch (field.type) {
     case "phone":
       return z

@@ -1,6 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { z } from "zod";
 import { ArrowRight, Check } from "lucide-react";
 import {
   type FormDefinition,
@@ -117,6 +118,10 @@ export function FormWizard({
     "--form-overlay-opacity": appearance.overlayOpacity / 100,
     "--form-text": appearance.text,
     "--form-border": appearance.border,
+    "--choice-bg": appearance.optionBackground,
+    "--choice-text": appearance.optionText,
+    "--choice-selected-bg": appearance.optionSelectedBackground,
+    "--choice-selected-text": appearance.optionSelectedText,
     "--form-radius": `${appearance.radius}px`,
     "--intro-align": settings.introduction.align,
     "--intro-items": {
@@ -151,21 +156,20 @@ export function FormWizard({
     <section
       className={`form-experience ${compact ? "compact" : ""}`}
       style={style}
-  >
-  {appearance.backgroundImage && (
-    <img
-      className="form-background-layer"
-      src={appearance.backgroundImage}
-      alt=""
-      aria-hidden="true"
-      decoding="async"
-      onLoad={onBackgroundImageLoad}
-      onError={onBackgroundImageError}
-    />
-  )}
-  <div className="form-overlay-layer" aria-hidden="true" />
-  <div className="form-sheet">
-
+    >
+      {appearance.backgroundImage && (
+        <img
+          className="form-background-layer"
+          src={appearance.backgroundImage}
+          alt=""
+          aria-hidden="true"
+          decoding="async"
+          onLoad={onBackgroundImageLoad}
+          onError={onBackgroundImageError}
+        />
+      )}
+      <div className="form-overlay-layer" aria-hidden="true" />
+      <div className="form-sheet">
         {appearance.cover && (
           <img className="form-cover" src={appearance.cover} alt="" />
         )}
@@ -320,9 +324,14 @@ export function FormWizard({
                         else setIndex((i) => i + 1);
                       } catch (err) {
                         setError(
-                          err instanceof Error
-                            ? err.message
-                            : "Confira os campos",
+                          err instanceof z.ZodError
+                            ? err.issues[0]?.code === "invalid_type"
+                              ? "Confira a resposta antes de continuar."
+                              : (err.issues[0]?.message ??
+                                "Confira a resposta.")
+                            : err instanceof Error
+                              ? err.message
+                              : "Confira os campos",
                         );
                       }
                     }}

@@ -123,6 +123,10 @@ test("editor conserva opções sem Aplicar e concentra caminhos em Fluxo", async
   await expect(page.getByLabel("Destino de Obstétrica")).toHaveValue(b!);
   const preview = page.getByRole("complementary");
   await expect(preview.getByRole("img")).toHaveCount(1);
+  await preview.getByRole("button", { name: /Continuar/ }).click();
+  await expect(preview.getByRole("alert")).toHaveText("Selecione uma opção para continuar.");
+  await expect(preview.locator(".choice-card").first()).toHaveCSS("color", "rgb(23, 34, 55)");
+  await expect(preview.locator(".choice-card").first()).toHaveCSS("background-color", "rgb(255, 255, 255)");
   await preview.getByRole("radio", { name: /Ginecológica/ }).check();
   await preview.getByRole("button", { name: /Continuar/ }).click();
   await expect(
@@ -254,6 +258,9 @@ test("aparência funciona antes das perguntas e permanece após salvar", async (
       input.dispatchEvent(new Event("change", { bubbles: true }));
     }, value);
   }
+  await color("Fundo das opções", "#123456");
+  await color("Texto das opções", "#ffffff");
+  await expect(preview.locator(".form-experience")).toHaveCSS("--choice-bg", "#123456");
   await color("Botão", "#e11d48");
   await expect(page.getByLabel("Botão", { exact: true })).toHaveCSS(
     "height",

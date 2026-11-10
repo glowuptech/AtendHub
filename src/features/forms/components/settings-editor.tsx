@@ -298,6 +298,10 @@ export function SettingsEditor({
             <div className="profile-info-grid">
               {(
                 [
+                  "optionBackground",
+                  "optionText",
+                  "optionSelectedBackground",
+                  "optionSelectedText",
                   "primary",
                   "button",
                   "buttonText",
@@ -309,6 +313,10 @@ export function SettingsEditor({
                 <label key={k}>
                   {
                     {
+                      optionBackground: "Fundo das opções",
+                      optionText: "Texto das opções",
+                      optionSelectedBackground: "Fundo da opção selecionada",
+                      optionSelectedText: "Texto da opção selecionada",
                       primary: "Cor principal",
                       button: "Botão",
                       buttonText: "Texto do botão",
@@ -322,6 +330,10 @@ export function SettingsEditor({
                     type="color"
                     aria-label={
                       {
+                        optionBackground: "Fundo das opções",
+                        optionText: "Texto das opções",
+                        optionSelectedBackground: "Fundo da opção selecionada",
+                        optionSelectedText: "Texto da opção selecionada",
                         primary: "Cor principal",
                         button: "Botão",
                         buttonText: "Texto do botão",
