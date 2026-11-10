@@ -103,11 +103,6 @@ export function FormWizard({
   }, [index, done]);
   const appearance = settings.appearance;
   const introVisible = settings.introduction.mode === "separate" && !introSeen;
-  const overlay = `${appearance.overlay}${Math.round(
-    appearance.overlayOpacity * 2.55,
-  )
-    .toString(16)
-    .padStart(2, "0")}`;
   const style = {
     "--form-primary": appearance.primary,
     "--form-button": appearance.button,
@@ -119,6 +114,9 @@ export function FormWizard({
     "--form-text": appearance.text,
     "--form-border": appearance.border,
     "--form-radius": `${appearance.radius}px`,
+    "--form-background-image": appearance.backgroundImage
+      ? `url("${appearance.backgroundImage}")`
+      : "none",
     "--intro-align": settings.introduction.align,
     "--intro-items": {
       left: "flex-start",
@@ -135,9 +133,6 @@ export function FormWizard({
       appearance.font === "system"
         ? "ui-sans-serif, system-ui, sans-serif"
         : `"${appearance.font}", ${["Georgia", "Palatino"].includes(appearance.font) ? "serif" : "sans-serif"}`,
-    backgroundImage: appearance.backgroundImage
-      ? `linear-gradient(${overlay}, ${overlay}), url("${appearance.backgroundImage}")`
-      : undefined,
   } as CSSProperties;
   const validateContacts = () => {
     for (const k of ["name", "phone", "email"] as const) {
