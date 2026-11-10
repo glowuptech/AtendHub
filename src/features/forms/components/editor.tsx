@@ -191,9 +191,14 @@ export function EditorWorkspace({
     [notice, setNotice] = useState(""),
     [saved, setSaved] = useState(false),
     [previewKey, setPreviewKey] = useState(0),
-    [previewMode, setPreviewMode] = useState<"mobile" | "wide">("mobile");
+    [previewMode, setPreviewMode] = useState<"mobile" | "wide">("mobile"),
+    [previewImageErrorSrc, setPreviewImageErrorSrc] = useState("");
   const version = draft.versions.find((v) => v.id === draft.activeVersionId)!;
   const frozen = version.state === "snapshot";
+  const previewBackgroundImage = settingsOf(version.settings).appearance.backgroundImage;
+  const previewImageError = Boolean(
+    previewBackgroundImage && previewImageErrorSrc === previewBackgroundImage,
+  );
   function updateVersion(change: Partial<FormVersion>) {
     setSaved(false);
     setDraft((f) => ({
@@ -862,14 +867,24 @@ export function EditorWorkspace({
               Ampliada
             </Button>
           </div>
+          {previewImageError && (
+            <p className="preview-image-error" role="alert">
+              A imagem de fundo não pôde ser carregada nesta prévia. Selecione
+              outra imagem PNG, JPEG ou WebP.
+            </p>
+          )}
           <div className="phone-frame">
             <FormWizard
-              key={`${previewKey}-${settingsOf(version.settings).introduction.mode}-${version.steps.map((s) => s.id).join()}`}
+              key={`${previewKey}-${settingsOf(version.settings).introduction.mode}-${version.steps.map((s) => s.id).join()}-${previewBackgroundImage}`}
               compact
               form={draft}
               version={version}
               fields={fields}
               clinicName={client.name}
+              onBackgroundImageError={() =>
+                setPreviewImageErrorSrc(previewBackgroundImage)
+              }
+              onBackgroundImageLoad={() => setPreviewImageErrorSrc("")}
             />
           </div>
         </aside>

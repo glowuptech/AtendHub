@@ -21,6 +21,8 @@ export function FormWizard({
   clinicName,
   compact = false,
   live = false,
+  onBackgroundImageError,
+  onBackgroundImageLoad,
 }: {
   form: FormDefinition;
   version: FormVersion;
@@ -28,6 +30,8 @@ export function FormWizard({
   clinicName: string;
   compact?: boolean;
   live?: boolean;
+  onBackgroundImageError?: () => void;
+  onBackgroundImageLoad?: () => void;
 }) {
   const { repositories, refresh } = useDemo();
   const settings = settingsOf(version.settings);
@@ -154,6 +158,9 @@ export function FormWizard({
       src={appearance.backgroundImage}
       alt=""
       aria-hidden="true"
+      decoding="async"
+      onLoad={onBackgroundImageLoad}
+      onError={onBackgroundImageError}
     />
   )}
   <div className="form-overlay-layer" aria-hidden="true" />
