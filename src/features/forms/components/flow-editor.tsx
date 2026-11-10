@@ -140,93 +140,178 @@ export function FlowEditor({ version, fields, onChange }: Props) {
               Adicionar caminho
             </Button>
           </details>
-          <h3>1. Confira o destino de cada resposta</h3>
-          {!field?.options.length && (
-            <p>Adicione opções a essa pergunta no bloco “Perguntas”.</p>
-          )}
-          {field?.options.map((option) => (
-            <label key={option.id}>
-              {option.label || "Opção sem título"} →
-              <select
-                aria-label={`Destino de ${option.label}`}
-                value={option.pathId ?? ""}
-                onChange={(e) =>
-                  onChange(
-                    version,
-                    fields.map((f) =>
-                      f.id === field.id
-                        ? {
-                            ...f,
-                            options: f.options.map((o) =>
-                              o.id === option.id
-                                ? { ...o, pathId: e.target.value || null }
-                                : o,
-                            ),
-                          }
-                        : f,
-                    ),
-                  )
-                }
-              >
-                <option value="">Escolha o caminho</option>
-                {paths.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.letter} — {p.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ))}
-          <h3>2. Escolha quais perguntas aparecem</h3>
-          <p className="muted">
-            Marque “Todos” para perguntas comuns, ou os caminhos desejados. A
-            ordem é a mesma da aba Perguntas.
-          </p>
-          {version.steps
-            .filter((s) => s.id !== router.id)
-            .map((s) => {
-              const change = (pathIds: string[]) =>
-                onChange(
-                  {
-                    ...version,
-                    steps: version.steps.map((item) =>
-                      item.id === s.id
-                        ? { ...item, question: { ...item.question, pathIds } }
-                        : item,
-                    ),
-                  },
-                  fields,
+          <div className="journey-map" aria-label="Mapa dos caminhos">
+            <div className="journey-origin">
+              <span>Pergunta de entrada</span>
+              <strong>{router.question.label}</strong>
+            </div>
+            <p className="muted">
+              Cada resposta conecta a um caminho. Abra “Escolher perguntas” no
+              cartão para definir a sequência. Salve o rascunho ao terminar.
+            </p>
+            <div className="journey-branches">
+              {field?.options.map((option, index) => {
+                const path = paths.find((p) => p.id === option.pathId);
+                const following = version.steps.filter(
+                  (s) => s.id !== router.id,
                 );
-              return (
-                <fieldset key={s.id} className="flow-membership">
-                  <legend>{s.question.label}</legend>
-                  <label className="check-option">
-                    <input
-                      type="checkbox"
-                      checked={!s.question.pathIds.length}
-                      onChange={() => change([])}
-                    />
-                    Todos os caminhos
-                  </label>
-                  {paths.map((p) => (
-                    <label className="check-option" key={p.id}>
-                      <input
-                        type="checkbox"
-                        checked={s.question.pathIds.includes(p.id)}
+                const exclusive = following.filter(
+                  (s) => path && s.question.pathIds.includes(path.id),
+                );
+                return (
+                  <section
+                    className="journey-branch"
+                    key={option.id}
+                    style={{
+                      borderColor: ["#7c3aed", "#0f766e", "#be185d", "#b45309"][
+                        index % 4
+                      ],
+                    }}
+                    aria-label={`Resposta ${option.label}`}
+                  >
+                    <div className="journey-answer">
+                      <small>SE RESPONDER</small>
+                      <strong>{option.label || "Opção sem título"}</strong>
+                    </div>
+                    <div className="journey-connector" aria-hidden="true">
+                      ↓
+                    </div>
+                    <label>
+                      SEGUIR PARA
+                      <select
+                        aria-label={`Destino de ${option.label}`}
+                        value={option.pathId ?? ""}
                         onChange={(e) =>
-                          change(
-                            e.target.checked
-                              ? [...s.question.pathIds, p.id]
-                              : s.question.pathIds.filter((id) => id !== p.id),
+                          onChange(
+                            version,
+                            fields.map((f) =>
+                              f.id === field.id
+                                ? {
+                                    ...f,
+                                    options: f.options.map((o) =>
+                                      o.id === option.id
+                                        ? {
+                                            ...o,
+                                            pathId: e.target.value || null,
+                                          }
+                                        : o,
+                                    ),
+                                  }
+                                : f,
+                            ),
                           )
                         }
-                      />
-                      {p.letter} — {p.name}
+                      >
+                        <option value="">Escolha o caminho</option>
+                        {paths.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.letter} — {p.name}
+                          </option>
+                        ))}
+                      </select>
                     </label>
+                    {path && (
+                      <>
+                        <div className="journey-connector" aria-hidden="true">
+                          ↓
+                        </div>
+                        <ol className="journey-questions">
+                          {exclusive.map((s) => (
+                            <li key={s.id}>
+                              {s.question.label}
+                              {s.question.pathIds.length > 1 && (
+                                <small>Compartilhada com outros caminhos</small>
+                              )}
+                            </li>
+                          ))}
+                        </ol>
+                        {!exclusive.length && (
+                          <p className="muted">
+                            Este caminho ainda não tem perguntas específicas.
+                          </p>
+                        )}
+                        <details>
+                          <summary>Escolher perguntas de {path.name}</summary>
+                          <p className="muted">
+                            Marcar tira a pergunta de “Todos” e a inclui neste
+                            caminho. Você pode marcar a mesma pergunta em outros
+                            caminhos. Desmarcar o último destino volta a
+                            exibi-la para todos.
+                          </p>
+                          {following.map((s) => (
+                            <label className="check-option" key={s.id}>
+                              <input
+                                type="checkbox"
+                                disabled={
+                                  version.steps.indexOf(s) <
+                                  version.steps.indexOf(router)
+                                }
+                                checked={s.question.pathIds.includes(path.id)}
+                                onChange={(e) =>
+                                  onChange(
+                                    {
+                                      ...version,
+                                      steps: version.steps.map((item) =>
+                                        item.id === s.id
+                                          ? {
+                                              ...item,
+                                              question: {
+                                                ...item.question,
+                                                pathIds: e.target.checked
+                                                  ? [
+                                                      ...item.question.pathIds,
+                                                      path.id,
+                                                    ]
+                                                  : item.question.pathIds.filter(
+                                                      (id) => id !== path.id,
+                                                    ),
+                                              },
+                                            }
+                                          : item,
+                                      ),
+                                    },
+                                    fields,
+                                  )
+                                }
+                              />
+                              {s.question.label}
+                              {version.steps.indexOf(s) <
+                              version.steps.indexOf(router)
+                                ? " (antes da escolha)"
+                                : ""}
+                            </label>
+                          ))}
+                        </details>
+                      </>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
+            <div className="journey-common">
+              <strong>Perguntas para todos</strong>
+              <p className="muted">
+                Aparecem em todos os percursos, na posição definida no bloco
+                Perguntas.
+              </p>
+              <ul>
+                {version.steps
+                  .filter(
+                    (s) => s.id !== router.id && !s.question.pathIds.length,
+                  )
+                  .map((s) => (
+                    <li key={s.id}>{s.question.label}</li>
                   ))}
-                </fieldset>
-              );
-            })}
+              </ul>
+              {!version.steps.some(
+                (s) => s.id !== router.id && !s.question.pathIds.length,
+              ) && <p>Nenhuma pergunta comum.</p>}
+            </div>
+            <div className="journey-origin">
+              <span>↓</span>
+              <strong>Conclusão do formulário</strong>
+            </div>
+          </div>
         </>
       )}
     </Card>

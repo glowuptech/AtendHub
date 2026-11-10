@@ -94,14 +94,25 @@ test("editor conserva opções sem Aplicar e concentra caminhos em Fluxo", async
     .getAttribute("value");
   await page.getByLabel("Destino de Ginecológica").selectOption(a!);
   await page.getByLabel("Destino de Obstétrica").selectOption(b!);
-  await page
-    .getByRole("group", { name: "Pergunta exclusiva A", exact: true })
-    .getByRole("checkbox", { name: "A — Ginecológica", exact: true })
-    .check();
-  await page
-    .getByRole("group", { name: "Pergunta exclusiva B", exact: true })
-    .getByRole("checkbox", { name: "B — Obstétrica", exact: true })
-    .check();
+  for (const [answer, path] of [
+    ["Ginecológica", "A"],
+    ["Obstétrica", "B"],
+  ]) {
+    const branch = page.getByRole("region", {
+      name: `Resposta ${answer}`,
+      exact: true,
+    });
+    await branch.locator("summary").click();
+    await branch
+      .getByRole("checkbox", {
+        name: `Pergunta exclusiva ${path}`,
+        exact: true,
+      })
+      .check();
+    await expect(branch.locator(".journey-questions")).toContainText(
+      `Pergunta exclusiva ${path}`,
+    );
+  }
   await page
     .getByRole("button", { name: "Salvar rascunho", exact: true })
     .click();
@@ -126,7 +137,9 @@ test("editor conserva opções sem Aplicar e concentra caminhos em Fluxo", async
   await expect(
     preview.getByRole("heading", { name: "Pergunta exclusiva A", exact: true }),
   ).toHaveCount(0);
-  await page.screenshot({ path: "test-results/editor-flow-desktop.png" });
+  await page
+    .locator(".journey-map")
+    .screenshot({ path: "test-results/editor-flow-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
