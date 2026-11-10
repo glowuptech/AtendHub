@@ -13,7 +13,7 @@ create table if not exists public.atendhub_public_form_events (
   form_version_id uuid not null references public.atendhub_form_versions(id) on delete cascade,
   session_id text not null,
   event_type text not null check (event_type in ('view', 'action')),
-  action_id text,
+  action_id text not null default '',
   occurred_at timestamptz not null default now(),
   unique (form_id, session_id, event_type, action_id)
 );

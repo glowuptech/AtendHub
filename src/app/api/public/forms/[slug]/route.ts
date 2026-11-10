@@ -14,6 +14,11 @@ const payloadSchema = z.object({
   complete: z.boolean(),
   nextIndex: z.number().int().min(0).optional(),
 });
+const eventSchema = z.object({
+  eventType: z.enum(["view", "action"]),
+  sessionId: z.string().min(1).max(100),
+  actionId: z.string().max(120).optional(),
+});
 
 type VersionRow = {
   id: string; form_id: string; organization_id: string; client_id: string;
@@ -63,12 +68,25 @@ export async function GET(_request: Request, context: { params: Promise<{ slug: 
 }
 
 export async function POST(request: Request, context: { params: Promise<{ slug: string }> }) {
-  const parsed = payloadSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Dados do formulário inválidos." }, { status: 400 });
+  const body = await request.json().catch(() => null);
   const form = await load((await context.params).slug);
   if (!form) return NextResponse.json({ error: "Formulário não encontrado." }, { status: 404 });
   const version = form.versions.find((item) => item.id === form.activeVersionId);
   if (!version) return NextResponse.json({ error: "Versão publicada indisponível." }, { status: 409 });
+  const event = eventSchema.safeParse(body);
+  if (event.success) {
+    const { error } = await admin().from("atendhub_public_form_events").upsert({
+      form_id: form.id,
+      form_version_id: version.id,
+      session_id: event.data.sessionId,
+      event_type: event.data.eventType,
+      action_id: event.data.actionId ?? null,
+    }, { onConflict: "form_id,session_id,event_type,action_id" });
+    if (error) return NextResponse.json({ error: "Não foi possível registrar o evento." }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+  const parsed = payloadSchema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({ error: "Dados do formulário inválidos." }, { status: 400 });
   const settings = settingsOf(version.settings);
   const contacts = parsed.data.contacts;
   for (const key of ["name", "phone", "email"] as const) {

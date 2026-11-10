@@ -49,15 +49,24 @@ export function PublicForm({ slug }: { slug: string }) {
   if (error || !form) return <main className="public-page"><Denied /></main>;
   const version = form.versions.find((item: { id: string }) => item.id === form.activeVersionId);
   if (!version) return <main className="public-page"><Denied /></main>;
+  const sendEvent = (eventType: "view" | "action", actionId?: string) => {
+    void fetch(`/api/public/forms/${encodeURIComponent(slug)}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ eventType, actionId, sessionId }),
+      keepalive: true,
+    });
+  };
   const capture: WizardCapture = {
     progress: () => null,
-    view: () => undefined,
-    action: () => undefined,
+    view: (input) => sendEvent("view", input.sessionId),
+    action: (_input, actionId) => sendEvent("action", actionId),
     capture: (input) => {
       void fetch(`/api/public/forms/${encodeURIComponent(slug)}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...input, sessionId, idempotencyKey }),
+        keepalive: true,
       });
       return sessionId;
     },
