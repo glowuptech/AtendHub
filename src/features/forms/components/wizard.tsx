@@ -15,6 +15,8 @@ import { FieldInput } from "./field-input";
 import { settingsOf } from "../services/settings";
 import { eligibleSteps } from "../services/routing";
 import { useDemo } from "@/components/layout/demo-context";
+import type { CaptureRepository } from "../services/capture";
+export type WizardCapture = Pick<CaptureRepository, "progress" | "view" | "capture" | "action">;
 export function FormWizard({
   form,
   version,
@@ -24,6 +26,7 @@ export function FormWizard({
   live = false,
   onBackgroundImageError,
   onBackgroundImageLoad,
+  captureRepository,
 }: {
   form: FormDefinition;
   version: FormVersion;
@@ -33,11 +36,13 @@ export function FormWizard({
   live?: boolean;
   onBackgroundImageError?: () => void;
   onBackgroundImageLoad?: () => void;
+  captureRepository?: WizardCapture;
 }) {
   const { repositories, refresh } = useDemo();
+  const capture = captureRepository ?? repositories.capture;
   const settings = settingsOf(version.settings);
   const progress = live
-    ? repositories.capture.progress(form.clientId, form.id, version.id)
+    ? capture.progress(form.clientId, form.id, version.id)
     : null;
   const [index, setIndex] = useState(progress?.nextIndex ?? 0),
     [answers, setAnswers] = useState<Record<string, FieldValue>>(
@@ -87,7 +92,7 @@ export function FormWizard({
       if (live && !counted && elapsed >= settings.tracking.viewSeconds * 1000) {
         counted = true;
         try {
-          repositories.capture.view({
+          capture.view({
             clientId: form.clientId,
             formId: form.id,
             versionId: version.id,
@@ -287,7 +292,7 @@ export function FormWizard({
                         }
                         if (live) {
                           if (isLast) {
-                            repositories.capture.capture({
+                            capture.capture({
                               ...base(),
                               contacts,
                               answers: Object.fromEntries(
@@ -306,7 +311,7 @@ export function FormWizard({
                               settings.contactPosition === "start") ||
                             savedPartial
                           ) {
-                            const id = repositories.capture.capture({
+                            const id = capture.capture({
                               ...base(),
                               contacts,
                               answers,
@@ -316,7 +321,7 @@ export function FormWizard({
                             setSavedPartial(Boolean(id));
                           }
                           if (step)
-                            repositories.capture.action(base(), step.actionId);
+                            capture.action(base(), step.actionId);
                           refresh();
                         }
                         setError("");

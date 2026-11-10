@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import useSWR from "swr";
 import { useDemo } from "@/components/layout/demo-context";
 import { useClients } from "@/features/clients/hooks";
 import { useForms } from "../hooks";
@@ -11,7 +12,7 @@ import {
   DemoNotice,
 } from "@/components/layout/shared";
 import { settingsOf } from "../services/settings";
-import { FormWizard } from "./wizard";
+import { FormWizard, type WizardCapture } from "./wizard";
 
 export function FormPreview({
   clientId: id,
@@ -32,35 +33,45 @@ export function FormPreview({
   if (!version) return <Denied />;
   return <><Heading title="Prévia do formulário" description={`${client.name} · persistido no Supabase.`} action={<NavButton href={`/app/clientes/${id}/formularios`}>Voltar</NavButton>} /><div className="preview-center"><FormWizard form={form} version={version} fields={form.fields ?? []} clinicName={client.name} /></div><div className="preview-center"><p>O formulário público ainda não está conectado ao fluxo persistido.</p></div></>;
 }
+const publicFetcher = async (url: string) => {
+  const response = await fetch(url);
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error ?? "Formulário indisponível.");
+  return body;
+};
+
 export function PublicForm({ slug }: { slug: string }) {
-  const { scope, repositories } = useDemo();
-  const form = repositories.clients
-    .list(scope)
-    .flatMap((c) => repositories.forms.list(c.id))
-    .find(
-      (f) =>
-        f.slug === slug &&
-        f.status !== "archived" &&
-        f.versions.find((v) => v.id === f.activeVersionId)?.state ===
-          "snapshot" &&
-        settingsOf(f.versions.find((v) => v.id === f.activeVersionId)?.settings)
-          .enabled,
-    );
-  if (!form)
-    return (
-      <main>
-        <Denied />
-      </main>
-    );
+  const { data: form, error, isLoading } = useSWR(`/api/public/forms/${encodeURIComponent(slug)}`, publicFetcher, {
+    revalidateOnFocus: false,
+  });
+  const [sessionId] = useState(() => crypto.randomUUID());
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  if (isLoading) return <main className="public-page"><p role="status">Carregando formulário…</p></main>;
+  if (error || !form) return <main className="public-page"><Denied /></main>;
+  const version = form.versions.find((item: { id: string }) => item.id === form.activeVersionId);
+  if (!version) return <main className="public-page"><Denied /></main>;
+  const capture: WizardCapture = {
+    progress: () => null,
+    view: () => undefined,
+    action: (_input, _actionId) => undefined,
+    capture: (input) => {
+      void fetch(`/api/public/forms/${encodeURIComponent(slug)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...input, sessionId, idempotencyKey }),
+      });
+      return sessionId;
+    },
+  };
   return (
     <main className="public-page">
-      <DemoNotice />
       <FormWizard
         live
         form={form}
-        version={form.versions.find((v) => v.id === form.activeVersionId)!}
-        fields={repositories.fields.list(form.clientId)}
-        clinicName={repositories.clients.get(form.clientId).name}
+        version={version}
+        fields={form.fields ?? []}
+        clinicName={form.clinicName ?? form.name}
+        captureRepository={capture}
       />
     </main>
   );
