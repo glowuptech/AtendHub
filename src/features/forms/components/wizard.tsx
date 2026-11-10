@@ -114,9 +114,6 @@ export function FormWizard({
     "--form-text": appearance.text,
     "--form-border": appearance.border,
     "--form-radius": `${appearance.radius}px`,
-    "--form-background-image": appearance.backgroundImage
-      ? `url("${appearance.backgroundImage}")`
-      : "none",
     "--intro-align": settings.introduction.align,
     "--intro-items": {
       left: "flex-start",
@@ -150,8 +147,18 @@ export function FormWizard({
     <section
       className={`form-experience ${compact ? "compact" : ""}`}
       style={style}
-    >
-      <div className="form-sheet">
+  >
+  {appearance.backgroundImage && (
+    <img
+      className="form-background-layer"
+      src={appearance.backgroundImage}
+      alt=""
+      aria-hidden="true"
+    />
+  )}
+  <div className="form-overlay-layer" aria-hidden="true" />
+  <div className="form-sheet">
+
         {appearance.cover && (
           <img className="form-cover" src={appearance.cover} alt="" />
         )}
