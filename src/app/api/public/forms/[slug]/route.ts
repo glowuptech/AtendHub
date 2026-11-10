@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { FormSchema, type FormDefinition, type FieldValue } from "@/domain/schemas";
-import { eligibleSteps, pathForAnswer } from "@/features/forms/services/routing";
+import { eligibleSteps } from "@/features/forms/services/routing";
 import { settingsOf } from "@/features/forms/services/settings";
 import { validateAnswer } from "@/domain/schemas";
 

@@ -9,7 +9,6 @@ import {
   Card,
   NavButton,
   Denied,
-  DemoNotice,
 } from "@/components/layout/shared";
 import { settingsOf } from "../services/settings";
 import { FormWizard, type WizardCapture } from "./wizard";
@@ -53,7 +52,7 @@ export function PublicForm({ slug }: { slug: string }) {
   const capture: WizardCapture = {
     progress: () => null,
     view: () => undefined,
-    action: (_input, _actionId) => undefined,
+    action: () => undefined,
     capture: (input) => {
       void fetch(`/api/public/forms/${encodeURIComponent(slug)}`, {
         method: "POST",
