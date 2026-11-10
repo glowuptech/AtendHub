@@ -19,11 +19,17 @@ export function SettingsEditor({
     latest.current = s;
   }, [s]);
   const [error, setError] = useState("");
+  const [uploading, setUploading] = useState<"cover" | "backgroundImage" | "">("");
+  const uploadGeneration = useRef<Record<"cover" | "backgroundImage", number>>({
+    cover: 0,
+    backgroundImage: 0,
+  });
   const patch = (v: Partial<FormSettings>) => onChange({ ...s, ...v });
   async function upload(
     file: File | undefined,
     key: "cover" | "backgroundImage",
   ) {
+    const generation = ++uploadGeneration.current[key];
     if (!file) return;
     if (
       !["image/png", "image/jpeg", "image/webp"].includes(file.type) ||
@@ -32,16 +38,29 @@ export function SettingsEditor({
       setError("Escolha uma imagem PNG, JPEG ou WebP de até 1 MB.");
       return;
     }
+    setError("");
+    setUploading(key);
     const reader = new FileReader();
     reader.onload = () => {
+      if (uploadGeneration.current[key] !== generation) return;
+      const result = typeof reader.result === "string" ? reader.result : "";
+      if (!result) {
+        setUploading("");
+        setError("Não foi possível ler a imagem.");
+        return;
+      }
       const current = latest.current;
       onChange({
         ...current,
-        appearance: { ...current.appearance, [key]: String(reader.result) },
+        appearance: { ...current.appearance, [key]: result },
       });
-      setError("");
+      setUploading("");
     };
-    reader.onerror = () => setError("Não foi possível ler a imagem.");
+    reader.onerror = () => {
+      if (uploadGeneration.current[key] !== generation) return;
+      setUploading("");
+      setError("Não foi possível ler a imagem.");
+    };
     reader.readAsDataURL(file);
   }
   return (
@@ -384,8 +403,12 @@ export function SettingsEditor({
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/webp"
+                      aria-describedby={`${k}-upload-status`}
                       onChange={(e) => void upload(e.target.files?.[0], k)}
                     />
+                    <span id={`${k}-upload-status`} className="muted">
+                      {uploading === k ? "Lendo imagem…" : "PNG, JPEG ou WebP até 1 MB"}
+                    </span>
                   </label>
                   {s.appearance[k] && (
                     <div className="form-asset-preview">
@@ -400,9 +423,11 @@ export function SettingsEditor({
                       <button
                         type="button"
                         className="text-button"
-                        onClick={() =>
-                          patch({ appearance: { ...s.appearance, [k]: "" } })
-                        }
+                        onClick={() => {
+                          ++uploadGeneration.current[k];
+                          setUploading("");
+                          patch({ appearance: { ...s.appearance, [k]: "" } });
+                        }}
                       >
                         {k === "cover"
                           ? "Remover capa"
@@ -469,6 +494,12 @@ export function SettingsEditor({
                   <p>
                     O painel está sólido e cobre a foto atrás do texto. Reduza
                     “Fundo do painel” para ver a imagem.
+                  </p>
+                )}
+                {s.appearance.overlayOpacity === 100 && (
+                  <p>
+                    A sobreposição está em 100% e pode esconder totalmente a
+                    foto. Reduza “Escurecimento da imagem” para revelá-la.
                   </p>
                 )}
                 <button

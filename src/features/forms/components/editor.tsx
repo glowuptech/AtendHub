@@ -875,7 +875,7 @@ export function EditorWorkspace({
           )}
           <div className="phone-frame">
             <FormWizard
-              key={`${previewKey}-${settingsOf(version.settings).introduction.mode}-${version.steps.map((s) => s.id).join()}-${previewBackgroundImage}`}
+              key={`${previewKey}-${settingsOf(version.settings).introduction.mode}-${version.steps.map((s) => s.id).join()}`}
               compact
               form={draft}
               version={version}
