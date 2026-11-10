@@ -156,33 +156,43 @@ test("aparência funciona antes das perguntas e permanece após salvar", async (
   const preview = page.getByRole("complementary");
   await expect(preview.locator(".form-experience")).toBeVisible();
   await page.getByRole("button", { name: /04 Aparência/ }).click();
-  await page.getByLabel("Imagem de fundo opcional").setInputFiles({
-    name: "fundo.png",
-    mimeType: "image/png",
-    buffer: Buffer.from(
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6ioAAAAASUVORK5CYII=",
-      "base64",
-    ),
-  });
+  await page.getByLabel("Imagem de fundo opcional").setInputFiles(
+    "tests/editor-harness/recognizable-background.png",
+  );
+  const background = preview.locator(".form-background-layer");
   await expect(page.getByAltText("Prévia da imagem de fundo")).toBeVisible();
-  await expect(preview.locator(".form-experience")).toHaveCSS(
-    "background-image",
-    /data:image\/png;base64/,
+  await expect(background).toHaveAttribute("src", /^data:image\/png;base64,/);
+  await expect.poll(async () => background.evaluate((image) => (image as HTMLImageElement).complete)).toBe(true);
+  await expect.poll(async () => background.evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await expect(background).toHaveJSProperty("naturalHeight", expect.any(Number));
+  await expect(background).toHaveCSS("opacity", "1");
+  await expect.poll(async () => background.evaluate((image) => image.getBoundingClientRect().width)).toBeGreaterThan(0);
+  await expect.poll(async () => background.evaluate((image) => image.getBoundingClientRect().height)).toBeGreaterThan(0);
+
+  async function range(label: string, value: string) {
+    await page.getByLabel(label, { exact: false }).evaluate((input, next) => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, next);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }, value);
+  }
+  await range("Fundo do painel", "0");
+  await range("Escurecimento da imagem", "0");
+  await expect(preview.locator(".form-experience")).toHaveCSS("--form-panel-opacity", "0");
+  await expect(preview.locator(".form-experience")).toHaveCSS("--form-overlay-opacity", "0");
+  await page.screenshot({ path: "test-results/appearance-photo-clear.png" });
+
+  await range("Escurecimento da imagem", "30");
+  await expect(preview.locator(".form-experience")).toHaveCSS("--form-overlay-opacity", "0.3");
+  await range("Fundo do painel", "50");
+  await expect(preview.locator(".form-experience")).toHaveCSS("--form-panel-opacity", "0.5");
+  await expect(preview.locator(".form-content, .form-intro").first()).toHaveCSS("opacity", "1");
+
+  await page.getByLabel("Imagem de fundo opcional").setInputFiles(
+    "tests/editor-harness/recognizable-background-replacement.png",
   );
-  await page
-    .getByRole("button", {
-      name: "Usar foto escura com texto claro",
-      exact: true,
-    })
-    .click();
-  await expect(preview.locator(".form-experience h1")).toHaveCSS(
-    "color",
-    "rgb(255, 255, 255)",
-  );
-  await expect(preview.locator(".form-experience")).toHaveCSS(
-    "background-image",
-    /linear-gradient/,
-  );
+  await expect.poll(async () => background.getAttribute("src")).toContain("data:image/png;base64,");
+  await expect.poll(async () => background.evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   // Native color inputs use input/change events; assert the rendered styles, not only state.
   async function color(label: string, value: string) {
     await page.getByLabel(label, { exact: true }).evaluate((input, value) => {
@@ -234,10 +244,10 @@ test("aparência funciona antes das perguntas e permanece após salvar", async (
     .click();
   await expect(page.getByRole("status")).toContainText("salvo");
   await page.reload();
-  await expect(preview.locator(".form-experience")).toHaveCSS(
-    "background-image",
-    /data:image\/png;base64/,
-  );
+  const persistedBackground = preview.locator(".form-background-layer");
+  await expect(persistedBackground).toBeVisible();
+  await expect(persistedBackground).toHaveAttribute("src", /^data:image\/png;base64,/);
+  await expect.poll(async () => persistedBackground.evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   await expect(
     preview.getByRole("button", { name: /Começar triagem/ }),
   ).toHaveCSS("background-color", "rgb(225, 29, 72)");
@@ -245,6 +255,8 @@ test("aparência funciona antes das perguntas e permanece após salvar", async (
     "color",
     "rgb(22, 163, 74)",
   );
+  await page.getByRole("button", { name: "Remover imagem de fundo", exact: true }).click();
+  await expect(preview.locator(".form-background-layer")).toHaveCount(0);
   await page.screenshot({ path: "test-results/editor-accordion-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(

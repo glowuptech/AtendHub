@@ -2577,9 +2577,20 @@ tbody tr:hover {
   gap: 4px;
   margin-bottom: 16px;
 }
-.preview-device-controls .button {
+  .preview-device-controls .button {
   min-width: 85px;
-}
+  }
+  .preview-image-error {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid #f0a0a0;
+  border-radius: 8px;
+  background: #fff4f4;
+  color: #8f1d1d;
+  font-size: 13px;
+  line-height: 1.4;
+  }
+
 .preview-wide .phone-frame {
   max-width: 100%;
   border-width: 1px;
