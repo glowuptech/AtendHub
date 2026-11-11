@@ -337,7 +337,7 @@ export function EditorWorkspace({
   );
   function markDirty() {
     hasLocalChanges.current = true;
-    markDirty();
+    setSaved(false);
   }
   useEffect(() => {
     latestDraft.current = draft;
