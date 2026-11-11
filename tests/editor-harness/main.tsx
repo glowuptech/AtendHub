@@ -1,6 +1,8 @@
 // Isolated browser harness: real components, simulated persistence only.
+import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { EditorWorkspace } from "@/features/forms/components/editor";
+import { makePersistedPathForm } from "./path-fixture";
 import { FormsList } from "@/features/forms/components/forms-list";
 import { clients } from "@/lib/mocks/fixtures";
 import "@/app/globals.css";
@@ -29,15 +31,31 @@ window.fetch = async (input, init) => {
   }
   return original(input, init);
 };
+function EditorHarness() {
+  const params = new URLSearchParams(location.search);
+  const isAsyncLoad = params.has("async-source");
+  const [source, setSource] = useState(() =>
+    isAsyncLoad ? undefined : stored ? JSON.parse(stored) : undefined,
+  );
+
+  useEffect(() => {
+    if (!isAsyncLoad) return;
+    const timer = window.setTimeout(() => {
+      const persisted = localStorage.getItem("editor-test-draft");
+      setSource(persisted ? JSON.parse(persisted) : makePersistedPathForm());
+    }, 25);
+    return () => window.clearTimeout(timer);
+  }, [isAsyncLoad]);
+
+  return <EditorWorkspace client={clients[0]} source={source} />;
+}
+
 createRoot(document.getElementById("root")!).render(
   <main style={{ padding: 24 }}>
     {new URLSearchParams(location.search).has("list") ? (
       <FormsList id={clients[0].id} />
     ) : (
-      <EditorWorkspace
-        client={clients[0]}
-        source={stored ? JSON.parse(stored) : undefined}
-      />
+      <EditorHarness />
     )}
   </main>,
 );

@@ -1,5 +1,11 @@
 "use client";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 const subscribe = () => () => {};
 import { z } from "zod";
 import { Plus, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
@@ -29,6 +35,13 @@ import { SettingsEditor } from "./settings-editor";
 import { EditorAccordion } from "./editor-accordion";
 import { FlowEditor } from "./flow-editor";
 import { validateRouting } from "../services/routing";
+import {
+  createPathDiagnosticReport,
+  fieldsForVersion,
+  routingSnapshot,
+  type PathDiagnosticEvent,
+} from "../services/path-diagnostics";
+import { PathDiagnostics } from "./path-diagnostics";
 import { settingsOf } from "../services/settings";
 import { FormWizard } from "./wizard";
 const typeLabels: Record<FieldType, string> = {
@@ -114,6 +127,122 @@ export function FormEditor({
     />
   );
 }
+function prepareEditorForm(
+  source: FormDefinition | undefined,
+  client: import("@/domain/schemas").Client,
+) {
+  if (source) {
+    const form = structuredClone(source);
+    const receivedVersion =
+      form.versions.find((item) => item.id === form.activeVersionId) ??
+      form.versions.at(-1);
+    if (!receivedVersion) throw new Error("Versão recebida ausente.");
+    const receivedFields = fieldsForVersion(form, receivedVersion);
+    form.fields = receivedFields;
+    const receivedVersionIdentity = {
+      id: receivedVersion.id,
+      number: receivedVersion.number,
+      state: receivedVersion.state,
+    };
+    const sourceFieldIds = source.fields.map((field) => field.id).sort();
+    const selectedVersionFieldIds = receivedFields
+      .map((field) => field.id)
+      .sort();
+    const optionPathIds = (definitions: CustomFieldDefinition[]) =>
+      definitions.flatMap((field) =>
+        field.options.map((option) => ({
+          fieldDefinitionId: field.id,
+          optionId: option.id,
+          pathId: option.pathId,
+        })),
+      );
+    let displayedVersion = receivedVersion;
+    const clonedQuestionIds: Array<{ before: string; after: string }> = [];
+    if (receivedVersion.state === "snapshot") {
+      displayedVersion = {
+        ...structuredClone(receivedVersion),
+        id: crypto.randomUUID(),
+        number: Math.max(...form.versions.map((item) => item.number)) + 1,
+        state: "draft",
+        steps: receivedVersion.steps.map((step) => {
+          const questionId = crypto.randomUUID();
+          clonedQuestionIds.push({
+            before: step.question.id,
+            after: questionId,
+          });
+          return {
+            ...step,
+            id: crypto.randomUUID(),
+            actionId: crypto.randomUUID(),
+            backActionId: crypto.randomUUID(),
+            question: { ...step.question, id: questionId },
+          };
+        }),
+      };
+      form.versions.push(displayedVersion);
+      form.activeVersionId = displayedVersion.id;
+    }
+    form.status = "draft";
+    return {
+      form,
+      initialization: {
+        source: "formulário recebido pela listagem autenticada",
+        receivedActiveVersionId: source.activeVersionId,
+        receivedVersion: receivedVersionIdentity,
+        displayedVersion: {
+          id: displayedVersion.id,
+          number: displayedVersion.number,
+          state: displayedVersion.state,
+        },
+        snapshotPreparedForEditing: receivedVersion.state === "snapshot",
+        clonedQuestionIds,
+        sourceFieldIds,
+        selectedVersionFieldIds,
+        sourceOptionPathIds: optionPathIds(source.fields),
+        selectedVersionOptionPathIds: optionPathIds(receivedFields),
+        pathIdsPreserved:
+          JSON.stringify(
+            receivedVersion.paths.map((path) => path.id).sort(),
+          ) ===
+          JSON.stringify(displayedVersion.paths.map((path) => path.id).sort()),
+      },
+    };
+  }
+  const formId = crypto.randomUUID();
+  const versionId = crypto.randomUUID();
+  return {
+    form: {
+      id: formId,
+      organizationId: client.organizationId,
+      clientId: client.id,
+      doctorId: null,
+      description: "",
+      fields: [],
+      name: "Novo formulário",
+      slug: `formulario-${formId.slice(0, 8)}`,
+      status: "draft" as const,
+      activeVersionId: versionId,
+      versions: [
+        {
+          id: versionId,
+          formId,
+          organizationId: client.organizationId,
+          clientId: client.id,
+          number: 1,
+          state: "draft" as const,
+          steps: [],
+          paths: [],
+          theme: client.branding,
+          destination: "demo_success" as const,
+          settings: settingsOf(),
+          successMessage: "Cadastro recebido! Em breve entraremos em contato.",
+        },
+      ],
+    } satisfies FormDefinition,
+    initialization: { source: "formulário novo", receivedVersion: null },
+  };
+}
+
 export function EditorWorkspace({
   source,
   client,
@@ -122,65 +251,50 @@ export function EditorWorkspace({
   client: import("@/domain/schemas").Client;
 }) {
   const clientId = client.id;
-  const [draft, setDraft] = useState<FormDefinition>(() => {
-    if (source) {
-      const f = structuredClone(source),
-        v = f.versions.find((v) => v.id === f.activeVersionId)!;
-      if (v.state === "snapshot") {
-        const next = {
-          ...structuredClone(v),
-          id: crypto.randomUUID(),
-          number: Math.max(...f.versions.map((v) => v.number)) + 1,
-          state: "draft" as const,
-          steps: v.steps.map((s) => ({
-            ...s,
-            id: crypto.randomUUID(),
-            actionId: crypto.randomUUID(),
-            backActionId: crypto.randomUUID(),
-            question: { ...s.question, id: crypto.randomUUID() },
-          })),
-        };
-        f.versions.push(next);
-        f.activeVersionId = next.id;
-      }
-      f.status = "draft";
-      return f;
-    }
-    const formId = crypto.randomUUID(),
-      versionId = crypto.randomUUID();
-    return {
-      id: formId,
-      organizationId: client.organizationId,
-      clientId,
-      doctorId: null,
-      description: "",
-      fields: [],
-      name: "Novo formulário",
-      slug: `formulario-${formId.slice(0, 8)}`,
-      status: "draft",
-      activeVersionId: versionId,
-      versions: [
-        {
-          id: versionId,
-          formId,
-          organizationId: client.organizationId,
-          clientId,
-          number: 1,
-          state: "draft",
-          steps: [],
-          paths: [],
-          theme: client.branding,
-          destination: "demo_success",
-          settings: settingsOf(),
-          successMessage: "Cadastro recebido! Em breve entraremos em contato.",
-        },
-      ],
-    };
+  const [initialEditorState, setInitialEditorState] = useState(() =>
+    prepareEditorForm(source, client),
+  );
+  const [draft, setDraft] = useState<FormDefinition>(initialEditorState.form);
+  const [diagnosticEvents, setDiagnosticEvents] = useState<
+    PathDiagnosticEvent[]
+  >(() =>
+    source
+      ? [
+          {
+            point: "A",
+            label: "GET/listagem: versão recebida",
+            details: routingSnapshot(
+              source.id,
+              source.activeVersionId,
+              source.versions.find(
+                (item) => item.id === source.activeVersionId,
+              ),
+              source.fields,
+            ),
+          },
+          {
+            point: "B",
+            label: "EditorWorkspace: prop source recebida",
+            details: {
+              formId: source.id,
+              activeVersionId: source.activeVersionId,
+              versionIds: source.versions.map((item) => item.id),
+            },
+          },
+          {
+            point: "C",
+            label: "Estado inicial do rascunho",
+            details: initialEditorState.initialization,
+          },
+        ]
+      : [],
+  );
+  const [lastSave, setLastSave] = useState<unknown>({
+    status: "não executado",
   });
   const latestDraft = useRef(draft);
-  useEffect(() => {
-    latestDraft.current = draft;
-  }, [draft]);
+  const receivedSource = useRef(source);
+  const hasLocalChanges = useRef(false);
   const saveLock = useRef(false);
   const fields = draft.fields;
   const [section, setSection] = useState("");
@@ -194,10 +308,89 @@ export function EditorWorkspace({
     [options, setOptions] = useState(""),
     [confirmed, setConfirmed] = useState(false),
     [notice, setNotice] = useState(""),
-    [saved, setSaved] = useState(false),
+    [saved, setSaved] = useState(() => {
+      const active = source?.versions.find(
+        (item) => item.id === source.activeVersionId,
+      );
+      return Boolean(source && active?.state === "draft");
+    }),
     [previewKey, setPreviewKey] = useState(0),
     [previewMode, setPreviewMode] = useState<"mobile" | "wide">("mobile"),
     [previewImageErrorSrc, setPreviewImageErrorSrc] = useState("");
+  const recordDiagnostic = useCallback(
+    (point: PathDiagnosticEvent["point"], label: string, details: unknown) => {
+      setDiagnosticEvents((events) => [
+        ...events.slice(-19),
+        { point, label, details },
+      ]);
+    },
+    [],
+  );
+  const recordFlowDiagnostic = useCallback(
+    (point: "D" | "E", details: unknown) =>
+      recordDiagnostic(
+        point,
+        point === "D" ? "Props recebidas pelo FlowEditor" : "Checkbox alterado",
+        details,
+      ),
+    [recordDiagnostic],
+  );
+  function markDirty() {
+    hasLocalChanges.current = true;
+    markDirty();
+  }
+  useEffect(() => {
+    latestDraft.current = draft;
+  }, [draft]);
+  useEffect(() => {
+    if (receivedSource.current === source) return;
+    receivedSource.current = source;
+    const timer = window.setTimeout(() => {
+      if (!source) return;
+      const receivedVersion = source.versions.find(
+        (item) => item.id === source.activeVersionId,
+      );
+      recordDiagnostic(
+        "A",
+        "GET/listagem: atualização recebida",
+        routingSnapshot(
+          source.id,
+          source.activeVersionId,
+          receivedVersion,
+          source.fields,
+        ),
+      );
+      recordDiagnostic("B", "EditorWorkspace: prop source atualizada", {
+        formId: source.id,
+        activeVersionId: source.activeVersionId,
+        versionIds: source.versions.map((item) => item.id),
+      });
+      if (hasLocalChanges.current) {
+        recordDiagnostic(
+          "C",
+          "Reidratação ignorada para preservar edição local",
+          {
+            formId: source.id,
+            activeVersionId: source.activeVersionId,
+            unsavedLocalChanges: true,
+          },
+        );
+        return;
+      }
+      const prepared = prepareEditorForm(source, client);
+      setInitialEditorState(prepared);
+      setDraft(prepared.form);
+      setPersistedId(source.id);
+      setSaved(!prepared.initialization.snapshotPreparedForEditing);
+      setActiveStep("");
+      recordDiagnostic(
+        "C",
+        "Rascunho reidratado da nova resposta",
+        prepared.initialization,
+      );
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [client, recordDiagnostic, source]);
   const version = draft.versions.find((v) => v.id === draft.activeVersionId)!;
   const frozen = version.state === "snapshot";
   const previewBackgroundImage = settingsOf(version.settings).appearance
@@ -205,8 +398,16 @@ export function EditorWorkspace({
   const previewImageError = Boolean(
     previewBackgroundImage && previewImageErrorSrc === previewBackgroundImage,
   );
+  const diagnosticReport = createPathDiagnosticReport({
+    receivedForm: source,
+    displayedForm: draft,
+    receivedActiveVersionId: source?.activeVersionId,
+    initialization: initialEditorState.initialization,
+    events: diagnosticEvents,
+    lastSave,
+  });
   function updateVersion(change: Partial<FormVersion>) {
-    setSaved(false);
+    markDirty();
     setDraft((f) => ({
       ...f,
       versions: f.versions.map((v) =>
@@ -223,15 +424,30 @@ export function EditorWorkspace({
     if (saveLock.current) return;
     saveLock.current = true;
     const submittedDraft = draft;
+    const submittedVersion = submittedDraft.versions.find(
+      (item) => item.id === submittedDraft.activeVersionId,
+    );
+    const requestSnapshot = routingSnapshot(
+      submittedDraft.id,
+      submittedDraft.activeVersionId,
+      submittedVersion,
+      submittedDraft.fields,
+    );
+    setLastSave({ status: "enviando", request: requestSnapshot });
     setSaving(true);
     try {
-      if (snapshot) validateRouting(version, fields);
+      if (snapshot && submittedVersion)
+        validateRouting(submittedVersion, submittedDraft.fields);
       const response = await fetch(
         persistedId ? `/api/forms/${persistedId}` : "/api/forms",
         {
           method: persistedId ? "PUT" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ clientId, form: draft, publish: snapshot }),
+          body: JSON.stringify({
+            clientId,
+            form: submittedDraft,
+            publish: snapshot,
+          }),
         },
       );
       const result = await response.json();
@@ -240,19 +456,35 @@ export function EditorWorkspace({
           result.error ?? "Não foi possível salvar o formulário.",
         );
       const returnedVersion = (result as FormDefinition).versions?.find(
-        (v) => v.id === result.activeVersionId,
+        (item) => item.id === result.activeVersionId,
       );
-      const expectedLinks = version.steps.map((s) => ({
-        id: s.question.id,
-        paths: [...s.question.pathIds].sort(),
-        router: s.question.definesPath,
+      const expectedLinks = (submittedVersion?.steps ?? []).map((step) => ({
+        id: step.question.id,
+        paths: [...step.question.pathIds].sort(),
+        router: step.question.definesPath,
       }));
-      const returnedLinks = returnedVersion?.steps.map((s) => ({
-        id: s.question.id,
-        paths: [...s.question.pathIds].sort(),
-        router: s.question.definesPath,
+      const returnedLinks = returnedVersion?.steps.map((step) => ({
+        id: step.question.id,
+        paths: [...step.question.pathIds].sort(),
+        router: step.question.definesPath,
       }));
+      const responseSnapshot = routingSnapshot(
+        result.id,
+        result.activeVersionId,
+        returnedVersion,
+        result.fields ?? [],
+      );
       if (JSON.stringify(expectedLinks) !== JSON.stringify(returnedLinks)) {
+        setLastSave({
+          status: "resposta divergente",
+          request: requestSnapshot,
+          response: responseSnapshot,
+          httpStatus: response.status,
+        });
+        recordDiagnostic("F", "Resposta de salvamento divergente", {
+          request: requestSnapshot,
+          response: responseSnapshot,
+        });
         throw new Error(
           "O servidor não confirmou os caminhos das perguntas. Suas marcações foram mantidas neste editor. Tente salvar novamente; não feche esta página.",
         );
@@ -265,10 +497,10 @@ export function EditorWorkspace({
           ...current,
           id: result.id,
           activeVersionId: result.activeVersionId,
-          versions: current.versions.map((v) =>
-            v.id === current.activeVersionId
-              ? { ...v, id: result.activeVersionId, formId: result.id }
-              : v,
+          versions: current.versions.map((item) =>
+            item.id === current.activeVersionId
+              ? { ...item, id: result.activeVersionId, formId: result.id }
+              : item,
           ),
         }));
       await mutate(
@@ -279,20 +511,42 @@ export function EditorWorkspace({
             : [result],
         { revalidate: false },
       );
+      hasLocalChanges.current = !unchanged;
       setSaved(unchanged);
+      setLastSave({
+        status: "confirmado",
+        httpStatus: response.status,
+        request: requestSnapshot,
+        response: responseSnapshot,
+      });
+      recordDiagnostic("F", "Salvamento confirmado", {
+        httpStatus: response.status,
+        request: requestSnapshot,
+        response: responseSnapshot,
+      });
       setNotice(
         snapshot
           ? "Formulário publicado. A versão anterior permanece preservada."
           : "Formulário salvo como rascunho.",
       );
     } catch (e) {
-      setNotice(
+      const message =
         e instanceof z.ZodError
           ? e.issues[0].message
           : e instanceof Error
             ? e.message
-            : "Verifique os campos.",
-      );
+            : "Verifique os campos.";
+      setLastSave((previous: unknown) => ({
+        ...(previous && typeof previous === "object" ? previous : {}),
+        status: "falhou",
+        request: requestSnapshot,
+        error: message,
+      }));
+      recordDiagnostic("F", "Salvamento falhou", {
+        request: requestSnapshot,
+        error: message,
+      });
+      setNotice(message);
     } finally {
       saveLock.current = false;
       setSaving(false);
@@ -330,6 +584,7 @@ export function EditorWorkspace({
       <p role="status" className="notice">
         {notice}
       </p>
+      <PathDiagnostics report={diagnosticReport} />
       <div className={`editor-grid preview-${previewMode}`}>
         <div className="editor-fields">
           <EditorAccordion
@@ -352,7 +607,7 @@ export function EditorWorkspace({
                     disabled={frozen || saving}
                     value={draft.doctorId ?? ""}
                     onChange={(e) => {
-                      setSaved(false);
+                      markDirty();
                       setDraft({ ...draft, doctorId: e.target.value || null });
                     }}
                   >
@@ -372,7 +627,7 @@ export function EditorWorkspace({
                     disabled={frozen || saving}
                     value={draft.name}
                     onChange={(e) => {
-                      setSaved(false);
+                      markDirty();
                       setDraft({ ...draft, name: e.target.value });
                     }}
                   />
@@ -383,7 +638,7 @@ export function EditorWorkspace({
                     disabled={frozen || saving}
                     value={draft.slug}
                     onChange={(e) => {
-                      setSaved(false);
+                      markDirty();
                       setDraft({ ...draft, slug: e.target.value });
                     }}
                   />
@@ -472,8 +727,10 @@ export function EditorWorkspace({
               <FlowEditor
                 version={version}
                 fields={fields}
+                receivedActiveVersionId={source?.activeVersionId}
+                onDiagnostic={recordFlowDiagnostic}
                 onChange={(next, nextFields) => {
-                  setSaved(false);
+                  markDirty();
                   setDraft((current) => ({
                     ...current,
                     fields: nextFields,
@@ -562,7 +819,7 @@ export function EditorWorkspace({
                             (f) => f.id === s.question.fieldDefinitionId,
                           )!}
                           onSave={(field) => {
-                            setSaved(false);
+                            markDirty();
                             setDraft((current) => ({
                               ...current,
                               fields: current.fields.map((item) =>
@@ -806,7 +1063,7 @@ export function EditorWorkspace({
                           field.label,
                           version.steps.length,
                         );
-                        setSaved(false);
+                        markDirty();
                         setDraft((current) => ({
                           ...current,
                           fields: current.fields.some((f) => f.id === field.id)

@@ -1,7 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CustomFieldDefinition, FormVersion } from "@/domain/schemas";
 import { Button } from "@/components/ui/button";
+import { routingSnapshot } from "../services/path-diagnostics";
 import { Card } from "@/components/layout/shared";
 import {
   addPath,
@@ -14,8 +15,16 @@ type Props = {
   version: FormVersion;
   fields: CustomFieldDefinition[];
   onChange: (version: FormVersion, fields: CustomFieldDefinition[]) => void;
+  receivedActiveVersionId?: string;
+  onDiagnostic?: (point: "D" | "E", details: unknown) => void;
 };
-export function FlowEditor({ version, fields, onChange }: Props) {
+export function FlowEditor({
+  version,
+  fields,
+  onChange,
+  receivedActiveVersionId,
+  onDiagnostic,
+}: Props) {
   const [error, setError] = useState("");
   const paths = version.paths ?? [];
   const router = version.steps.find((s) => s.question.definesPath);
@@ -27,6 +36,40 @@ export function FlowEditor({ version, fields, onChange }: Props) {
         ["single_select", "image_choice"].includes(f.type),
     ),
   );
+  const pathIds = new Set(paths.map((path) => path.id));
+  const orphanedQuestionReferences = version.steps.flatMap((step) =>
+    step.question.pathIds
+      .filter((pathId) => !pathIds.has(pathId))
+      .map((pathId) => ({ questionId: step.question.id, pathId })),
+  );
+  const orphanedOptionReferences = fields
+    .filter((item) => item.id === router?.question.fieldDefinitionId)
+    .flatMap((item) =>
+      item.options
+        .filter((option) => option.pathId && !pathIds.has(option.pathId))
+        .map((option) => ({
+          fieldDefinitionId: item.id,
+          optionId: option.id,
+          pathId: option.pathId,
+        })),
+    );
+  useEffect(() => {
+    onDiagnostic?.("D", {
+      formId: version.formId,
+      receivedActiveVersionId: receivedActiveVersionId ?? null,
+      displayedVersion: {
+        id: version.id,
+        number: version.number,
+        state: version.state,
+      },
+      routing: routingSnapshot(
+        version.formId,
+        receivedActiveVersionId ?? version.id,
+        version,
+        fields,
+      ),
+    });
+  }, [fields, onDiagnostic, receivedActiveVersionId, version]);
   return (
     <Card title="Fluxo das perguntas">
       <p className="muted">
@@ -62,6 +105,26 @@ export function FlowEditor({ version, fields, onChange }: Props) {
           Adicione uma pergunta de seleção única ou por imagens no bloco
           “Perguntas” para criar caminhos.
         </p>
+      )}
+      {(orphanedQuestionReferences.length > 0 ||
+        orphanedOptionReferences.length > 0) && (
+        <div role="alert" className="path-reference-warning">
+          <strong>Há vínculos de caminho sem correspondência exata.</strong>
+          <p>
+            Os dados foram preservados. Compare os IDs em “Diagnóstico dos
+            caminhos”; nenhum vínculo será renomeado automaticamente.
+          </p>
+          {orphanedQuestionReferences.map((reference) => (
+            <code key={`question-${reference.questionId}-${reference.pathId}`}>
+              question {reference.questionId} → {reference.pathId}
+            </code>
+          ))}
+          {orphanedOptionReferences.map((reference) => (
+            <code key={`option-${reference.optionId}-${reference.pathId}`}>
+              option {reference.optionId} → {reference.pathId}
+            </code>
+          ))}
+        </div>
       )}
       {router && (
         <>
@@ -242,12 +305,36 @@ export function FlowEditor({ version, fields, onChange }: Props) {
                             <label className="check-option" key={s.id}>
                               <input
                                 type="checkbox"
+                                data-question-id={s.question.id}
+                                data-path-id={path.id}
                                 disabled={
                                   version.steps.indexOf(s) <
                                   version.steps.indexOf(router)
                                 }
                                 checked={s.question.pathIds.includes(path.id)}
-                                onChange={(e) =>
+                                onChange={(e) => {
+                                  const nextPathIds = e.target.checked
+                                    ? [
+                                        ...new Set([
+                                          ...s.question.pathIds,
+                                          path.id,
+                                        ]),
+                                      ]
+                                    : s.question.pathIds.filter(
+                                        (id) => id !== path.id,
+                                      );
+                                  onDiagnostic?.("E", {
+                                    formId: version.formId,
+                                    versionId: version.id,
+                                    stepId: s.id,
+                                    questionId: s.question.id,
+                                    fieldDefinitionId:
+                                      s.question.fieldDefinitionId,
+                                    pathIdUsedByCheckbox: path.id,
+                                    checked: e.target.checked,
+                                    previousPathIds: [...s.question.pathIds],
+                                    nextPathIds,
+                                  });
                                   onChange(
                                     {
                                       ...version,
@@ -257,22 +344,15 @@ export function FlowEditor({ version, fields, onChange }: Props) {
                                               ...item,
                                               question: {
                                                 ...item.question,
-                                                pathIds: e.target.checked
-                                                  ? [
-                                                      ...item.question.pathIds,
-                                                      path.id,
-                                                    ]
-                                                  : item.question.pathIds.filter(
-                                                      (id) => id !== path.id,
-                                                    ),
+                                                pathIds: nextPathIds,
                                               },
                                             }
                                           : item,
                                       ),
                                     },
                                     fields,
-                                  )
-                                }
+                                  );
+                                }}
                               />
                               {s.question.label}
                               {version.steps.indexOf(s) <
