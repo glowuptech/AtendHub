@@ -182,9 +182,6 @@ export function EditorWorkspace({
     latestDraft.current = draft;
   }, [draft]);
   const saveLock = useRef(false);
-  const [flowRevision, setFlowRevision] = useState(0);
-  const autoSavedRevision = useRef(0);
-  const saveLatest = useRef<() => void>(() => {});
   const fields = draft.fields;
   const [section, setSection] = useState("");
   const [activeStep, setActiveStep] = useState("");
@@ -242,6 +239,24 @@ export function EditorWorkspace({
         throw new Error(
           result.error ?? "Não foi possível salvar o formulário.",
         );
+      const returnedVersion = (result as FormDefinition).versions?.find(
+        (v) => v.id === result.activeVersionId,
+      );
+      const expectedLinks = version.steps.map((s) => ({
+        id: s.question.id,
+        paths: [...s.question.pathIds].sort(),
+        router: s.question.definesPath,
+      }));
+      const returnedLinks = returnedVersion?.steps.map((s) => ({
+        id: s.question.id,
+        paths: [...s.question.pathIds].sort(),
+        router: s.question.definesPath,
+      }));
+      if (JSON.stringify(expectedLinks) !== JSON.stringify(returnedLinks)) {
+        throw new Error(
+          "O servidor não confirmou os caminhos das perguntas. Suas marcações foram mantidas neste editor. Tente salvar novamente; não feche esta página.",
+        );
+      }
       setPersistedId(result.id);
       const unchanged = latestDraft.current === submittedDraft;
       if (unchanged) setDraft(result);
@@ -283,27 +298,6 @@ export function EditorWorkspace({
       setSaving(false);
     }
   }
-  useEffect(() => {
-    saveLatest.current = () => {
-      void save();
-    };
-  });
-  useEffect(() => {
-    // Only an existing unpublished draft can autosave without changing a public link.
-    if (
-      !flowRevision ||
-      autoSavedRevision.current === flowRevision ||
-      saving ||
-      !persistedId ||
-      (source && source.status !== "draft")
-    )
-      return;
-    const timer = setTimeout(() => {
-      autoSavedRevision.current = flowRevision;
-      saveLatest.current();
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, [flowRevision, saving, persistedId, source?.status]);
   return (
     <>
       <Heading
@@ -355,7 +349,7 @@ export function EditorWorkspace({
                 <label>
                   Profissional vinculado
                   <select
-                    disabled={frozen}
+                    disabled={frozen || saving}
                     value={draft.doctorId ?? ""}
                     onChange={(e) => {
                       setSaved(false);
@@ -375,7 +369,7 @@ export function EditorWorkspace({
                 <label>
                   Nome do formulário
                   <input
-                    disabled={frozen}
+                    disabled={frozen || saving}
                     value={draft.name}
                     onChange={(e) => {
                       setSaved(false);
@@ -386,7 +380,7 @@ export function EditorWorkspace({
                 <label>
                   Slug
                   <input
-                    disabled={frozen}
+                    disabled={frozen || saving}
                     value={draft.slug}
                     onChange={(e) => {
                       setSaved(false);
@@ -397,7 +391,7 @@ export function EditorWorkspace({
                 <label>
                   Mensagem de conclusão
                   <input
-                    disabled={frozen}
+                    disabled={frozen || saving}
                     value={version.successMessage}
                     onChange={(e) =>
                       updateVersion({ successMessage: e.target.value })
@@ -424,7 +418,7 @@ export function EditorWorkspace({
             <SettingsEditor
               value={version.settings}
               onChange={(settings) => updateVersion({ settings })}
-              disabled={frozen}
+              disabled={frozen || saving}
               section="presentation"
             />
           </EditorAccordion>
@@ -442,7 +436,7 @@ export function EditorWorkspace({
             <SettingsEditor
               value={version.settings}
               onChange={(settings) => updateVersion({ settings })}
-              disabled={frozen}
+              disabled={frozen || saving}
               section="contacts"
             />
           </EditorAccordion>
@@ -460,7 +454,7 @@ export function EditorWorkspace({
             <SettingsEditor
               value={version.settings}
               onChange={(settings) => updateVersion({ settings })}
-              disabled={frozen}
+              disabled={frozen || saving}
               section="appearance"
             />
           </EditorAccordion>
@@ -474,12 +468,11 @@ export function EditorWorkspace({
             onToggle={() => setSection(section === "flow" ? "" : "flow")}
           >
             {" "}
-            <fieldset disabled={frozen} className="flow-editor-shell">
+            <fieldset disabled={frozen || saving} className="flow-editor-shell">
               <FlowEditor
                 version={version}
                 fields={fields}
                 onChange={(next, nextFields) => {
-                  setFlowRevision((value) => value + 1);
                   setSaved(false);
                   setDraft((current) => ({
                     ...current,
@@ -543,7 +536,7 @@ export function EditorWorkspace({
                     <fieldset
                       className="step-editor"
                       key={s.id}
-                      disabled={frozen}
+                      disabled={frozen || saving}
                     >
                       <legend>Editar pergunta {i + 1}</legend>
                       <label>
@@ -677,7 +670,7 @@ export function EditorWorkspace({
                 ))}
               </Card>
               <Card title="Adicionar pergunta">
-                <fieldset disabled={frozen}>
+                <fieldset disabled={frozen || saving}>
                   <details>
                     <summary>Avançado: reutilizar campo existente</summary>
                     <label>
@@ -864,7 +857,7 @@ export function EditorWorkspace({
             <SettingsEditor
               value={version.settings}
               onChange={(settings) => updateVersion({ settings })}
-              disabled={frozen}
+              disabled={frozen || saving}
               section="tracking"
             />
           </EditorAccordion>

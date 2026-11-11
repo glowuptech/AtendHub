@@ -121,18 +121,69 @@ test("editor conserva opções sem Aplicar e concentra caminhos em Fluxo", async
   await page.getByRole("button", { name: /05 Caminhos/ }).click();
   await expect(page.getByLabel("Destino de Ginecológica")).toHaveValue(a!);
   await expect(page.getByLabel("Destino de Obstétrica")).toHaveValue(b!);
-  await page.getByLabel("Destino de Ginecológica").selectOption(b!);
-  await expect(page.getByText("Alterações salvas", { exact: true })).toBeVisible({ timeout: 10000 });
-  await page.reload();
+  for (const [answer, path] of [
+    ["Ginecológica", "A"],
+    ["Obstétrica", "B"],
+  ]) {
+    const branch = page.getByRole("region", {
+      name: `Resposta ${answer}`,
+      exact: true,
+    });
+    await branch.locator("summary").click();
+    await expect(
+      branch.getByRole("checkbox", {
+        name: `Pergunta exclusiva ${path}`,
+        exact: true,
+      }),
+    ).toBeChecked();
+  }
+  await page.getByRole("button", { name: /06 Perguntas/ }).click();
   await page.getByRole("button", { name: /05 Caminhos/ }).click();
-  await expect(page.getByLabel("Destino de Ginecológica")).toHaveValue(b!);
-  await page.getByLabel("Destino de Ginecológica").selectOption(a!);
+  const branch = page.getByRole("region", {
+    name: "Resposta Ginecológica",
+    exact: true,
+  });
+  await branch.locator("summary").click();
+  await expect(
+    branch.getByRole("checkbox", { name: "Pergunta exclusiva A", exact: true }),
+  ).toBeChecked();
+  let unexpectedSaves = 0;
+  page.on("request", (request) => {
+    if (
+      request.url().includes("/api/forms") &&
+      ["POST", "PUT"].includes(request.method())
+    )
+      unexpectedSaves++;
+  });
+  const membership = branch.getByRole("checkbox", {
+    name: "Pergunta exclusiva A",
+    exact: true,
+  });
+  await membership.uncheck();
+  await membership.check();
+  // Wait past the previous 1.2s debounce: editing must not save automatically.
+  await page.waitForTimeout(1800);
+  expect(unexpectedSaves).toBe(0);
+  await page
+    .getByRole("button", { name: "Salvar rascunho", exact: true })
+    .click();
+  await expect(
+    page.getByText("Alterações salvas", { exact: true }),
+  ).toBeVisible();
   const preview = page.getByRole("complementary");
   await expect(preview.getByRole("img")).toHaveCount(1);
   await preview.getByRole("button", { name: /Continuar/ }).click();
-  await expect(preview.getByRole("alert")).toHaveText("Selecione uma opção para continuar.");
-  await expect(preview.locator(".choice-card").first()).toHaveCSS("color", "rgb(23, 34, 55)");
-  await expect(preview.locator(".choice-card").first()).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(preview.getByRole("alert")).toHaveText(
+    "Selecione uma opção para continuar.",
+  );
+  await expect(preview.locator(".choice-card").first()).toHaveCSS(
+    "color",
+    "rgb(23, 34, 55)",
+  );
+  await expect(preview.locator(".choice-card").first()).toHaveCSS(
+    "background-color",
+    "rgb(255, 255, 255)",
+  );
   await preview.getByRole("radio", { name: /Ginecológica/ }).check();
   await preview.getByRole("button", { name: /Continuar/ }).click();
   await expect(
@@ -266,7 +317,10 @@ test("aparência funciona antes das perguntas e permanece após salvar", async (
   }
   await color("Fundo das opções", "#123456");
   await color("Texto das opções", "#ffffff");
-  await expect(preview.locator(".form-experience")).toHaveCSS("--choice-bg", "#123456");
+  await expect(preview.locator(".form-experience")).toHaveCSS(
+    "--choice-bg",
+    "#123456",
+  );
   await color("Botão", "#e11d48");
   await expect(page.getByLabel("Botão", { exact: true })).toHaveCSS(
     "height",
