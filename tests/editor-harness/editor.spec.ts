@@ -121,6 +121,12 @@ test("editor conserva opções sem Aplicar e concentra caminhos em Fluxo", async
   await page.getByRole("button", { name: /05 Caminhos/ }).click();
   await expect(page.getByLabel("Destino de Ginecológica")).toHaveValue(a!);
   await expect(page.getByLabel("Destino de Obstétrica")).toHaveValue(b!);
+  await page.getByLabel("Destino de Ginecológica").selectOption(b!);
+  await expect(page.getByText("Alterações salvas", { exact: true })).toBeVisible({ timeout: 10000 });
+  await page.reload();
+  await page.getByRole("button", { name: /05 Caminhos/ }).click();
+  await expect(page.getByLabel("Destino de Ginecológica")).toHaveValue(b!);
+  await page.getByLabel("Destino de Ginecológica").selectOption(a!);
   const preview = page.getByRole("complementary");
   await expect(preview.getByRole("img")).toHaveCount(1);
   await preview.getByRole("button", { name: /Continuar/ }).click();

@@ -163,7 +163,7 @@ export function selectRouter(
       ...f,
       options: f.options.map((o) => ({
         ...o,
-        pathId: id && f.id === field?.id ? o.pathId : null,
+        pathId: id ? o.pathId : null,
       })),
     })),
   ];

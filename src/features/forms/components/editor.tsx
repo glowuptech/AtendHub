@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 const subscribe = () => () => {};
 import { z } from "zod";
 import { Plus, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
@@ -177,6 +177,14 @@ export function EditorWorkspace({
       ],
     };
   });
+  const latestDraft = useRef(draft);
+  useEffect(() => {
+    latestDraft.current = draft;
+  }, [draft]);
+  const saveLock = useRef(false);
+  const [flowRevision, setFlowRevision] = useState(0);
+  const autoSavedRevision = useRef(0);
+  const saveLatest = useRef<() => void>(() => {});
   const fields = draft.fields;
   const [section, setSection] = useState("");
   const [activeStep, setActiveStep] = useState("");
@@ -195,7 +203,8 @@ export function EditorWorkspace({
     [previewImageErrorSrc, setPreviewImageErrorSrc] = useState("");
   const version = draft.versions.find((v) => v.id === draft.activeVersionId)!;
   const frozen = version.state === "snapshot";
-  const previewBackgroundImage = settingsOf(version.settings).appearance.backgroundImage;
+  const previewBackgroundImage = settingsOf(version.settings).appearance
+    .backgroundImage;
   const previewImageError = Boolean(
     previewBackgroundImage && previewImageErrorSrc === previewBackgroundImage,
   );
@@ -214,7 +223,9 @@ export function EditorWorkspace({
     });
   }
   async function save(snapshot = false) {
-    if (saving) return;
+    if (saveLock.current) return;
+    saveLock.current = true;
+    const submittedDraft = draft;
     setSaving(true);
     try {
       if (snapshot) validateRouting(version, fields);
@@ -232,7 +243,19 @@ export function EditorWorkspace({
           result.error ?? "Não foi possível salvar o formulário.",
         );
       setPersistedId(result.id);
-      setDraft(result);
+      const unchanged = latestDraft.current === submittedDraft;
+      if (unchanged) setDraft(result);
+      else
+        setDraft((current) => ({
+          ...current,
+          id: result.id,
+          activeVersionId: result.activeVersionId,
+          versions: current.versions.map((v) =>
+            v.id === current.activeVersionId
+              ? { ...v, id: result.activeVersionId, formId: result.id }
+              : v,
+          ),
+        }));
       await mutate(
         `/api/forms?clientId=${encodeURIComponent(clientId)}`,
         (cached: FormDefinition[] | undefined) =>
@@ -241,7 +264,7 @@ export function EditorWorkspace({
             : [result],
         { revalidate: false },
       );
-      setSaved(true);
+      setSaved(unchanged);
       setNotice(
         snapshot
           ? "Formulário publicado. A versão anterior permanece preservada."
@@ -256,9 +279,31 @@ export function EditorWorkspace({
             : "Verifique os campos.",
       );
     } finally {
+      saveLock.current = false;
       setSaving(false);
     }
   }
+  useEffect(() => {
+    saveLatest.current = () => {
+      void save();
+    };
+  });
+  useEffect(() => {
+    // Only an existing unpublished draft can autosave without changing a public link.
+    if (
+      !flowRevision ||
+      autoSavedRevision.current === flowRevision ||
+      saving ||
+      !persistedId ||
+      (source && source.status !== "draft")
+    )
+      return;
+    const timer = setTimeout(() => {
+      autoSavedRevision.current = flowRevision;
+      saveLatest.current();
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [flowRevision, saving, persistedId, source?.status]);
   return (
     <>
       <Heading
@@ -434,6 +479,7 @@ export function EditorWorkspace({
                 version={version}
                 fields={fields}
                 onChange={(next, nextFields) => {
+                  setFlowRevision((value) => value + 1);
                   setSaved(false);
                   setDraft((current) => ({
                     ...current,

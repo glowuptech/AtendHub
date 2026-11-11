@@ -100,3 +100,19 @@ describe("Caminhos criados pelas respostas", () => {
     expect({ version, fields }).toEqual(original);
   });
 });
+
+it("preserva destinos ao mudar o roteador e voltar", () => {
+  const { version, fields, router, field } = setup();
+  const other = version.steps.find((s) => s.id !== router.id)!;
+  const otherField = fields.find(
+    (f) => f.id === other.question.fieldDefinitionId,
+  )!;
+  otherField.type = "single_select";
+  otherField.options = [
+    { ...field.options[0], id: "other-option", pathId: null },
+  ];
+  const expected = structuredClone(field.options);
+  const [next, defs] = selectRouter(version, fields, other.id);
+  const [, restored] = selectRouter(next, defs, router.id);
+  expect(restored.find((f) => f.id === field.id)!.options).toEqual(expected);
+});
