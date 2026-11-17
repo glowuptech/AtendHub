@@ -1,5 +1,6 @@
 "use client";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { mutate as globalMutate } from "swr";
 import {
   ArrowLeft,
   PanelRightOpen,
@@ -10,15 +11,38 @@ import {
   WifiOff,
   Eye,
   ChevronDown,
+  TriangleAlert,
+  RotateCw,
 } from "lucide-react";
-import type { Client, Conversation, Lead } from "@/domain/schemas";
 import { Button } from "@/components/ui/button";
 import { stageLabels } from "@/components/layout/shared";
 import { ContactAvatar } from "./avatar";
-import { contactName, messageDay, messageTime } from "../services/presentation";
+import { markRead, sendMessage, useInboxMessages } from "../hooks";
+import type { InboxConversation, InboxMessage } from "../model";
+import {
+  messageDay,
+  messageTime,
+  statusLabels,
+} from "../services/presentation";
+
+const CONVERSATIONS_KEY = "/api/inbox/conversations";
+
+function bodyOf(message: InboxMessage) {
+  if (message.body) return message.body;
+  const name = message.media.fileName ? ` · ${message.media.fileName}` : "";
+  const labels: Record<string, string> = {
+    image: "Imagem",
+    video: "Vídeo",
+    audio: "Áudio",
+    document: "Documento",
+    sticker: "Figurinha",
+    location: "Localização",
+    contact: "Contato",
+  };
+  return `[${labels[message.type] ?? "Mídia"}${name}]`;
+}
+
 export function ChatPanel({
-  client,
-  lead,
   conversation,
   draft,
   onDraft,
@@ -26,9 +50,7 @@ export function ChatPanel({
   onContext,
   contextOpen,
 }: {
-  client: Client;
-  lead: Lead;
-  conversation: Conversation;
+  conversation: InboxConversation;
   draft: string;
   onDraft: (text: string) => void;
   onBack: () => void;
@@ -36,19 +58,31 @@ export function ChatPanel({
   contextOpen: boolean;
 }) {
   const input = useRef<HTMLTextAreaElement>(null),
-    history = useRef<HTMLDivElement>(null);
+    history = useRef<HTMLDivElement>(null),
+    attempt = useRef<{ id: string; body: string } | null>(null),
+    readMark = useRef("");
   const [emoji, setEmoji] = useState(false),
-    [notice, setNotice] = useState(""),
-    [below, setBelow] = useState(false);
-  const messages = [...conversation.messages].sort((a, b) =>
-    a.at.localeCompare(b.at),
-  );
+    [below, setBelow] = useState(false),
+    [sending, setSending] = useState(false),
+    [error, setError] = useState(""),
+    [retrying, setRetrying] = useState("");
+  const {
+    messages,
+    hasMore,
+    loading,
+    error: loadError,
+    loadOlder,
+    loadingOlder,
+    olderError,
+    refresh,
+  } = useInboxMessages(conversation.id);
   const lastId = messages.at(-1)?.id;
+  const lastStatus = messages.at(-1)?.status;
   const atBottom = useRef(true);
   useLayoutEffect(() => {
     const node = history.current;
     if (node && atBottom.current) node.scrollTop = node.scrollHeight;
-  }, [lastId]);
+  }, [lastId, lastStatus]);
   useLayoutEffect(() => {
     const node = input.current;
     if (node) {
@@ -56,11 +90,63 @@ export function ChatPanel({
       node.style.height = `${Math.min(node.scrollHeight, 128)}px`;
     }
   }, [draft]);
-  const doctor = client.doctors.find((d) => d.id === lead.doctorId);
+  useEffect(() => {
+    const key = `${conversation.id}:${conversation.unreadCount}`;
+    if (!conversation.unreadCount || readMark.current === key) return;
+    readMark.current = key;
+    markRead(conversation.id).then(() => globalMutate(CONVERSATIONS_KEY));
+  }, [conversation.id, conversation.unreadCount]);
+
+  async function dispatch(requestId: string, body: string) {
+    const result = await sendMessage(conversation.id, requestId, body);
+    await Promise.all([refresh(), globalMutate(CONVERSATIONS_KEY)]);
+    return result;
+  }
+
+  async function submit() {
+    const body = draft.trim();
+    if (!body || sending || !conversation.canSend) return;
+    // A network failure keeps the same request id so a retry cannot create a duplicate message.
+    if (attempt.current?.body !== body)
+      attempt.current = { id: crypto.randomUUID(), body };
+    setSending(true);
+    setError("");
+    try {
+      await dispatch(attempt.current.id, body);
+      attempt.current = null;
+      onDraft("");
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Não foi possível enviar.",
+      );
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function retry(message: InboxMessage) {
+    if (!message.requestId || retrying) return;
+    setRetrying(message.id);
+    setError("");
+    try {
+      await dispatch(message.requestId, message.body);
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Não foi possível reenviar.",
+      );
+    } finally {
+      setRetrying("");
+    }
+  }
+
+  const subtitle = [conversation.professionalName, conversation.clientName]
+    .filter(Boolean)
+    .join(" · ");
+  const blocked = !conversation.canSend;
   return (
     <section
       className="inbox-chat thread"
-      aria-label={`Conversa com ${contactName(lead, conversation)}`}
+      aria-label={`Conversa com ${conversation.contactName}`}
     >
       <header className="inbox-chat-header">
         <Button
@@ -72,16 +158,14 @@ export function ChatPanel({
         >
           <ArrowLeft size={20} />
         </Button>
-        <ContactAvatar
-          name={contactName(lead, conversation)}
-          photoUrl={conversation.photoUrl}
-        />
+        <ContactAvatar name={conversation.contactName} />
         <div className="inbox-chat-person">
-          <strong>{contactName(lead, conversation)}</strong>
-          <small>
-            {doctor ? `${doctor.name} · ${client.name}` : client.name}
-          </small>
-          <span>{stageLabels[lead.stage]}</span>
+          <strong>{conversation.contactName}</strong>
+          <small>{subtitle}</small>
+          <span>
+            {stageLabels[conversation.stage as keyof typeof stageLabels] ??
+              conversation.stage}
+          </span>
         </div>
         <Button
           className="inbox-context-toggle"
@@ -95,10 +179,12 @@ export function ChatPanel({
           <span>Informações e IA</span>
         </Button>
       </header>
-      <div className="inbox-connection">
-        <WifiOff size={14} />
-        <span>WhatsApp desconectado · envio indisponível</span>
-      </div>
+      {conversation.sendBlockedReason && (
+        <div className="inbox-connection" role="status">
+          <WifiOff size={14} />
+          <span>{conversation.sendBlockedReason}</span>
+        </div>
+      )}
       <div
         ref={history}
         className="inbox-message-history"
@@ -111,7 +197,37 @@ export function ChatPanel({
           setBelow(!atBottom.current);
         }}
       >
-        {!messages.length && (
+        {hasMore && (
+          <div className="inbox-load-older">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={loadingOlder}
+              onClick={() => {
+                atBottom.current = false;
+                loadOlder();
+              }}
+            >
+              {loadingOlder ? "Carregando…" : "Carregar mensagens anteriores"}
+            </Button>
+            {olderError && <small role="alert">{olderError}</small>}
+          </div>
+        )}
+        {loading && !messages.length && (
+          <div className="inbox-chat-empty" role="status">
+            <p>Carregando mensagens…</p>
+          </div>
+        )}
+        {loadError && !messages.length && (
+          <div className="inbox-chat-empty" role="alert">
+            <h3>Não foi possível carregar as mensagens</h3>
+            <p>{loadError.message}</p>
+            <Button size="sm" variant="outline" onClick={() => refresh()}>
+              Tentar novamente
+            </Button>
+          </div>
+        )}
+        {!loading && !loadError && !messages.length && (
           <div className="inbox-chat-empty">
             <h3>Nenhuma mensagem registrada</h3>
             <p>O histórico deste contato aparecerá aqui.</p>
@@ -119,20 +235,53 @@ export function ChatPanel({
         )}
         {messages.map((m, i) => (
           <div key={m.id}>
-            {(!i || messageDay(messages[i - 1].at) !== messageDay(m.at)) && (
+            {(!i ||
+              messageDay(messages[i - 1].occurredAt) !==
+                messageDay(m.occurredAt)) && (
               <div className="inbox-day-separator">
-                <span>{messageDay(m.at)}</span>
+                <span>{messageDay(m.occurredAt)}</span>
               </div>
             )}
             <article
               className={`inbox-message ${m.direction}`}
-              aria-label={`${m.direction === "inbound" ? "Recebida" : "Enviada"} às ${messageTime(m.at)}`}
+              data-status={m.status}
+              aria-label={`${m.direction === "inbound" ? "Recebida" : "Enviada"} às ${messageTime(m.occurredAt)}`}
             >
-              <p>{m.body}</p>
+              <p>{bodyOf(m)}</p>
               <footer>
-                <time dateTime={m.at}>{messageTime(m.at)}</time>
-                <span>Registro local</span>
+                <time dateTime={m.occurredAt}>{messageTime(m.occurredAt)}</time>
+                {m.direction === "outbound" && (
+                  <span>
+                    {m.origin === "external_device"
+                      ? "Enviada pelo celular"
+                      : statusLabels[m.status]}
+                  </span>
+                )}
               </footer>
+              {(m.status === "failed" || m.status === "uncertain") && (
+                <div className="inbox-message-problem" role="alert">
+                  <TriangleAlert size={14} />
+                  <span>
+                    {m.failureReason ??
+                      (m.status === "failed"
+                        ? "A mensagem não foi enviada."
+                        : "Não foi possível confirmar o envio.")}
+                  </span>
+                  {m.mine && m.requestId && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={retrying === m.id}
+                      onClick={() => retry(m)}
+                    >
+                      <RotateCw size={13} />
+                      {m.status === "failed"
+                        ? "Tentar novamente"
+                        : "Reenviar após conferir"}
+                    </Button>
+                  )}
+                </div>
+              )}
             </article>
           </div>
         ))}
@@ -151,10 +300,16 @@ export function ChatPanel({
           Últimas mensagens
         </Button>
       )}
-      <form className="inbox-composer" onSubmit={(e) => e.preventDefault()}>
+      <form
+        className="inbox-composer"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
         <div className="inbox-composer-field">
           <label className="sr-only" htmlFor={`message-${conversation.id}`}>
-            Mensagem para {contactName(lead, conversation)}
+            Mensagem para {conversation.contactName}
           </label>
           <textarea
             ref={input}
@@ -162,8 +317,24 @@ export function ChatPanel({
             rows={1}
             value={draft}
             maxLength={6000}
+            disabled={blocked}
             onChange={(e) => onDraft(e.target.value)}
-            placeholder="Escreva um rascunho…"
+            onKeyDown={(e) => {
+              if (
+                e.key === "Enter" &&
+                !e.shiftKey &&
+                !e.nativeEvent.isComposing &&
+                e.keyCode !== 229
+              ) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            placeholder={
+              blocked
+                ? (conversation.sendBlockedReason ?? "Envio indisponível")
+                : "Escreva uma mensagem…"
+            }
           />
         </div>
         <div className="inbox-composer-tools">
@@ -173,6 +344,7 @@ export function ChatPanel({
             size="icon"
             aria-label="Escolher emoji"
             aria-expanded={emoji}
+            disabled={blocked}
             onClick={() => setEmoji(!emoji)}
           >
             <Smile size={18} />
@@ -183,7 +355,7 @@ export function ChatPanel({
             size="icon"
             aria-label="Anexos indisponíveis"
             disabled
-            title="Depende da integração WhatsApp"
+            title="Envio de mídia ainda não está disponível"
           >
             <Paperclip size={18} />
           </Button>
@@ -193,21 +365,25 @@ export function ChatPanel({
             size="icon"
             aria-label="Áudio indisponível"
             disabled
-            title="Depende da integração WhatsApp"
+            title="Envio de áudio ainda não está disponível"
           >
             <Mic size={18} />
           </Button>
-          <small>Rascunho nesta sessão</small>
+          <small>{blocked ? "Somente leitura" : "Texto · Enter envia"}</small>
           <Button
-            type="button"
+            type="submit"
             size="icon"
             aria-label="Enviar mensagem"
-            disabled
-            title="Conecte o WhatsApp para enviar"
+            disabled={blocked || sending || !draft.trim()}
           >
             <Send size={18} />
           </Button>
         </div>
+        {error && (
+          <p className="inbox-send-error" role="alert">
+            {error}
+          </p>
+        )}
         {emoji && (
           <div className="inbox-emojis" aria-label="Emojis">
             {[
@@ -238,21 +414,13 @@ export function ChatPanel({
         <details className="inbox-local-preview">
           <summary>
             <Eye size={13} />
-            Prévia local
+            Sobre o envio
           </summary>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() =>
-              setNotice(
-                "Exemplo de resposta administrativa exibido. Nenhuma mensagem foi enviada.",
-              )
-            }
-          >
-            Demonstrar resposta
-          </Button>
-          {notice && <p role="status">{notice}</p>}
+          <p>
+            A mensagem só aparece como enviada depois que o n8n confirma o ID
+            do WhatsApp. Se a confirmação não chegar, ela fica como “não
+            confirmada” para você conferir no WhatsApp.
+          </p>
         </details>
       </form>
     </section>

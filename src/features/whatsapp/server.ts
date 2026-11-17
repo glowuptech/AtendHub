@@ -70,7 +70,7 @@ function isCompatibleStatus(eventType: EventType, status: EventStatus) {
   }
 }
 
-function destinationUrl(value: unknown) {
+export function destinationUrl(value: unknown) {
   if (typeof value !== "string" || !value.trim()) return null;
   try {
     const url = new URL(value);

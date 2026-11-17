@@ -1,15 +1,12 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, SlidersHorizontal, MessagesSquare } from "lucide-react";
-import { useDemo } from "@/components/layout/demo-context";
 import { Button } from "@/components/ui/button";
 import { Badge, stageLabels } from "@/components/layout/shared";
-import { LeadModal } from "@/features/queue/lead-modal";
-import { assignedConversations } from "../services/assigned";
+import { useInboxConversations } from "../hooks";
 import {
-  contactName,
-  lastMessage,
+  matchesQuick,
   matchesSearch,
   messageTime,
   waitingFor,
@@ -21,32 +18,21 @@ import { ContextPanel } from "./context-panel";
 import { ContextDrawer } from "./context-drawer";
 
 export function Inbox() {
-  const {
-    repositories,
-    scope,
-    attendant,
-    inboxLeadId,
-    setClientId,
-    inboxDrafts: drafts,
-    setInboxDrafts: setDrafts,
-  } = useDemo();
   const router = useRouter(),
     root = useRef<HTMLDivElement>(null);
+  const { data, error, isLoading, mutate } = useInboxConversations();
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState(""),
     [query, setQuery] = useState(""),
     [quick, setQuick] = useState<QuickFilter>("all");
-  const [filter, setFilter] = useState("all"),
+  const [client, setClient] = useState("all"),
     [operation, setOperation] = useState("all"),
-    [doctor, setDoctor] = useState("all"),
+    [connection, setConnection] = useState("all"),
     [stage, setStage] = useState("all");
-  const [mobileChat, setMobileChat] = useState(Boolean(inboxLeadId)),
+  const [mobileChat, setMobileChat] = useState(false),
     [wide, setWide] = useState(false),
     [showContext, setShowContext] = useState(true),
     [drawer, setDrawer] = useState(false);
-  const [openedLead, setOpenedLead] = useState<{
-    id: string;
-    clientId: string;
-  } | null>(null);
   useEffect(() => {
     const node = root.current;
     if (!node) return;
@@ -72,77 +58,63 @@ export function Inbox() {
       window.visualViewport?.removeEventListener("scroll", measure);
     };
   }, []);
-  const clients = repositories.clients.list(scope);
-  const all = assignedConversations(repositories, scope, attendant);
-  const conversations = all
-    .filter((c) => {
-      const professional = c.client.doctors.find(
-        (d) => d.id === c.lead.doctorId,
-      );
-      return (
-        (filter === "all" || c.clientId === filter) &&
-        (operation === "all" || c.client.vertical === operation) &&
-        (doctor === "all" ||
-          (doctor === "none"
-            ? !c.lead.doctorId
-            : `${c.clientId}:${c.lead.doctorId}` === doctor)) &&
-        (stage === "all" || c.lead.stage === stage) &&
-        (quick === "all" || waitingFor(c) === quick) &&
-        matchesSearch(query, [
-          contactName(c.lead, c),
-          c.lead.contact?.phone,
-          c.client.name,
-          professional?.name,
-          lastMessage(c)?.body,
-        ])
-      );
-    })
-    .sort((a, b) =>
-      (lastMessage(b)?.at ?? b.lead.createdAt).localeCompare(
-        lastMessage(a)?.at ?? a.lead.createdAt,
-      ),
-    );
+  const all = useMemo(() => data ?? [], [data]);
+  const options = useMemo(
+    () => ({
+      clients: [...new Map(all.map((c) => [c.clientId, c.clientName]))],
+      operations: [
+        ...new Map(
+          all.map((c) => [c.operationCode, c.operationName || c.operationCode]),
+        ),
+      ].filter(([code]) => code),
+      connections: [
+        ...new Map(
+          all.map((c) => [
+            c.connection.id,
+            `${c.connection.name} · +${c.connection.phone}`,
+          ]),
+        ),
+      ],
+    }),
+    [all],
+  );
+  const conversations = all.filter(
+    (c) =>
+      (client === "all" || c.clientId === client) &&
+      (operation === "all" || c.operationCode === operation) &&
+      (connection === "all" || c.connection.id === connection) &&
+      (stage === "all" || c.stage === stage) &&
+      matchesQuick(c, quick) &&
+      matchesSearch(query, [
+        c.contactName,
+        c.phone,
+        c.clientName,
+        c.professionalName,
+        c.lastMessagePreview,
+      ]),
+  );
   const conversation =
-    conversations.find((c) => c.id === selected) ??
-    conversations.find((c) => c.leadId === inboxLeadId) ??
-    conversations[0];
-  const activeFilters = [filter, operation, doctor, stage].filter(
+    conversations.find((c) => c.id === selected) ?? conversations[0];
+  const activeFilters = [client, operation, connection, stage].filter(
     (v) => v !== "all",
   ).length;
   function clearFilters() {
     setQuery("");
     setQuick("all");
-    setFilter("all");
+    setClient("all");
     setOperation("all");
-    setDoctor("all");
+    setConnection("all");
     setStage("all");
-  }
-  function editLead() {
-    if (!conversation) return;
-    setClientId(conversation.clientId);
-    router.push(`/app/leads/${conversation.leadId}`);
   }
   const context = conversation ? (
     <ContextPanel
       key={conversation.id}
-      client={conversation.client}
-      lead={conversation.lead}
       conversation={conversation}
-      appointments={repositories.appointments
-        .list(conversation.clientId)
-        .filter((a) => a.leadId === conversation.leadId)
-        .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))}
       onClose={() => {
         if (wide) setShowContext(false);
         else setDrawer(false);
       }}
-      onOpenLead={() =>
-        setOpenedLead({
-          id: conversation.leadId,
-          clientId: conversation.clientId,
-        })
-      }
-      onEdit={editLead}
+      onOpenLead={() => router.push(`/app/leads/${conversation.leadId}`)}
       onInsert={(text) =>
         setDrafts((previous) => ({
           ...previous,
@@ -180,7 +152,8 @@ export function Inbox() {
               {(
                 [
                   ["all", "Todas"],
-                  ["reply", "Aguardando minha resposta"],
+                  ["unread", "Não lidas"],
+                  ["reply", "Aguardando resposta"],
                   ["customer", "Aguardando cliente"],
                 ] as const
               ).map(([value, label]) => (
@@ -192,18 +165,6 @@ export function Inbox() {
                   {label}
                 </button>
               ))}
-              <button
-                disabled
-                title="A integração ainda não informa leitura de mensagens"
-              >
-                Não lidas
-              </button>
-              <button
-                disabled
-                title="Ainda não há estado de encerramento de conversa"
-              >
-                Finalizadas
-              </button>
             </div>
             <details className="inbox-filters">
               <summary>
@@ -213,18 +174,15 @@ export function Inbox() {
               </summary>
               <div>
                 <label>
-                  Filtrar cliente
+                  Cliente
                   <select
-                    value={filter}
-                    onChange={(e) => {
-                      setFilter(e.target.value);
-                      setDoctor("all");
-                    }}
+                    value={client}
+                    onChange={(e) => setClient(e.target.value)}
                   >
                     <option value="all">Todos os clientes</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
+                    {options.clients.map(([id, name]) => (
+                      <option key={id} value={id}>
+                        {name}
                       </option>
                     ))}
                   </select>
@@ -233,40 +191,28 @@ export function Inbox() {
                   Operação
                   <select
                     value={operation}
-                    onChange={(e) => {
-                      setOperation(e.target.value);
-                      setDoctor("all");
-                    }}
+                    onChange={(e) => setOperation(e.target.value)}
                   >
                     <option value="all">Todas as operações</option>
-                    <option value="healthcare">Prescrita</option>
-                    <option value="legal">Veredite</option>
+                    {options.operations.map(([code, name]) => (
+                      <option key={code} value={code}>
+                        {name}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label>
-                  Profissional
+                  Conexão WhatsApp
                   <select
-                    value={doctor}
-                    onChange={(e) => setDoctor(e.target.value)}
+                    value={connection}
+                    onChange={(e) => setConnection(e.target.value)}
                   >
-                    <option value="all">Todos os profissionais</option>
-                    <option value="none">Sem profissional vinculado</option>
-                    {clients
-                      .filter(
-                        (c) =>
-                          (filter === "all" || c.id === filter) &&
-                          (operation === "all" || c.vertical === operation),
-                      )
-                      .flatMap((c) =>
-                        c.doctors.map((d) => (
-                          <option
-                            key={`${c.id}:${d.id}`}
-                            value={`${c.id}:${d.id}`}
-                          >
-                            {d.name} · {c.name}
-                          </option>
-                        )),
-                      )}
+                    <option value="all">Todas as conexões</option>
+                    {options.connections.map(([id, name]) => (
+                      <option key={id} value={id}>
+                        {name}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label>
@@ -283,15 +229,9 @@ export function Inbox() {
                     ))}
                   </select>
                 </label>
-                <label>
-                  Atendente responsável
-                  <select value={attendant} disabled>
-                    <option>{attendant}</option>
-                  </select>
-                </label>
                 <small>
-                  Este Inbox exibe somente os seus atendimentos. Leitura e
-                  encerramento dependem da integração.
+                  Você vê as conversas dos clientes aos quais tem acesso.
+                  Somente o responsável pelo lead pode responder.
                 </small>
                 <Button variant="ghost" size="sm" onClick={clearFilters}>
                   Limpar filtros
@@ -304,68 +244,84 @@ export function Inbox() {
             tabIndex={0}
             aria-label="Lista de conversas"
           >
-            {conversations.map((c) => {
-              const last = lastMessage(c),
-                professional = c.client.doctors.find(
-                  (d) => d.id === c.lead.doctorId,
-                );
-              return (
-                <button
-                  className="inbox-conversation"
-                  key={c.id}
-                  aria-pressed={c.id === conversation?.id}
-                  onClick={() => {
-                    setSelected(c.id);
-                    setMobileChat(true);
-                  }}
-                >
-                  <ContactAvatar
-                    name={contactName(c.lead, c)}
-                    photoUrl={c.photoUrl}
-                  />
-                  <span className="inbox-conversation-content">
-                    <span className="inbox-conversation-name">
-                      <strong>{contactName(c.lead, c)}</strong>
-                      {last && (
-                        <time dateTime={last.at}>{messageTime(last.at)}</time>
-                      )}
-                    </span>
-                    <span className="inbox-professional">
-                      {professional?.name || "Sem profissional vinculado"}
-                    </span>
-                    <span
-                      className="inbox-operation"
-                      data-operation={c.client.vertical}
-                    >
-                      {c.client.name} ·{" "}
-                      {c.client.vertical === "healthcare"
-                        ? "Prescrita"
-                        : "Veredite"}
-                    </span>
-                    <span className="inbox-message-preview">
-                      {last?.body || "Nenhuma mensagem registrada"}
-                    </span>
-                    {waitingFor(c) === "reply" && (
-                      <span className="inbox-reply-status">
-                        Aguardando sua resposta
-                      </span>
+            {conversations.map((c) => (
+              <button
+                className="inbox-conversation"
+                key={c.id}
+                aria-pressed={c.id === conversation?.id}
+                onClick={() => {
+                  setSelected(c.id);
+                  setMobileChat(true);
+                }}
+              >
+                <ContactAvatar name={c.contactName} />
+                <span className="inbox-conversation-content">
+                  <span className="inbox-conversation-name">
+                    <strong>{c.contactName}</strong>
+                    {c.lastMessageAt && (
+                      <time dateTime={c.lastMessageAt}>
+                        {messageTime(c.lastMessageAt)}
+                      </time>
                     )}
                   </span>
-                </button>
-              );
-            })}
-            {!conversations.length && (
+                  <span className="inbox-professional">
+                    {c.professionalName || "Sem profissional vinculado"}
+                  </span>
+                  <span
+                    className="inbox-operation"
+                    data-operation={c.operationCode}
+                  >
+                    {c.clientName}
+                    {c.operationName ? ` · ${c.operationName}` : ""}
+                  </span>
+                  <span className="inbox-message-preview">
+                    {c.lastMessagePreview || "Nenhuma mensagem registrada"}
+                  </span>
+                  <span className="inbox-conversation-meta">
+                    {c.unreadCount > 0 && (
+                      <span className="inbox-unread">
+                        {c.unreadCount}
+                        <span className="sr-only"> não lidas</span>
+                      </span>
+                    )}
+                    {waitingFor(c) === "reply" && (
+                      <span className="inbox-reply-status">
+                        Aguardando resposta
+                      </span>
+                    )}
+                    {!c.mine && (
+                      <span className="inbox-readonly-tag">Somente leitura</span>
+                    )}
+                  </span>
+                </span>
+              </button>
+            ))}
+            {isLoading && (
+              <div className="inbox-list-empty" role="status">
+                <p>Carregando conversas…</p>
+              </div>
+            )}
+            {error && !isLoading && (
+              <div className="inbox-list-empty" role="alert">
+                <h3>Não foi possível carregar as conversas</h3>
+                <p>{error.message}</p>
+                <Button size="sm" variant="outline" onClick={() => mutate()}>
+                  Tentar novamente
+                </Button>
+              </div>
+            )}
+            {!isLoading && !error && !conversations.length && (
               <div className="inbox-list-empty">
                 <MessagesSquare size={26} />
                 <h3>
                   {all.length
                     ? "Nenhuma conversa encontrada"
-                    : "Nenhum atendimento atribuído"}
+                    : "Nenhuma conversa ainda"}
                 </h3>
                 <p>
                   {all.length
                     ? "Ajuste os filtros para encontrar o contato."
-                    : "Assuma um lead na fila de atendimento."}
+                    : "As conversas aparecem quando um contato envia mensagem a uma conexão WhatsApp conectada."}
                 </p>
                 {all.length > 0 && (
                   <Button size="sm" variant="outline" onClick={clearFilters}>
@@ -379,8 +335,6 @@ export function Inbox() {
         {conversation ? (
           <ChatPanel
             key={conversation.id}
-            client={conversation.client}
-            lead={conversation.lead}
             conversation={conversation}
             draft={drafts[conversation.id] ?? ""}
             onDraft={(text) =>
@@ -419,18 +373,6 @@ export function Inbox() {
         <ContextDrawer onClose={() => setDrawer(false)}>
           {context}
         </ContextDrawer>
-      )}
-      {openedLead && (
-        <LeadModal
-          clientId={openedLead.clientId}
-          id={openedLead.id}
-          onClose={() => setOpenedLead(null)}
-          onConverse={() => {
-            setOpenedLead(null);
-            setDrawer(false);
-            setMobileChat(true);
-          }}
-        />
       )}
     </div>
   );

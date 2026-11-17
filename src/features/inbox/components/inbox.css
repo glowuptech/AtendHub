@@ -833,3 +833,61 @@
     }
   }
 }
+
+.inbox-unread {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--brand);
+  color: white;
+}
+.inbox-conversation-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.inbox-conversation-meta .inbox-reply-status {
+  margin-top: 0;
+}
+.inbox-readonly-tag {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+.inbox-load-older {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0 14px;
+}
+.inbox-message[data-status="pending"] {
+  opacity: 0.75;
+}
+.inbox-message[data-status="failed"] {
+  border-color: var(--danger, #c0392b);
+}
+.inbox-message[data-status="uncertain"] {
+  border-color: var(--warning);
+}
+.inbox-message-problem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.inbox-send-error {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--danger, #c0392b);
+}

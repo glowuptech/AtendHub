@@ -21,7 +21,7 @@ export function AssistantPanel({
   onInsert,
   service = unavailableAssistant,
 }: {
-  client: Client;
+  client: Pick<Client, "name" | "knowledge">;
   conversationId: string;
   onInsert: (text: string) => void;
   service?: AssistantService;

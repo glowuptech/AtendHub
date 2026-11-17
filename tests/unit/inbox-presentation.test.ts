@@ -1,43 +1,76 @@
 import { test, expect } from "vitest";
-import { conversations, leads } from "@/lib/mocks/fixtures";
 import {
-  contactName,
-  lastMessage,
+  matchesQuick,
   matchesSearch,
   waitingFor,
 } from "@/features/inbox/services/presentation";
 import { unavailableAssistant } from "@/features/inbox/services/assistant";
+import { interpretSendResponse } from "@/features/inbox/model";
+import type { InboxConversation } from "@/features/inbox/model";
+
+const base = {
+  lastInboundAt: null,
+  lastOutboundAt: null,
+  unreadCount: 0,
+} as unknown as InboxConversation;
+
 test("espera depende da direção cronológica, não do estágio do lead", () => {
-  const c = structuredClone(conversations[0]);
-  c.messages = [
-    { ...c.messages[0], at: "2026-11-04T12:01:00.000Z" },
-    { ...c.messages[1], at: "2026-11-04T12:00:00.000Z" },
-  ];
-  expect(waitingFor(c)).toBe("reply");
-  expect(lastMessage(c)?.direction).toBe("inbound");
-  c.messages = [];
-  expect(waitingFor(c)).toBe("all");
+  expect(
+    waitingFor({
+      lastInboundAt: "2026-11-04T12:01:00.000Z",
+      lastOutboundAt: "2026-11-04T12:00:00.000Z",
+    }),
+  ).toBe("reply");
+  expect(
+    waitingFor({
+      lastInboundAt: "2026-11-04T12:00:00.000Z",
+      lastOutboundAt: "2026-11-04T12:01:00.000Z",
+    }),
+  ).toBe("customer");
+  expect(waitingFor({ lastInboundAt: null, lastOutboundAt: null })).toBe("none");
 });
+
+test("filtros rápidos usam não lidas e direção da última mensagem", () => {
+  expect(matchesQuick({ ...base, unreadCount: 2 }, "unread")).toBe(true);
+  expect(matchesQuick(base, "unread")).toBe(false);
+  expect(
+    matchesQuick({ ...base, lastInboundAt: "2026-11-04T12:00:00.000Z" }, "reply"),
+  ).toBe(true);
+  expect(matchesQuick(base, "all")).toBe(true);
+});
+
 test("busca aceita acentos e telefone formatado sem agrupar identidades", () => {
   expect(matchesSearch("clinica", ["Clínica Horizonte"])).toBe(true);
   expect(matchesSearch("11999998888", ["(11) 99999-8888"])).toBe(true);
   expect(matchesSearch("Ana", ["Outro cliente"])).toBe(false);
   expect(matchesSearch("-", ["Clínica"])).toBe(false);
-  const lead = {
-    ...leads[0],
-    name: "",
-    contact: { name: "", phone: "11999998888", email: "" },
-  };
-  expect(contactName(lead, { ...conversations[0], name: "" })).toBe(
-    "11999998888",
-  );
 });
+
 test("IA desconectada não produz respostas", async () => {
   expect(unavailableAssistant.available).toBe(false);
   await expect(
     unavailableAssistant.ask(
-      { conversationId: conversations[0].id, question: "Valor?" },
+      { conversationId: "c1", question: "Valor?" },
       new AbortController().signal,
     ),
   ).rejects.toThrow("não conectado");
+});
+
+test("envio só é confirmado com ok=true e messageId do provedor", () => {
+  expect(
+    interpretSendResponse(true, '[{"Final":{"ok":true,"messageId":"3EB0","status":"sent"}}]'),
+  ).toEqual({ outcome: "sent", providerMessageId: "3EB0" });
+  expect(interpretSendResponse(true, '{"ok":true}').outcome).toBe("uncertain");
+  expect(interpretSendResponse(true, "ok").outcome).toBe("uncertain");
+  expect(interpretSendResponse(true, "").outcome).toBe("uncertain");
+  expect(
+    interpretSendResponse(false, '{"ok":true,"messageId":"x"}').outcome,
+  ).toBe("uncertain");
+  expect(
+    interpretSendResponse(true, '{"ok":true,"messageId":"x","status":"queued"}')
+      .outcome,
+  ).toBe("uncertain");
+  expect(
+    interpretSendResponse(false, '{"ok":false,"message":"Sem sessão"}'),
+  ).toEqual({ outcome: "failed", reason: "Sem sessão" });
 });

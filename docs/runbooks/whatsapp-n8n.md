@@ -155,3 +155,22 @@ O servidor aceita também a resposta Evolution/n8n abaixo, diretamente ou encaps
 - Somente a confirmação efetiva devolvendo `connected` conclui o pareamento. A imagem é ocultada quando a conexão está conectada ou excluída.
 - Campos desconhecidos da resposta não são repassados ao navegador. A `apikey`, se retornada, é persistida em tabela privada e nunca incluída no resultado HTTP da aplicação.
 - A resposta de produção fornecida pelo usuário foi analisada localmente (sem chamada ao n8n) e aceita: JSON em Final, success, connecting e imagem PNG em Data URL. Nenhum conteúdo dessa credencial ou QR foi incorporado aos fixtures do repositório.
+
+## Inbox: envio de mensagens de texto
+
+O Inbox lê conversas e mensagens de `atendhub_inbox_conversations` / `atendhub_inbox_messages` (RLS por organização, cliente e responsável do lead). Mensagens recebidas entram pelo webhook de ingestão (`atendhub_ingest_whatsapp_message`); recibos (`delivered`/`read`) por `atendhub_inbox_record_message_status`.
+
+**Envio.** Somente o responsável pelo lead, com a conexão `connected`, pode enviar. O app grava a mensagem como `pending` e um evento em `atendhub_inbox_send_events` (sem `apiKey`) e chama a URL salva em Configurações → Webhooks → "Envio de mensagens do Inbox" com `Idempotency-Key = id do evento`. A `apiKey` da Evolution é lida no servidor apenas nesse momento e nunca é gravada no histórico.
+
+Resposta esperada do workflow (Respond to Webhook):
+
+```json
+{ "ok": true, "messageId": "<id retornado pela Evolution>", "status": "sent" }
+```
+
+- `ok:true` com `messageId` -> `sent`. Qualquer outro formato, HTTP não-2xx com `ok:true`, resposta vazia ou timeout (30 s) -> `uncertain` ("não confirmada"): o usuário confere no WhatsApp e pode reenviar com a mesma solicitação.
+- `ok:false` + `message` -> `failed`; "Tentar novamente" reutiliza o mesmo `requestId`.
+- O workflow deve deduplicar por `Idempotency-Key`/`message.id`, pois o reenvio de uma mensagem `uncertain` repete a chamada.
+- Se a Evolution devolver o eco `fromMe` com o mesmo `messageId`, a mensagem é reconciliada em vez de duplicada.
+
+Fora do escopo desta etapa: mídia, áudio, reações, grupos, IA, templates e Realtime (o app faz polling a cada 3–5 s).
