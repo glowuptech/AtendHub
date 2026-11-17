@@ -90,6 +90,7 @@ beforeAll(async () => {
     "20261117065145_atendhub_whatsapp_sync_response",
     "20261117080000_atendhub_whatsapp_private_credentials",
     "20261118000000_atendhub_inbox",
+    "20261118010000_atendhub_start_inbox_conversation",
   ])
     await db.exec(await readFile(`supabase/migrations/${f}.sql`, "utf8"));
   await db.exec(`
@@ -354,4 +355,34 @@ describe("envio pelo Inbox, reconciliação e RLS", () => {
       [ORG, CLIENT_A, CONN_A, conversationId],
     )).rejects.toThrow();
   });
+});
+
+
+describe("conversa proativa sem mensagem recebida",()=>{
+ const lead=id(5000);
+ it("abre uma conversa vazia idempotente, sem mensagem, envio ou mudança do lead",async()=>{
+  await admin();
+  await db.query("insert into atendhub_leads(id,organization_id,client_id,name,phone,owner_id,stage) values($1,$2,$3,'Adriana','16999990000',$4,'in_progress')",[lead,ORG,CLIENT_A,USER_OWNER]);
+  await as(USER_OWNER);
+  const start=()=>db.query<{id:string}>("select atendhub_inbox_start_conversation($1,$2) as id",[lead,CONN_A]);
+  const first=(await start()).rows[0].id;
+  expect((await start()).rows[0].id).toBe(first);
+  await admin();
+  expect(await count(`atendhub_inbox_messages where conversation_id='${first}'`)).toBe(0);
+  expect(await count(`atendhub_inbox_send_events where message_id in (select id from atendhub_inbox_messages where conversation_id='${first}')`)).toBe(0);
+  expect((await db.query<Json>("select phone,last_message_at from atendhub_inbox_conversations where id=$1",[first])).rows[0]).toEqual({phone:"5516999990000",last_message_at:null});
+ });
+ it("recusa outro responsável e uma conexão de outro cliente",async()=>{
+  await as(USER_OTHER);
+  await expect(db.query("select atendhub_inbox_start_conversation($1,$2)",[lead,CONN_A])).rejects.toThrow("INBOX_START_FORBIDDEN");
+  await as(USER_OWNER);
+  await expect(db.query("select atendhub_inbox_start_conversation($1,$2)",[lead,CONN_B])).rejects.toThrow("CONNECTION_NOT_FOUND");
+ });
+ it("não reatribui conversa de outro lead com o mesmo número",async()=>{
+  await admin();
+  const duplicate=id(5001);
+  await db.query("insert into atendhub_leads(id,organization_id,client_id,name,phone,owner_id) values($1,$2,$3,'Outra pessoa','16999990000',$4)",[duplicate,ORG,CLIENT_A,USER_OWNER]);
+  await as(USER_OWNER);
+  await expect(db.query("select atendhub_inbox_start_conversation($1,$2)",[duplicate,CONN_A])).rejects.toThrow("CONVERSATION_LEAD_CONFLICT");
+ });
 });

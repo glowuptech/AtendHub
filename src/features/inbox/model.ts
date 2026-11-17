@@ -29,6 +29,7 @@ export type InboxConversation = {
   stage: string;
   source: string;
   ownerId: string | null;
+  ownerName?: string | null;
   mine: boolean;
   professionalName: string | null;
   status: "open" | "closed";
@@ -86,7 +87,11 @@ function unwrap(input: unknown) {
     if (Array.isArray(value)) {
       if (value.length !== 1) throw new Error("multiple");
       value = value[0];
-    } else if (typeof value === "object" && value !== null && "Final" in value) {
+    } else if (
+      typeof value === "object" &&
+      value !== null &&
+      "Final" in value
+    ) {
       value = (value as { Final: unknown }).Final;
     } else if (typeof value === "string") {
       value = JSON.parse(value);
@@ -124,7 +129,11 @@ export function interpretSendResponse(
       outcome: "failed",
       reason: parsed.message ?? "O n8n informou falha no envio.",
     };
-  if (!httpOk || !parsed.messageId || (parsed.status && parsed.status !== "sent"))
+  if (
+    !httpOk ||
+    !parsed.messageId ||
+    (parsed.status && parsed.status !== "sent")
+  )
     return {
       outcome: "uncertain",
       reason:

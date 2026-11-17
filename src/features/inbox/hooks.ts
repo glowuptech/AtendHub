@@ -3,6 +3,14 @@ import { useCallback, useState } from "react";
 import useSWR from "swr";
 import type { InboxConversation, InboxMessage, MessageStatus } from "./model";
 
+export function useAssignedInboxLeads() {
+  return useSWR<import("./assigned-model").AssignedInboxLead[]>(
+    "/api/inbox/assigned-leads",
+    fetcher,
+    { refreshInterval: 5000, revalidateOnFocus: true },
+  );
+}
+
 type MessagePage = { messages: InboxMessage[]; hasMore: boolean };
 
 async function fetcher<T>(url: string): Promise<T> {
@@ -23,7 +31,9 @@ export function useInboxConversations() {
 
 export function useInboxMessages(conversationId: string | null) {
   const latest = useSWR<MessagePage>(
-    conversationId ? `/api/inbox/conversations/${conversationId}/messages` : null,
+    conversationId
+      ? `/api/inbox/conversations/${conversationId}/messages`
+      : null,
     fetcher,
     { refreshInterval: 3000, revalidateOnFocus: true },
   );
@@ -61,7 +71,9 @@ export function useInboxMessages(conversationId: string | null) {
   );
   return {
     messages,
-    hasMore: older.length ? (olderHasMore ?? false) : (latest.data?.hasMore ?? false),
+    hasMore: older.length
+      ? (olderHasMore ?? false)
+      : (latest.data?.hasMore ?? false),
     loading: latest.isLoading,
     error: latest.error as Error | undefined,
     loadOlder,

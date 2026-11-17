@@ -15,7 +15,7 @@ test("assumir independe do calendário e atualiza responsável", async ({
   await expect(
     page.getByText("Atendimento de Lead de teste assumido e salvo."),
   ).toBeVisible();
-  await expect(page.getByText("Responsável:")).toBeVisible();
+  await expect(page.getByText("Ana Atendente", { exact: true })).toBeVisible();
   await expect(button).toHaveCount(0);
 });
 test("permissão negada é informada e permite nova tentativa", async ({

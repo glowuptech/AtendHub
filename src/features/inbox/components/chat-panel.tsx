@@ -417,8 +417,8 @@ export function ChatPanel({
             Sobre o envio
           </summary>
           <p>
-            A mensagem só aparece como enviada depois que o n8n confirma o ID
-            do WhatsApp. Se a confirmação não chegar, ela fica como “não
+            A mensagem só aparece como enviada depois que o n8n confirma o ID do
+            WhatsApp. Se a confirmação não chegar, ela fica como “não
             confirmada” para você conferir no WhatsApp.
           </p>
         </details>

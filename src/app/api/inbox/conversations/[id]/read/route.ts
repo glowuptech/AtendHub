@@ -9,7 +9,10 @@ export async function POST(
 ) {
   const auth = await sessionOrganizationContext();
   if ("error" in auth) return auth.error;
-  const id = z.string().uuid().safeParse((await params).id);
+  const id = z
+    .string()
+    .uuid()
+    .safeParse((await params).id);
   if (!id.success)
     return NextResponse.json({ error: "Conversa inválida." }, { status: 400 });
   try {
@@ -18,7 +21,9 @@ export async function POST(
   } catch (error) {
     const known = error instanceof InboxError;
     return NextResponse.json(
-      { error: known ? error.message : "Não foi possível atualizar a leitura." },
+      {
+        error: known ? error.message : "Não foi possível atualizar a leitura.",
+      },
       { status: known ? error.status : 500 },
     );
   }
