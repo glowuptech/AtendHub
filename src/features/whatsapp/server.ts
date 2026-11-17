@@ -87,11 +87,13 @@ async function applyResponse(
   eventId: string,
   deliveryStatus: "delivered" | "retry",
   status: EventStatus | null,
+  privateCredential: string | null = null,
 ) {
   const { data, error } = await admin.rpc("atendhub_whatsapp_apply_response", {
     p_event_id: eventId,
     p_delivery_status: deliveryStatus,
     p_result_status: status,
+    p_api_key: privateCredential,
   });
   if (error || !data) throw new Error("WHATSAPP_RESULT_NOT_PERSISTED");
   return data as {
@@ -100,6 +102,31 @@ async function applyResponse(
     stale: boolean;
     status: EventStatus | null;
   };
+}
+
+type ConnectionPayload = Record<string, unknown> & {
+  connection?: Record<string, unknown>;
+};
+
+/** Enriches an outbound connection payload without persisting the credential in event history. */
+export async function enrichConnectionPayload(
+  admin: ReturnType<typeof integrationAdmin>,
+  organizationId: string,
+  connectionId: string,
+  payload: ConnectionPayload,
+): Promise<ConnectionPayload> {
+  const { data, error } = await admin
+    .from("atendhub_whatsapp_connection_credentials")
+    .select("api_key")
+    .eq("connection_id", connectionId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (error) throw new Error("WHATSAPP_CREDENTIAL_LOOKUP_FAILED");
+
+  const connection = { ...(payload.connection ?? {}) };
+  delete connection.apiKey;
+  if (typeof data?.api_key === "string") connection.apiKey = data.api_key;
+  return { ...payload, connection };
 }
 
 export async function dispatchConnectionEvent(
@@ -182,6 +209,21 @@ export async function dispatchConnectionEvent(
     );
   }
 
+  let outboundPayload: ConnectionPayload;
+  try {
+    outboundPayload = await enrichConnectionPayload(
+      admin,
+      auth.organizationId,
+      event.connection_id,
+      event.payload as ConnectionPayload,
+    );
+  } catch {
+    return fail(
+      "Não foi possível preparar com segurança o evento. Ele permanece salvo para reenvio.",
+      500,
+    );
+  }
+
   let response: Response;
   let bodyText: string;
   try {
@@ -192,7 +234,7 @@ export async function dispatchConnectionEvent(
         "Content-Type": "application/json",
         "Idempotency-Key": event.id,
       },
-      body: JSON.stringify(event.payload),
+      body: JSON.stringify(outboundPayload),
       signal: AbortSignal.timeout(RESPONSE_TIMEOUT_MS),
     });
     bodyText = await response.text();
@@ -225,7 +267,10 @@ export async function dispatchConnectionEvent(
     );
   }
   let parsed:
-    | { success: true; data: ReturnType<typeof parseWhatsappResponse> }
+    | {
+        success: true;
+        data: ReturnType<typeof parseWhatsappResponse>;
+      }
     | { success: false };
   try {
     parsed = { success: true, data: parseWhatsappResponse(rawResponse) };
@@ -235,8 +280,8 @@ export async function dispatchConnectionEvent(
 
   if (!response.ok) {
     const message =
-      parsed.success && !parsed.data.ok
-        ? parsed.data.message
+      parsed.success && !parsed.data.publicResult.ok
+        ? parsed.data.publicResult.message
         : `O webhook respondeu com HTTP ${response.status}. O evento continua salvo para reenvio.`;
     return fail(message ?? "O n8n recusou a ação.", 502);
   }
@@ -247,11 +292,14 @@ export async function dispatchConnectionEvent(
       502,
     );
   }
-  if (!parsed.data.ok)
-    return fail(parsed.data.message ?? "O n8n recusou a ação.", 502);
+  if (!parsed.data.publicResult.ok)
+    return fail(
+      parsed.data.publicResult.message ?? "O n8n recusou a ação.",
+      502,
+    );
   if (
-    parsed.data.status &&
-    !isCompatibleStatus(eventType, parsed.data.status)
+    parsed.data.publicResult.status &&
+    !isCompatibleStatus(eventType, parsed.data.publicResult.status)
   ) {
     return fail(
       "O estado retornado não é compatível com esta ação. O evento continua salvo para correção e reenvio.",
@@ -260,17 +308,17 @@ export async function dispatchConnectionEvent(
   }
 
   if (
-    (parsed.data.qrCode || parsed.data.pairingCode) &&
+    (parsed.data.publicResult.qrCode || parsed.data.publicResult.pairingCode) &&
     eventType === "whatsapp.connection.delete_requested"
   )
     return fail("A exclusão não pode retornar QR Code.", 502);
   const pairing =
-    parsed.data.qrCode || parsed.data.pairingCode
+    parsed.data.publicResult.qrCode || parsed.data.publicResult.pairingCode
       ? {
-          qrCode: parsed.data.qrCode,
-          pairingCode: parsed.data.pairingCode,
+          qrCode: parsed.data.publicResult.qrCode,
+          pairingCode: parsed.data.publicResult.pairingCode,
           qrExpiresAt: new Date(
-            Date.now() + (parsed.data.expiresIn ?? 60) * 1000,
+            Date.now() + (parsed.data.publicResult.expiresIn ?? 60) * 1000,
           ).toISOString(),
         }
       : {};
@@ -280,7 +328,8 @@ export async function dispatchConnectionEvent(
       admin,
       eventId,
       "delivered",
-      parsed.data.status ?? null,
+      parsed.data.publicResult.status ?? null,
+      parsed.data.privateCredential ?? null,
     );
   } catch {
     return {
@@ -313,7 +362,8 @@ export async function dispatchConnectionEvent(
       ...pairing,
       status: persisted.status,
       message:
-        parsed.data.message ?? "Resultado confirmado e salvo com sucesso.",
+        parsed.data.publicResult.message ??
+        "Resultado confirmado e salvo com sucesso.",
     };
   }
   return {
@@ -323,7 +373,7 @@ export async function dispatchConnectionEvent(
     kind: "received",
     ...pairing,
     message:
-      parsed.data.message ??
+      parsed.data.publicResult.message ??
       "Evento recebido pelo n8n. O resultado da Evolution ainda não foi confirmado; o estado permanece aguardando.",
   };
 }

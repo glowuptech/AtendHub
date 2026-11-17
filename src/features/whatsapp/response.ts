@@ -21,6 +21,12 @@ const qrImage = z
         : bytes.subarray(0, 4).toString() === "RIFF" &&
           bytes.subarray(8, 12).toString() === "WEBP";
   }, "QR Code inválido. Retorne uma imagem PNG, JPEG ou WebP em base64.");
+const apiKey = z
+  .string()
+  .trim()
+  .min(1)
+  .max(4096)
+  .refine((value) => !/[\u0000-\u001f\u007f]/.test(value));
 const response = z
   .object({
     ok: z.boolean(),
@@ -63,7 +69,7 @@ const response = z
         message: "QR Code incompatível com o estado retornado.",
       });
   });
-/** Accept one n8n item/Final wrapper, never return arbitrary fields such as apikey. */
+/** Unwrap one n8n item/Final and split the validated public result from its private credential. */
 export function parseWhatsappResponse(input: unknown) {
   let value = input;
   for (let depth = 0; depth < 4; depth++) {
@@ -98,11 +104,18 @@ export function parseWhatsappResponse(input: unknown) {
     pairingCode: raw.pairing_code ?? raw.pairingCode ?? undefined,
     expiresIn: raw.expires_in ?? undefined,
   });
+  const privateCredential =
+    raw.apikey === undefined || raw.apikey === null
+      ? undefined
+      : apiKey.parse(raw.apikey);
   return {
-    ...parsed,
-    status:
-      parsed.status === "connecting"
-        ? ("awaiting_confirmation" as const)
-        : parsed.status,
+    publicResult: {
+      ...parsed,
+      status:
+        parsed.status === "connecting"
+          ? ("awaiting_confirmation" as const)
+          : parsed.status,
+    },
+    privateCredential,
   };
 }

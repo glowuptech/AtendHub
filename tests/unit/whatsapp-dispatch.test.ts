@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   from: vi.fn(),
+  adminFrom: vi.fn(),
   rpc: vi.fn(),
   event: {
     id: "00000000-0000-4000-8000-000000000101",
@@ -39,7 +40,7 @@ vi.mock("@/lib/supabase/organization-session", () => ({
   sessionOrganizationContext: vi.fn(),
 }));
 vi.mock("@supabase/supabase-js", () => ({
-  createClient: vi.fn(() => ({ rpc: state.rpc })),
+  createClient: vi.fn(() => ({ rpc: state.rpc, from: state.adminFrom })),
 }));
 
 import { dispatchConnectionEvent } from "@/features/whatsapp/server";
@@ -85,6 +86,9 @@ beforeEach(() => {
         ? { data: state.event, error: null }
         : { data: state.settings, error: null },
     ),
+  );
+  state.adminFrom.mockImplementation(() =>
+    makeQuery({ data: null, error: null }),
   );
   state.rpc.mockImplementation(
     async (_name: string, args: Record<string, unknown>) => ({
@@ -133,6 +137,7 @@ it("envia o payload salvo por POST sem exigir ou enviar secrets", async () => {
     p_event_id: state.event.id,
     p_delivery_status: "delivered",
     p_result_status: "connected",
+    p_api_key: null,
   });
 });
 
@@ -163,6 +168,33 @@ it.each([
   );
 });
 
+it("inclui a chave privada obtida no servidor no evento seguinte", async () => {
+  state.adminFrom.mockImplementation((table: string) =>
+    table === "atendhub_whatsapp_connection_credentials"
+      ? makeQuery({ data: { api_key: "synthetic-private-key" }, error: null })
+      : makeQuery({ data: null, error: null }),
+  );
+  const transport = vi
+    .fn<typeof fetch>()
+    .mockResolvedValue(
+      Response.json({ ok: true, status: "connected", message: "Conectado." }),
+    );
+
+  const result = await dispatchConnectionEvent(
+    auth,
+    state.event.id as string,
+    transport,
+  );
+
+  const body = JSON.parse(String(transport.mock.calls[0][1]?.body));
+  expect(body.connection.apiKey).toBe("synthetic-private-key");
+  const storedPayload = state.event.payload as {
+    connection: Record<string, unknown>;
+  };
+  expect(storedPayload.connection).not.toHaveProperty("apiKey");
+  expect(JSON.stringify(result)).not.toContain("synthetic-private-key");
+});
+
 it("registra recebimento genérico sem inventar status conectado", async () => {
   const result = await dispatchConnectionEvent(
     auth,
@@ -178,6 +210,7 @@ it("registra recebimento genérico sem inventar status conectado", async () => {
     p_event_id: state.event.id,
     p_delivery_status: "delivered",
     p_result_status: null,
+    p_api_key: null,
   });
 });
 
@@ -203,6 +236,7 @@ it("mantém o evento disponível após ok:false, HTTP de erro ou JSON inválido"
       p_event_id: state.event.id,
       p_delivery_status: "retry",
       p_result_status: null,
+      p_api_key: null,
     });
   }
 });
@@ -261,22 +295,20 @@ it("recebe QR serializado em Final, persiste aguardando e nunca retorna apikey",
   setEvent({ event_type: "whatsapp.connection.create_requested" });
   const qr =
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6ioAAAAASUVORK5CYII=";
-  const transport = vi
-    .fn()
-    .mockResolvedValue(
-      Response.json([
-        {
-          Final: JSON.stringify({
-            success: true,
-            status: "connecting",
-            qr_code: qr,
-            pairing_code: null,
-            message: "QR Code gerado",
-            apikey: "never-send-this",
-          }),
-        },
-      ]),
-    );
+  const transport = vi.fn().mockResolvedValue(
+    Response.json([
+      {
+        Final: JSON.stringify({
+          success: true,
+          status: "connecting",
+          qr_code: qr,
+          pairing_code: null,
+          message: "QR Code gerado",
+          apikey: "synthetic-private-key",
+        }),
+      },
+    ]),
+  );
   const result = await dispatchConnectionEvent(
     auth,
     String(state.event.id),
@@ -287,9 +319,12 @@ it("recebe QR serializado em Final, persiste aguardando e nunca retorna apikey",
     status: "awaiting_confirmation",
     qrCode: qr,
   });
-  expect(JSON.stringify(result)).not.toContain("never-send-this");
+  expect(JSON.stringify(result)).not.toContain("synthetic-private-key");
   expect(state.rpc).toHaveBeenCalledWith(
     "atendhub_whatsapp_apply_response",
-    expect.objectContaining({ p_result_status: "awaiting_confirmation" }),
+    expect.objectContaining({
+      p_result_status: "awaiting_confirmation",
+      p_api_key: "synthetic-private-key",
+    }),
   );
 });
