@@ -46,7 +46,7 @@ grant select,update on public.atendhub_whatsapp_events to service_role;
 grant select on public.atendhub_whatsapp_connections,public.atendhub_whatsapp_events to authenticated;
 -- Mutations only through the narrow transactional function; org and actor come from auth.uid().
 create function public.atendhub_whatsapp_command(p_action text,p_request_id uuid,p_connection_id uuid default null,p_client_id uuid default null,p_name text default null,p_phone text default null)
-returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
+returns jsonb language plpgsql security definer set search_path='' as $$
 declare org uuid; c public.atendhub_whatsapp_connections; ev public.atendhub_whatsapp_events; client public.atendhub_clients; prefix text; eid uuid:=gen_random_uuid(); kind text;
 begin
  select organization_id into org from public.atendhub_team_members where id=auth.uid() and status='active' and role='super_admin';
@@ -83,7 +83,7 @@ end $$;
 revoke all on function public.atendhub_whatsapp_command(text,uuid,uuid,uuid,text,text) from public,anon;
 grant execute on function public.atendhub_whatsapp_command(text,uuid,uuid,uuid,text,text) to authenticated;
 -- Callback is only invoked by the server after verifying the n8n HMAC.
-create function public.atendhub_whatsapp_callback(p_connection_id uuid,p_event_id uuid,p_status text) returns boolean language plpgsql security definer set search_path=public,pg_temp as $$
+create function public.atendhub_whatsapp_callback(p_connection_id uuid,p_event_id uuid,p_status text) returns boolean language plpgsql security definer set search_path='' as $$
 declare c public.atendhub_whatsapp_connections; ev public.atendhub_whatsapp_events;
 begin
  select * into c from public.atendhub_whatsapp_connections where id=p_connection_id for update;
