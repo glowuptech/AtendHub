@@ -8,6 +8,10 @@ const server = await createServer({
   resolve: {
     alias: [
       {
+        find: "next/navigation",
+        replacement: root + "tests/editor-harness/navigation.ts",
+      },
+      {
         find: "@/components/layout/demo-context",
         replacement: root + "tests/editor-harness/context.ts",
       },

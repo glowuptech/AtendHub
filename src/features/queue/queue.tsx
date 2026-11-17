@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useClients } from "@/features/clients/hooks";
 import { useLeads } from "@/features/leads/hooks";
@@ -20,14 +20,22 @@ const stages = [
 ] as const;
 export function Queue() {
   const router = useRouter();
+  const claimLock = useRef(false);
   const { calendar, error: calendarError, isConfigured } = useServiceCalendar();
   const { data: clients = [], error: clientsError } = useClients();
-  const { data: persistedLeads = [], error: leadsError, mutate: mutateLeads } = useLeads();
+  const {
+    data: persistedLeads = [],
+    error: leadsError,
+    mutate: mutateLeads,
+  } = useLeads();
   function converse() {
-    setMessage("O Inbox ainda não está conectado a um provedor de mensagens. Nenhuma mensagem foi simulada.");
+    setMessage(
+      "O Inbox ainda não está conectado a um provedor de mensagens. Nenhuma mensagem foi simulada.",
+    );
   }
   const [now, setNow] = useState<number | null>(null),
     [message, setMessage] = useState(""),
+    [claimingId, setClaimingId] = useState<string | null>(null),
     [search, setSearch] = useState(""),
     [filter, setFilter] = useState("");
   useEffect(() => {
@@ -35,8 +43,14 @@ export function Queue() {
     return () => clearInterval(timer);
   }, []);
   const leads = persistedLeads
-    .map((lead) => ({ ...lead, client: clients.find((client) => client.id === lead.client_id) }))
-    .filter((lead): lead is typeof lead & { client: (typeof clients)[number] } => Boolean(lead.client))
+    .map((lead) => ({
+      ...lead,
+      client: clients.find((client) => client.id === lead.client_id),
+    }))
+    .filter(
+      (lead): lead is typeof lead & { client: (typeof clients)[number] } =>
+        Boolean(lead.client),
+    )
     .filter(
       (l) =>
         (!filter || l.client_id === filter) &&
@@ -52,8 +66,24 @@ export function Queue() {
         title="Fila de atendimento"
         description="Todos os clientes autorizados · prioridade para quem está aguardando"
       />
-      {(clientsError || leadsError || calendarError) && <p role="alert">Não foi possível atualizar a fila real. Tente novamente.</p>}
-      {!isConfigured && !calendarError && <p role="status">O calendário de SLA ainda não foi configurado para esta organização.</p>}
+      {(clientsError || leadsError) && (
+        <p role="alert">
+          Não foi possível atualizar a fila real. Tente novamente.
+        </p>
+      )}
+      {calendarError && (
+        <p role="alert">
+          Não foi possível carregar o calendário de SLA. O prazo está
+          indisponível; você ainda pode assumir atendimentos autorizados.
+        </p>
+      )}
+      {!isConfigured && !calendarError && (
+        <p role="status">
+          O calendário de SLA ainda não foi configurado. Você pode assumir
+          atendimentos; o prazo útil ficará indisponível até configurar o
+          calendário em Configurações.
+        </p>
+      )}
       <div className="toolbar">
         <label>
           Buscar lead ou cliente
@@ -100,7 +130,10 @@ export function Queue() {
             {leads
               .filter((l) => l.stage === stage)
               .map((l) => {
-                const sla = isConfigured && now ? claimSla(l.created_at, now, calendar) : null;
+                const sla =
+                  isConfigured && now
+                    ? claimSla(l.created_at, now, calendar)
+                    : null;
                 return (
                   <article className="queue-card" key={l.id}>
                     <small className="queue-client">{l.client.name}</small>
@@ -131,25 +164,53 @@ export function Queue() {
                               ? sla.overdue
                                 ? `Atraso ${clock(sla.elapsedMs - 600000)}`
                                 : `${clock(sla.remainingMs)} restantes`
-                              : "Calculando prazo…"}
+                              : isConfigured
+                                ? "Calculando prazo…"
+                                : "Prazo indisponível"}
                           </strong>
                           <small>Tempo útil para assumir</small>
                         </div>
                         <Button
-                          disabled={!isConfigured}
+                          disabled={claimingId !== null}
                           onClick={async () => {
-                            const response = await fetch(`/api/leads/${l.id}/claim`, { method: "POST" });
-                            if (response.ok) {
+                            if (claimLock.current) return;
+                            claimLock.current = true;
+                            setClaimingId(l.id);
+                            setMessage("");
+                            try {
+                              const response = await fetch(
+                                `/api/leads/${l.id}/claim`,
+                                { method: "POST" },
+                              );
+                              const body = await response
+                                .json()
+                                .catch(() => null);
+                              if (!response.ok) {
+                                setMessage(
+                                  body?.error ??
+                                    "Não foi possível assumir este atendimento. Tente novamente.",
+                                );
+                                if (response.status === 409)
+                                  await mutateLeads();
+                                return;
+                              }
+                              setMessage(
+                                `Atendimento de ${l.name} assumido e salvo.`,
+                              );
                               await mutateLeads();
-                              setMessage(`Atendimento de ${l.name} assumido e salvo.`);
-                            } else {
-                              const body = await response.json().catch(() => null);
-                              setMessage(body?.error ?? "Este atendimento já foi assumido por outra pessoa.");
-                              await mutateLeads();
+                            } catch {
+                              setMessage(
+                                "Não foi possível confirmar a assunção. Atualize a fila antes de tentar novamente.",
+                              );
+                            } finally {
+                              claimLock.current = false;
+                              setClaimingId(null);
                             }
                           }}
                         >
-                          Assumir atendimento
+                          {claimingId === l.id
+                            ? "Assumindo…"
+                            : "Assumir atendimento"}
                         </Button>
                       </>
                     ) : (
@@ -163,8 +224,22 @@ export function Queue() {
                           <select
                             value={l.stage}
                             onChange={async (e) => {
-                              const response = await fetch(`/api/leads/${l.id}/stage`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ stage: e.target.value }) });
-                              if (!response.ok) setMessage("Não foi possível mover este atendimento.");
+                              const response = await fetch(
+                                `/api/leads/${l.id}/stage`,
+                                {
+                                  method: "POST",
+                                  headers: {
+                                    "content-type": "application/json",
+                                  },
+                                  body: JSON.stringify({
+                                    stage: e.target.value,
+                                  }),
+                                },
+                              );
+                              if (!response.ok)
+                                setMessage(
+                                  "Não foi possível mover este atendimento.",
+                                );
                               await mutateLeads();
                             }}
                           >
@@ -186,10 +261,7 @@ export function Queue() {
                       >
                         Abrir lead
                       </Button>
-                      <Button
-                        variant="outline"
-                        onClick={converse}
-                      >
+                      <Button variant="outline" onClick={converse}>
                         Conversar
                       </Button>
                     </div>

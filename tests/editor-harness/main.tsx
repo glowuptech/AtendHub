@@ -1,15 +1,36 @@
 // Isolated browser harness: real components, simulated persistence only.
 import { useEffect, useState } from "react";
+import { Queue } from "@/features/queue/queue";
 import { createRoot } from "react-dom/client";
 import { EditorWorkspace } from "@/features/forms/components/editor";
 import { makePersistedPathForm } from "./path-fixture";
 import { FormsList } from "@/features/forms/components/forms-list";
 import { clients } from "@/lib/mocks/fixtures";
 import "@/app/globals.css";
+let queueOwner: string | null = null;
+const queueLead = () => ({
+  id: "00000000-0000-4000-8000-000000000123",
+  client_id: clients[0].id,
+  name: "Lead de teste",
+  phone: "",
+  source: "form",
+  stage: queueOwner ? "in_progress" : "new",
+  owner_id: queueOwner,
+  created_at: new Date().toISOString(),
+  capture_status: "completed",
+  claimed_at: queueOwner ? new Date().toISOString() : null,
+});
 const stored = localStorage.getItem("editor-test-draft");
 const original = window.fetch.bind(window);
 window.fetch = async (input, init) => {
   const url = String(input);
+  if (url === "/api/settings/calendar") return Response.json(null);
+  if (url.endsWith("/claim")) {
+    if (new URLSearchParams(location.search).has("denied")) return Response.json({error:"Sua conta não tem permissão para assumir este atendimento."}, {status:403});
+    queueOwner = "test-user";
+    return Response.json(queueLead());
+  }
+  if (url.startsWith("/api/leads")) return Response.json([queueLead()]);
   if (url.startsWith("/api/clients")) return Response.json(clients);
   if (url.startsWith("/api/forms")) {
     const current = JSON.parse(
@@ -52,7 +73,9 @@ function EditorHarness() {
 
 createRoot(document.getElementById("root")!).render(
   <main style={{ padding: 24 }}>
-    {new URLSearchParams(location.search).has("list") ? (
+    {new URLSearchParams(location.search).has("queue") ? (
+      <Queue />
+    ) : new URLSearchParams(location.search).has("list") ? (
       <FormsList id={clients[0].id} />
     ) : (
       <EditorHarness />

@@ -6,7 +6,7 @@
 |---|---|---|
 | Organizações, equipe, clientes e profissionais | Persistido e funcional | Lidos pelo Supabase com autorização por organização/cliente. |
 | Leads e fila | Persistido e funcional (base) | Tabelas `atendhub_leads`, `atendhub_lead_events` e APIs de criação, consulta, edição, assunção atômica e movimentação. Assunção, distribuição e movimentação usam permissões distintas no servidor. |
-| Calendário de SLA | Persistido e funcional | `atendhub_service_calendars` é lido/salvo pela configuração; o cálculo usa `created_at` do servidor, fuso, dias, feriados e exceções. Sem calendário salvo, assumir fica indisponível. |
+| Calendário de SLA | Persistido e funcional | `atendhub_service_calendars` é lido/salvo pela configuração; o cálculo usa `created_at` do servidor, fuso, dias, feriados e exceções. Sem calendário salvo, o prazo fica indisponível; a assunção pode ser solicitada e a RPC valida a permissão. |
 | Formulários e respostas | Editor/listagem persistidos; público pendente | CRUD de formulários e versões usa Supabase/RLS; cadastro manual usa versão, respostas históricas e estado incompleto. A rota pública ainda não está conectada. |
 | Inbox e mensagens | Dependente de integração externa | Nenhuma mensagem é simulada; WhatsApp/SMS permanecem desligados. |
 | Agendamentos | Sem dados fictícios, ainda não conectado | Não são criados automaticamente por Leads. |
@@ -58,3 +58,12 @@ Nenhum registro foi inserido ou removido.
 - Executar com duas contas autenticadas o teste de concorrência: uma chamada a `/claim` deve retornar 200, a outra 409 `LEAD_ALREADY_CLAIMED`; depois confirmar um único evento `assigned`.
 - Confirmar no banco que `first_response_at` é preenchido somente pelo primeiro contato efetivo quando o provedor de mensagens for conectado.
 - Remover fixtures dos módulos ainda não persistidos (Inbox, formulários, agendamentos, analytics e sistema) em uma etapa separada; eles devem continuar exibindo indisponibilidade/estado vazio, nunca sucesso simulado.
+
+## Correção de assunção na fila (2026-11-17)
+
+- A ausência/erro do calendário deixa o cálculo de SLA indisponível, sem impedir a solicitação de assunção. Não há cálculo ou penalidade usando o calendário de fallback.
+- O bloqueio do botão agora indica somente solicitação em andamento; a API/RPC decide autorização usando sessão e organização autenticadas.
+- A API de claim deixou de usar organizationContext (que exigia configuração Service Role mesmo utilizando RPC com sessão) e usa sessionOrganizationContext. Nenhum owner fornecido pelo navegador é aceito.
+- Conflito e permissão negada têm mensagens explícitas; erros de rede liberam nova tentativa.
+- Validados 5 testes unitários de API com Supabase simulado e 2 testes de navegador: assumir sem calendário e apresentar permissão negada. Esses testes não comprovam RLS, persistência nem concorrência no banco real.
+- Nenhuma migration foi criada/aplicada. A definição da RPC de produção não está versionada neste checkout; é necessário validar na sessão real a assunção, o owner persistido após reload e a concorrência entre duas contas.
