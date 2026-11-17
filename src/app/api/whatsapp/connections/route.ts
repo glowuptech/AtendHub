@@ -19,6 +19,8 @@ export async function GET() {
   if (error) return apiError(error, 500, { stage: "whatsapp-list" });
   return NextResponse.json(data);
 }
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   const auth = await whatsappAuth();
   if ("error" in auth) return auth.error;
@@ -48,11 +50,23 @@ export async function POST(request: Request) {
       },
       { status: 409 },
     );
-  let delivery = "retry";
+
   try {
-    delivery = await dispatchConnectionEvent(auth, data.eventId);
+    const result = await dispatchConnectionEvent(auth, data.eventId);
+    if (!result.ok)
+      return NextResponse.json(
+        { error: result.message, eventId: result.eventId, connectionId: result.connectionId },
+        { status: result.httpStatus },
+      );
+    return NextResponse.json({ ...data, ...result }, { status: 201 });
   } catch {
-    /* Keep persisted event available for retry. */
+    return NextResponse.json(
+      {
+        error: "Conexão e evento foram salvos, mas não foi possível confirmar o envio. Reenvie o mesmo evento.",
+        eventId: data.eventId,
+        connectionId: data.connectionId,
+      },
+      { status: 502 },
+    );
   }
-  return NextResponse.json({ ...data, delivery }, { status: 201 });
 }

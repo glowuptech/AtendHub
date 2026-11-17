@@ -33,7 +33,13 @@ beforeEach(() => {
     data: { eventId: id, connectionId: id },
     error: null,
   });
-  state.dispatch.mockResolvedValue("delivered");
+  state.dispatch.mockResolvedValue({
+    ok: true,
+    eventId: id,
+    connectionId: id,
+    kind: "received",
+    message: "Evento recebido pelo n8n.",
+  });
 });
 it("não usa organização/dono enviados pelo browser e normaliza o telefone", async () => {
   const response = (await POST(req()))!;
@@ -48,7 +54,11 @@ it("não usa organização/dono enviados pelo browser e normaliza o telefone", a
       p_phone: "551633334444",
     },
   );
-  expect(await response.json()).toMatchObject({ delivery: "delivered" });
+  expect(await response.json()).toMatchObject({
+    ok: true,
+    kind: "received",
+    message: "Evento recebido pelo n8n.",
+  });
 });
 it("não cria nem dispara eventos sem autorização", async () => {
   state.auth.mockResolvedValue({ error: Response.json({}, { status: 403 }) });
@@ -56,11 +66,14 @@ it("não cria nem dispara eventos sem autorização", async () => {
   expect(state.rpc).not.toHaveBeenCalled();
   expect(state.dispatch).not.toHaveBeenCalled();
 });
-it("falha de envio preserva o evento gravado para retentativa", async () => {
+it("falha de envio mantém o evento persistido e a mesma chave para retentativa", async () => {
   state.dispatch.mockRejectedValue(new Error("network"));
-  expect(await (await POST(req()))!.json()).toMatchObject({
-    delivery: "retry",
+  const response = await POST(req());
+  expect(response!.status).toBe(502);
+  expect(await response!.json()).toMatchObject({
+    error: expect.stringContaining("Reenvie o mesmo evento"),
     eventId: id,
+    connectionId: id,
   });
   expect(state.rpc).toHaveBeenCalledTimes(1);
 });

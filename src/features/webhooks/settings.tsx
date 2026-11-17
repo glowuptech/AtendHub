@@ -51,9 +51,9 @@ export function WebhookSettings() {
         </Badge>
       </div>
       <p className="team-note">
-        URLs salvas por organização no servidor. Conexões WhatsApp usam este
-        destino; os demais fluxos continuam dependendo de suas integrações. As
-        assinaturas são configuradas nas variáveis de ambiente, não nesta tela.
+        URLs salvas por organização no servidor. Conexões WhatsApp usam POST
+        síncrono e recebem o resultado do n8n nesta mesma chamada. Os demais
+        fluxos continuam dependendo de suas integrações.
       </p>
       {persisted &&
         webhookDestinations.every(({ id }) => !persisted[id]) &&

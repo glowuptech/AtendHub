@@ -23,6 +23,7 @@ export function WhatsappSettings() {
     [name, setName] = useState(""),
     [phone, setPhone] = useState(""),
     [notice, setNotice] = useState(""),
+    [noticeError, setNoticeError] = useState(false),
     [busy, setBusy] = useState(false),
     [editId, setEditId] = useState<string | null>(null),
     [editPhone, setEditPhone] = useState("");
@@ -34,6 +35,7 @@ export function WhatsappSettings() {
     lock.current = true;
     setBusy(true);
     setNotice("");
+    setNoticeError(false);
     keys.current[key] ??= crypto.randomUUID();
     try {
       const r = await fetch(url, {
@@ -41,24 +43,35 @@ export function WhatsappSettings() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...body, requestId: keys.current[key] }),
       });
-      const result = await r.json();
-      if (!r.ok)
-        throw new Error(result.error ?? "Não foi possível solicitar a ação.");
+      const result = await r.json().catch(() => null);
+      if (!r.ok) {
+        await mutate().catch(() => undefined);
+        setNoticeError(true);
+        throw new Error(
+          result?.error ?? "Não foi possível confirmar a resposta do n8n.",
+        );
+      }
       delete keys.current[key];
-      setNotice(
-        result.delivery === "delivered"
-          ? "Evento recebido pelo n8n. Aguardando confirmação do resultado da integração."
-          : result.delivery === "unconfigured"
-            ? "Cadastro e evento salvos. Configure o webhook e a assinatura no servidor; depois clique em Reenviar evento."
-            : "Evento salvo, mas o envio não foi confirmado. Use Reenviar evento para tentar novamente.",
-      );
-      await mutate();
+      if (result.kind === "stale") {
+        setNotice(result.message);
+      } else if (result.kind === "received") {
+        setNotice(
+          `${result.message} A resposta não confirmou o resultado da Evolution; a conexão não será marcada como conectada.`,
+        );
+      } else {
+        const state = result.status ? statuses[result.status] : null;
+        setNotice(
+          state ? `${result.message} Estado salvo: ${state}.` : result.message,
+        );
+      }
+      await mutate().catch(() => undefined);
       return true;
     } catch (cause) {
+      setNoticeError(true);
       setNotice(
         cause instanceof Error
           ? cause.message
-          : "Erro de conexão. Tente novamente.",
+          : "Erro de conexão. O evento continua salvo para reenvio.",
       );
       return false;
     } finally {
@@ -73,7 +86,11 @@ export function WhatsappSettings() {
         Cadastre números por cliente. O n8n cria e gerencia a instância na
         Evolution API.
       </p>
-      <p role="status">{notice}</p>
+      {notice && (
+        <p role={noticeError ? "alert" : "status"}>
+          {notice}
+        </p>
+      )}
       {error && (
         <p role="alert">
           {error.message}{" "}
