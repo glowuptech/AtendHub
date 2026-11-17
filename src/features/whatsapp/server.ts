@@ -1,40 +1,14 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { parseWhatsappResponse } from "./response";
 import { sessionOrganizationContext } from "@/lib/supabase/organization-session";
 
-const responseStatusSchema = z.enum([
-  "awaiting_confirmation",
-  "connected",
-  "disconnected",
-  "deleted",
-]);
-const webhookResponseSchema = z
-  .discriminatedUnion("ok", [
-    z
-      .object({
-        ok: z.literal(true),
-        status: responseStatusSchema.optional(),
-        message: z.string().trim().min(1).max(500).optional(),
-      })
-      .strict(),
-    z
-      .object({
-        ok: z.literal(false),
-        message: z.string().trim().min(1).max(500),
-      })
-      .strict(),
-  ])
-  .superRefine((value, context) => {
-    if (value.ok && value.status && !value.message) {
-      context.addIssue({ code: "custom", message: "Informe a mensagem do resultado." });
-    }
-  });
 const RESPONSE_TIMEOUT_MS = 45_000;
-const MAX_RESPONSE_BYTES = 16_384;
+const MAX_RESPONSE_BYTES = 1_500_000;
 
-type EventStatus = z.infer<typeof responseStatusSchema>;
+type EventStatus =
+  "awaiting_confirmation" | "connected" | "disconnected" | "deleted";
 type EventType =
   | "whatsapp.connection.create_requested"
   | "whatsapp.connection.confirm_requested"
@@ -47,6 +21,9 @@ type DispatchOutcome =
       connectionId: string;
       kind: "completed" | "received" | "stale";
       status?: EventStatus;
+      qrCode?: string;
+      pairingCode?: string;
+      qrExpiresAt?: string;
       message: string;
     }
   | {
@@ -97,12 +74,7 @@ function destinationUrl(value: unknown) {
   if (typeof value !== "string" || !value.trim()) return null;
   try {
     const url = new URL(value);
-    if (
-      url.protocol !== "https:" ||
-      url.username ||
-      url.password ||
-      url.hash
-    )
+    if (url.protocol !== "https:" || url.username || url.password || url.hash)
       return null;
     return url;
   } catch {
@@ -137,9 +109,7 @@ export async function dispatchConnectionEvent(
 ): Promise<DispatchOutcome> {
   const { data: event, error } = await auth.supabase
     .from("atendhub_whatsapp_events")
-    .select(
-      "id,connection_id,event_type,payload,delivery_status,result_status",
-    )
+    .select("id,connection_id,event_type,payload,delivery_status,result_status")
     .eq("id", eventId)
     .eq("organization_id", auth.organizationId)
     .single();
@@ -254,14 +224,21 @@ export async function dispatchConnectionEvent(
       502,
     );
   }
-  const parsed = webhookResponseSchema.safeParse(rawResponse);
+  let parsed:
+    | { success: true; data: ReturnType<typeof parseWhatsappResponse> }
+    | { success: false };
+  try {
+    parsed = { success: true, data: parseWhatsappResponse(rawResponse) };
+  } catch {
+    parsed = { success: false };
+  }
 
   if (!response.ok) {
     const message =
       parsed.success && !parsed.data.ok
         ? parsed.data.message
         : `O webhook respondeu com HTTP ${response.status}. O evento continua salvo para reenvio.`;
-    return fail(message, 502);
+    return fail(message ?? "O n8n recusou a ação.", 502);
   }
 
   if (!parsed.success) {
@@ -270,7 +247,8 @@ export async function dispatchConnectionEvent(
       502,
     );
   }
-  if (!parsed.data.ok) return fail(parsed.data.message, 502);
+  if (!parsed.data.ok)
+    return fail(parsed.data.message ?? "O n8n recusou a ação.", 502);
   if (
     parsed.data.status &&
     !isCompatibleStatus(eventType, parsed.data.status)
@@ -281,6 +259,21 @@ export async function dispatchConnectionEvent(
     );
   }
 
+  if (
+    (parsed.data.qrCode || parsed.data.pairingCode) &&
+    eventType === "whatsapp.connection.delete_requested"
+  )
+    return fail("A exclusão não pode retornar QR Code.", 502);
+  const pairing =
+    parsed.data.qrCode || parsed.data.pairingCode
+      ? {
+          qrCode: parsed.data.qrCode,
+          pairingCode: parsed.data.pairingCode,
+          qrExpiresAt: new Date(
+            Date.now() + (parsed.data.expiresIn ?? 60) * 1000,
+          ).toISOString(),
+        }
+      : {};
   let persisted: Awaited<ReturnType<typeof applyResponse>>;
   try {
     persisted = await applyResponse(
@@ -317,6 +310,7 @@ export async function dispatchConnectionEvent(
       eventId,
       connectionId: event.connection_id,
       kind: "completed",
+      ...pairing,
       status: persisted.status,
       message:
         parsed.data.message ?? "Resultado confirmado e salvo com sucesso.",
@@ -327,6 +321,7 @@ export async function dispatchConnectionEvent(
     eventId,
     connectionId: event.connection_id,
     kind: "received",
+    ...pairing,
     message:
       parsed.data.message ??
       "Evento recebido pelo n8n. O resultado da Evolution ainda não foi confirmado; o estado permanece aguardando.",

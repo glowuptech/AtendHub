@@ -4487,3 +4487,6 @@ input.form-color-picker::-moz-color-swatch { border: 1px solid #cbd5e1; border-r
 .form-experience .choice-card strong, .form-experience .choice-card small { color:inherit; }
 .form-experience .choice-card-check { color:inherit; }
 .form-experience .field-error { background:#fff1f2; color:#9f1239; border:1px solid #fda4af; border-radius:8px; padding:12px; }
+
+.whatsapp-qr { padding:16px; border:1px solid var(--border-subtle); border-radius:12px; margin-block:16px; }
+.whatsapp-qr img { display:block; background:white; padding:16px; width:min(100%,280px); height:auto; margin:16px auto; border-radius:8px; }

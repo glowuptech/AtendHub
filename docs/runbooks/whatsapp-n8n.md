@@ -128,3 +128,20 @@ Resposta genérica não altera o status da conexão. Uma resposta `ok: true` com
 A criação da conexão e do evento é transacional. Os comandos de ação derivam usuário e organização da sessão Supabase, verificam superadministrador ativo e validam cliente/conexão na mesma organização. A RLS existente é preservada. A RPC síncrona tem `SECURITY DEFINER`, `search_path = ''` e execução concedida somente a `service_role`; a RPC de callback foi removida. Nenhuma resposta do n8n pode escolher organização, cliente ou conexão: o servidor usa exclusivamente o `eventId` enviado e a relação persistida no banco.
 
 A URL por organização continua armazenada em Configurações → Webhooks. Nenhuma chamada é feita ao salvar essa URL. Não use webhook real em testes: criar, atualizar, confirmar ou excluir pode alterar uma instância real da Evolution. Testes automatizados usam transporte simulado.
+
+## QR Code na criação e renovação
+
+O servidor aceita também a resposta Evolution/n8n abaixo, diretamente ou encapsulada em uma lista de um item com `Final` contendo o JSON serializado:
+
+```json
+{"success":true,"status":"connecting","qr_code":"data:image/png;base64,...","pairing_code":null,"message":"QR Code gerado","expires_in":60}
+```
+
+- `connecting` é normalizado para `awaiting_confirmation`. Nunca significa conectado.
+- `qr_code` aceita Data URL PNG/JPEG/WebP ou base64 PNG puro, com limite de tamanho e validação da assinatura do formato. SVG e URLs externas são recusados.
+- O campo `expires_in` é opcional (15 a 300 segundos). Sem ele, o código tem limite de exibição de 60 segundos no app, sem comprovar a validade exata na Evolution.
+- A imagem e o pairing code são transitórios: não são salvos no banco, logs, outbox ou localStorage. Recarregar a página descarta o QR e exige nova solicitação.
+- “Gerar novo QR Code” envia um novo `whatsapp.connection.update_requested` para a mesma instância e telefone. O handler de atualização no n8n deve consultar/gerar o QR atual na Evolution e devolvê-lo, sem criar outra instância. A chave de idempotência é nova para essa nova solicitação; reenvios de um evento antigo não devem criar outra instância.
+- Somente a confirmação efetiva devolvendo `connected` conclui o pareamento. A imagem é ocultada quando a conexão está conectada ou excluída.
+- Campos desconhecidos da resposta, incluindo `apikey`, não são repassados ao navegador. A persistência privada da chave retornada ainda é uma etapa separada, solicitada para implementação no v0. Ela não foi criada por esta alteração de QR.
+- A resposta de produção fornecida pelo usuário foi analisada localmente (sem chamada ao n8n) e aceita: JSON em Final, success, connecting e imagem PNG em Data URL. Nenhum conteúdo dessa credencial ou QR foi incorporado aos fixtures do repositório.

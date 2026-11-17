@@ -53,6 +53,32 @@ window.fetch = async (input, init) => {
                 : connection.status;
       }
       localStorage.setItem("test-whatsapp", JSON.stringify(connections));
+      if (new URLSearchParams(location.search).has("qr")) {
+        const current =
+          url === "/api/whatsapp/connections"
+            ? connections.at(-1)
+            : connections.find((c: { id: string }) => url.endsWith(c.id));
+        const connected = body.action === "confirm";
+        if (connected) {
+          current.status = "connected";
+          localStorage.setItem("test-whatsapp", JSON.stringify(connections));
+        }
+        return Response.json({
+          ok: true,
+          connectionId: current.id,
+          eventId: crypto.randomUUID(),
+          kind: "completed",
+          status: connected ? "connected" : "awaiting_confirmation",
+          message: connected ? "Conexão confirmada." : "QR Code gerado",
+          ...(connected
+            ? {}
+            : {
+                qrCode:
+                  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6ioAAAAASUVORK5CYII=",
+                qrExpiresAt: new Date(Date.now() + 60000).toISOString(),
+              }),
+        });
+      }
       return Response.json({
         ok: true,
         eventId: crypto.randomUUID(),

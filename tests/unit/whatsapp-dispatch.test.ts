@@ -29,7 +29,9 @@ const state = vi.hoisted(() => ({
     delivery_status: "pending",
     result_status: null,
   } as Record<string, unknown>,
-  settings: { config: { whatsappConnection: "https://n8n.example/webhook/whatsapp" } },
+  settings: {
+    config: { whatsappConnection: "https://n8n.example/webhook/whatsapp" },
+  },
 }));
 
 vi.mock("server-only", () => ({}));
@@ -84,29 +86,29 @@ beforeEach(() => {
         : { data: state.settings, error: null },
     ),
   );
-  state.rpc.mockImplementation(async (_name: string, args: Record<string, unknown>) => ({
-    data: {
-      received: args.p_delivery_status === "delivered",
-      applied: Boolean(args.p_result_status),
-      stale: false,
-      status: args.p_result_status ?? null,
-    },
-    error: null,
-  }));
+  state.rpc.mockImplementation(
+    async (_name: string, args: Record<string, unknown>) => ({
+      data: {
+        received: args.p_delivery_status === "delivered",
+        applied: Boolean(args.p_result_status),
+        stale: false,
+        status: args.p_result_status ?? null,
+      },
+      error: null,
+    }),
+  );
 });
 
 afterEach(() => vi.unstubAllEnvs());
 
 it("envia o payload salvo por POST sem exigir ou enviar secrets", async () => {
-  const transport = vi
-    .fn<typeof fetch>()
-    .mockResolvedValue(
-      Response.json({
-        ok: true,
-        status: "connected",
-        message: "Conexão confirmada.",
-      }),
-    );
+  const transport = vi.fn<typeof fetch>().mockResolvedValue(
+    Response.json({
+      ok: true,
+      status: "connected",
+      message: "Conexão confirmada.",
+    }),
+  );
 
   const result = await dispatchConnectionEvent(
     auth,
@@ -145,9 +147,11 @@ it.each([
   const result = await dispatchConnectionEvent(
     auth,
     state.event.id as string,
-    vi.fn<typeof fetch>().mockResolvedValue(
-      Response.json({ ok: true, status, message: "Resultado da Evolution." }),
-    ),
+    vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        Response.json({ ok: true, status, message: "Resultado da Evolution." }),
+      ),
   );
   expect(result).toMatchObject({ ok: true, kind: "completed", status });
   expect(state.rpc).toHaveBeenCalledWith(
@@ -163,9 +167,11 @@ it("registra recebimento genérico sem inventar status conectado", async () => {
   const result = await dispatchConnectionEvent(
     auth,
     state.event.id as string,
-    vi.fn<typeof fetch>().mockResolvedValue(
-      Response.json({ ok: true, message: "Evento recebido." }),
-    ),
+    vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        Response.json({ ok: true, message: "Evento recebido." }),
+      ),
   );
   expect(result).toMatchObject({ ok: true, kind: "received" });
   expect(state.rpc).toHaveBeenCalledWith("atendhub_whatsapp_apply_response", {
@@ -177,7 +183,10 @@ it("registra recebimento genérico sem inventar status conectado", async () => {
 
 it("mantém o evento disponível após ok:false, HTTP de erro ou JSON inválido", async () => {
   const cases = [
-    [Response.json({ ok: false, message: "Evolution indisponível." }), "Evolution indisponível."],
+    [
+      Response.json({ ok: false, message: "Evolution indisponível." }),
+      "Evolution indisponível.",
+    ],
     [Response.json({ ok: true }, { status: 500 }), "HTTP 500"],
     [new Response("<html>erro</html>"), "JSON válido"],
   ] as const;
@@ -202,9 +211,9 @@ it("expira uma tentativa travada e deixa o evento reenviável", async () => {
   const result = await dispatchConnectionEvent(
     auth,
     state.event.id as string,
-    vi.fn<typeof fetch>().mockRejectedValue(
-      new DOMException("timeout", "TimeoutError"),
-    ),
+    vi
+      .fn<typeof fetch>()
+      .mockRejectedValue(new DOMException("timeout", "TimeoutError")),
   );
   expect(result).toMatchObject({ ok: false, httpStatus: 504 });
   expect(state.rpc).toHaveBeenCalledWith(
@@ -218,9 +227,11 @@ it("recusa estado incompatível com a ação", async () => {
   const result = await dispatchConnectionEvent(
     auth,
     state.event.id as string,
-    vi.fn<typeof fetch>().mockResolvedValue(
-      Response.json({ ok: true, status: "connected", message: "Conectado." }),
-    ),
+    vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        Response.json({ ok: true, status: "connected", message: "Conectado." }),
+      ),
   );
   expect(result).toMatchObject({ ok: false, httpStatus: 502 });
   expect(state.rpc).toHaveBeenCalledWith(
@@ -237,9 +248,48 @@ it("não aplica a resposta quando outra ação já é a mais recente", async () 
   const result = await dispatchConnectionEvent(
     auth,
     state.event.id as string,
-    vi.fn<typeof fetch>().mockResolvedValue(
-      Response.json({ ok: true, status: "connected", message: "Conectado." }),
-    ),
+    vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        Response.json({ ok: true, status: "connected", message: "Conectado." }),
+      ),
   );
   expect(result).toMatchObject({ ok: true, kind: "stale" });
+});
+
+it("recebe QR serializado em Final, persiste aguardando e nunca retorna apikey", async () => {
+  setEvent({ event_type: "whatsapp.connection.create_requested" });
+  const qr =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6ioAAAAASUVORK5CYII=";
+  const transport = vi
+    .fn()
+    .mockResolvedValue(
+      Response.json([
+        {
+          Final: JSON.stringify({
+            success: true,
+            status: "connecting",
+            qr_code: qr,
+            pairing_code: null,
+            message: "QR Code gerado",
+            apikey: "never-send-this",
+          }),
+        },
+      ]),
+    );
+  const result = await dispatchConnectionEvent(
+    auth,
+    String(state.event.id),
+    transport,
+  );
+  expect(result).toMatchObject({
+    ok: true,
+    status: "awaiting_confirmation",
+    qrCode: qr,
+  });
+  expect(JSON.stringify(result)).not.toContain("never-send-this");
+  expect(state.rpc).toHaveBeenCalledWith(
+    "atendhub_whatsapp_apply_response",
+    expect.objectContaining({ p_result_status: "awaiting_confirmation" }),
+  );
 });
