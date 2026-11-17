@@ -37,12 +37,33 @@ export function WeeklyAppointments() {
     () => true,
     () => false,
   );
-  const { clientId } = useDemo();
-  return ready ? (
-    <WeeklyWorkspace key={clientId} />
-  ) : (
-    <LoadingState label="Carregando agenda…" />
-  );
+  const { clientId, scope, authorizedClients } = useDemo();
+
+  if (!ready || !clientId) {
+    return <LoadingState label="Carregando agenda…" />;
+  }
+
+  if (!scope.clientIds.includes(clientId)) {
+    const selectedClient = authorizedClients.find(
+      (client) => client.id === clientId,
+    );
+
+    return (
+      <>
+        <Heading
+          title="Agendamentos"
+          eyebrow="WORKSPACE"
+          description={`${selectedClient?.name ?? "Clínica selecionada"} · agenda por profissional · America/Sao_Paulo`}
+        />
+        <Empty
+          title="Agenda indisponível para esta clínica"
+          description="Esta clínica está autorizada, mas não possui dados no repositório de demonstração. Nenhum dado de outra clínica será exibido."
+        />
+      </>
+    );
+  }
+
+  return <WeeklyWorkspace key={clientId} />;
 }
 function WeeklyWorkspace() {
   const { repositories, clientId, refresh } = useDemo();
