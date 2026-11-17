@@ -53,7 +53,14 @@ window.fetch = async (input, init) => {
                 : connection.status;
       }
       localStorage.setItem("test-whatsapp", JSON.stringify(connections));
-      return Response.json({ delivery: "delivered" });
+      return Response.json({
+        ok: true,
+        eventId: crypto.randomUUID(),
+        connectionId: "00000000-0000-4000-8000-000000000123",
+        kind: "received",
+        message:
+          "Evento recebido pelo n8n. O resultado da Evolution ainda está aguardando confirmação.",
+      });
     }
     return Response.json(connections);
   }

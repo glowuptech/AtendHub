@@ -5,6 +5,8 @@ import {
   dispatchConnectionEvent,
 } from "@/features/whatsapp/server";
 import { actionSchema } from "@/features/whatsapp/model";
+export const maxDuration = 60;
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
@@ -58,11 +60,23 @@ export async function POST(
       );
     eventId = data.eventId;
   }
-  let delivery = "retry";
+
   try {
-    delivery = await dispatchConnectionEvent(auth, eventId);
+    const result = await dispatchConnectionEvent(auth, eventId);
+    if (!result.ok)
+      return NextResponse.json(
+        { error: result.message, eventId: result.eventId, connectionId: result.connectionId },
+        { status: result.httpStatus },
+      );
+    return NextResponse.json(result);
   } catch {
-    /* Event is durable, never report connection as established here. */
+    return NextResponse.json(
+      {
+        error: "A ação foi salva, mas não foi possível confirmar a resposta. Reenvie o mesmo evento.",
+        eventId,
+        connectionId: id,
+      },
+      { status: 502 },
+    );
   }
-  return NextResponse.json({ eventId, delivery });
 }

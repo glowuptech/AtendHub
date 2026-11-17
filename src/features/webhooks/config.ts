@@ -11,7 +11,7 @@ export const webhookDestinations = [
     id: "whatsappConnection",
     title: "Conexão de WhatsApp",
     description:
-      "Solicitação de uma nova conexão de WhatsApp. O n8n conduz a conexão com a Evolution, vinculada ao cliente e à instância correspondente.",
+      "Atend&Hub envia POST JSON ao n8n e aguarda o Respond to Webhook com o resultado real da Evolution. O evento é vinculado à organização, cliente e instância correspondentes; não exige assinatura nem callback.",
     events: [
       "whatsapp.connection.create_requested",
       "whatsapp.connection.confirm_requested",
