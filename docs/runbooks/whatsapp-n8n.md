@@ -43,7 +43,8 @@ Exemplo exato do payload (valores ilustrativos; os IDs reais são UUIDs gerados 
     "id": "44444444-5555-4666-8777-888888888888",
     "instanceName": "dra-ana-luiza-recepcao",
     "name": "recepcao",
-    "phone": "551633334444"
+    "phone": "551633334444",
+    "apiKey": "<incluída pelo servidor quando já existe credencial salva>"
   }
 }
 ```
@@ -121,7 +122,9 @@ Se o fluxo só puder confirmar o recebimento, sem resultado final, devolva por e
 }
 ```
 
-Resposta genérica não altera o status da conexão. Uma resposta `ok: true` com `status` deve incluir `message`; statuses incompatíveis com a ação serão recusados. Campos extras não são aceitos. A mensagem é exibida como texto, nunca como HTML.
+Resposta genérica não altera o status da conexão. Uma resposta `ok: true` com `status` deve incluir `message`; statuses incompatíveis com a ação serão recusados. Campos extras são ignorados, exceto `apikey`, que é validada e capturada exclusivamente no servidor. A mensagem é exibida como texto, nunca como HTML.
+
+Quando a Evolution retornar a API key da instância, o `Respond to Webhook` pode incluí-la como `apikey` no JSON de resultado. O Atend&Hub salva esse valor na tabela privada vinculada à conexão e à organização do evento; ele não é devolvido ao navegador, adicionado à outbox ou registrado em logs. Em eventos posteriores, o servidor consulta a credencial e envia o nome exato `connection.apiKey` no payload para o n8n. Na criação inicial, esse campo é omitido enquanto não houver credencial salva. Nunca envie a chave como dado fornecido pelo navegador.
 
 ## Persistência e segurança
 
@@ -134,7 +137,14 @@ A URL por organização continua armazenada em Configurações → Webhooks. Nen
 O servidor aceita também a resposta Evolution/n8n abaixo, diretamente ou encapsulada em uma lista de um item com `Final` contendo o JSON serializado:
 
 ```json
-{"success":true,"status":"connecting","qr_code":"data:image/png;base64,...","pairing_code":null,"message":"QR Code gerado","expires_in":60}
+{
+  "success": true,
+  "status": "connecting",
+  "qr_code": "data:image/png;base64,...",
+  "pairing_code": null,
+  "message": "QR Code gerado",
+  "expires_in": 60
+}
 ```
 
 - `connecting` é normalizado para `awaiting_confirmation`. Nunca significa conectado.
@@ -143,5 +153,5 @@ O servidor aceita também a resposta Evolution/n8n abaixo, diretamente ou encaps
 - A imagem e o pairing code são transitórios: não são salvos no banco, logs, outbox ou localStorage. Recarregar a página descarta o QR e exige nova solicitação.
 - “Gerar novo QR Code” envia um novo `whatsapp.connection.update_requested` para a mesma instância e telefone. O handler de atualização no n8n deve consultar/gerar o QR atual na Evolution e devolvê-lo, sem criar outra instância. A chave de idempotência é nova para essa nova solicitação; reenvios de um evento antigo não devem criar outra instância.
 - Somente a confirmação efetiva devolvendo `connected` conclui o pareamento. A imagem é ocultada quando a conexão está conectada ou excluída.
-- Campos desconhecidos da resposta, incluindo `apikey`, não são repassados ao navegador. A persistência privada da chave retornada ainda é uma etapa separada, solicitada para implementação no v0. Ela não foi criada por esta alteração de QR.
+- Campos desconhecidos da resposta não são repassados ao navegador. A `apikey`, se retornada, é persistida em tabela privada e nunca incluída no resultado HTTP da aplicação.
 - A resposta de produção fornecida pelo usuário foi analisada localmente (sem chamada ao n8n) e aceita: JSON em Final, success, connecting e imagem PNG em Data URL. Nenhum conteúdo dessa credencial ou QR foi incorporado aos fixtures do repositório.

@@ -29,6 +29,12 @@ it("comandos, resposta síncrona, idempotência, isolamento e persistência", as
         "utf8",
       ),
     );
+    await db.exec(
+      await readFile(
+        "supabase/migrations/20261117080000_atendhub_whatsapp_private_credentials.sql",
+        "utf8",
+      ),
+    );
 
     const request = (index: number) =>
       `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`;
@@ -46,6 +52,7 @@ it("comandos, resposta síncrona, idempotência, isolamento e persistência", as
       eventId: string,
       status: string | null,
       deliveryStatus = "delivered",
+      apiKey: string | null = null,
     ) =>
       db.query<{
         result: {
@@ -55,8 +62,8 @@ it("comandos, resposta síncrona, idempotência, isolamento e persistência", as
           status: string | null;
         };
       }>(
-        `select public.atendhub_whatsapp_apply_response($1,$2,$3) as result`,
-        [eventId, deliveryStatus, status],
+        `select public.atendhub_whatsapp_apply_response($1,$2,$3,$4) as result`,
+        [eventId, deliveryStatus, status, apiKey],
       );
 
     const createRequest = request(1000);
@@ -107,20 +114,80 @@ it("comandos, resposta síncrona, idempotência, isolamento e persistência", as
       delivery_status: "delivered",
       result_status: null,
     });
-
-    const confirmation = (
-      await command("confirm", 1001, connectionId)
-    ).rows[0].result;
     expect(
       (
-        await apply(confirmation.eventId, "connected")
-      ).rows[0].result,
+        await db.query(
+          "select connection_id from public.atendhub_whatsapp_connection_credentials",
+        )
+      ).rows,
+    ).toHaveLength(0);
+    await apply(
+      createdEvent,
+      "awaiting_confirmation",
+      "delivered",
+      "synthetic-key-v1",
+    );
+    expect(
+      (
+        await db.query<{ has_api_key: boolean }>(
+          "select payload->'connection' ? 'apiKey' as has_api_key from public.atendhub_whatsapp_events where id=$1",
+          [createdEvent],
+        )
+      ).rows[0].has_api_key,
+    ).toBe(false);
+    const savedCredential = await db.query<{
+      api_key: string;
+      organization_id: string;
+    }>(
+      "select api_key,organization_id from public.atendhub_whatsapp_connection_credentials where connection_id=$1",
+      [connectionId],
+    );
+    expect(savedCredential.rows[0]).toEqual({
+      api_key: "synthetic-key-v1",
+      organization_id: "00000000-0000-4000-8000-000000000010",
+    });
+    await expect(
+      db.query(
+        "insert into public.atendhub_whatsapp_connection_credentials(connection_id,organization_id,api_key) values($1,$2,$3)",
+        [
+          connectionId,
+          "00000000-0000-4000-8000-000000000020",
+          "synthetic-cross-tenant-key",
+        ],
+      ),
+    ).rejects.toThrow();
+    await apply(
+      createdEvent,
+      "awaiting_confirmation",
+      "delivered",
+      "synthetic-key-v1",
+    );
+    expect(
+      (
+        await db.query(
+          "select connection_id from public.atendhub_whatsapp_connection_credentials",
+        )
+      ).rows,
+    ).toHaveLength(1);
+
+    const confirmation = (await command("confirm", 1001, connectionId)).rows[0]
+      .result;
+    expect(
+      (await apply(confirmation.eventId, "connected")).rows[0].result,
     ).toMatchObject({ received: true, applied: true, status: "connected" });
     const persistedAfterReload = await db.query<{ status: string }>(
       "select status from public.atendhub_whatsapp_connections where id=$1",
       [connectionId],
     );
     expect(persistedAfterReload.rows[0].status).toBe("connected");
+    expect(
+      (
+        await db.query<{ api_key: string }>(
+          "select api_key from public.atendhub_whatsapp_connection_credentials where connection_id=$1",
+          [connectionId],
+        )
+      ).rows[0].api_key,
+    ).toBe("synthetic-key-v1");
 
     const update = (await command("update", 1002, connectionId, "551633335555"))
       .rows[0].result;
@@ -138,15 +205,19 @@ it("comandos, resposta síncrona, idempotência, isolamento e persistência", as
       await command("update", 1003, connectionId, "551633336666")
     ).rows[0].result;
     await apply(pendingUpdate.eventId, "awaiting_confirmation");
-    const pendingConfirmation = (
-      await command("confirm", 1004, connectionId)
-    ).rows[0].result;
+    const pendingConfirmation = (await command("confirm", 1004, connectionId))
+      .rows[0].result;
     await apply(pendingConfirmation.eventId, null);
     const deletion = (await command("delete", 1005, connectionId)).rows[0]
       .result;
     expect(
       (
-        await apply(pendingConfirmation.eventId, "connected")
+        await apply(
+          pendingConfirmation.eventId,
+          "connected",
+          "delivered",
+          "synthetic-key-v2",
+        )
       ).rows[0].result,
     ).toMatchObject({ received: true, applied: false, stale: true });
     expect(
@@ -159,28 +230,47 @@ it("comandos, resposta síncrona, idempotência, isolamento e persistência", as
     ).toBe("delete_pending");
     expect(
       (
-        await apply(deletion.eventId, "deleted")
-      ).rows[0].result,
+        await db.query<{ api_key: string }>(
+          "select api_key from public.atendhub_whatsapp_connection_credentials where connection_id=$1",
+          [connectionId],
+        )
+      ).rows[0].api_key,
+    ).toBe("synthetic-key-v1");
+    expect(
+      (await apply(deletion.eventId, "deleted")).rows[0].result,
     ).toMatchObject({ applied: true, status: "deleted" });
 
     await expect(apply(deletion.eventId, "connected")).rejects.toThrow(
       "INVALID_TRANSITION",
     );
     await expect(
-      db.query(
-        `select public.atendhub_whatsapp_command('confirm',$1,$2)`,
-        [request(1006), connectionId],
-      ),
+      db.query(`select public.atendhub_whatsapp_command('confirm',$1,$2)`, [
+        request(1006),
+        connectionId,
+      ]),
     ).rejects.toThrow("CONNECTION_NOT_FOUND");
 
     await db.exec(
       "select set_config('app.user_id','',false); grant usage on schema auth to authenticated; grant select on public.atendhub_team_members to authenticated; set role authenticated",
     );
     expect(
-      (
-        await db.query("select * from public.atendhub_whatsapp_connections")
-      ).rows,
+      (await db.query("select * from public.atendhub_whatsapp_connections"))
+        .rows,
     ).toHaveLength(0);
+    await expect(
+      db.query(
+        "select api_key from public.atendhub_whatsapp_connection_credentials",
+      ),
+    ).rejects.toThrow("permission denied");
+    await db.exec("reset role; set role anon");
+    await expect(
+      db.query(
+        "select api_key from public.atendhub_whatsapp_connection_credentials",
+      ),
+    ).rejects.toThrow("permission denied");
+    await db.exec(
+      "reset role; select set_config('app.user_id','',false); set role authenticated",
+    );
     await expect(
       db.query(
         `select public.atendhub_whatsapp_apply_response($1,'delivered','connected')`,
@@ -189,10 +279,10 @@ it("comandos, resposta síncrona, idempotência, isolamento e persistência", as
     ).rejects.toThrow("permission denied");
     await db.exec("reset role; select set_config('app.user_id','',false)");
     await expect(
-      db.query(
-        `select public.atendhub_whatsapp_command('confirm',$1,$2)`,
-        [request(1007), connectionId],
-      ),
+      db.query(`select public.atendhub_whatsapp_command('confirm',$1,$2)`, [
+        request(1007),
+        connectionId,
+      ]),
     ).rejects.toThrow("WHATSAPP_FORBIDDEN");
   } finally {
     await db.close();

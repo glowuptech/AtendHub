@@ -15,30 +15,29 @@ it("aceita a resposta real do n8n: lista, Final serializado, success e connectin
       }),
     },
   ]);
-  expect(result).toMatchObject({
+  expect(result.publicResult).toMatchObject({
     ok: true,
     status: "awaiting_confirmation",
     qrCode: qr,
   });
-  expect(JSON.stringify(result)).not.toContain("apikey");
-  expect(JSON.stringify(result)).not.toContain("never-send-this");
+  expect(result.privateCredential).toBe("never-send-this");
+  expect(JSON.stringify(result.publicResult)).not.toContain("apikey");
+  expect(JSON.stringify(result.publicResult)).not.toContain("never-send-this");
 });
 it("aceita JSON direto, base64 puro e respostas antigas sem QR", () => {
-  expect(
-    parseWhatsappResponse({
-      success: true,
-      status: "connecting",
-      qr_code: qr.split(",")[1],
-      message: "QR",
-    }).qrCode,
-  ).toBe(qr);
-  expect(
-    parseWhatsappResponse({
-      ok: true,
-      status: "connected",
-      message: "Conectado",
-    }),
-  ).toMatchObject({ ok: true, status: "connected" });
+  const direct = parseWhatsappResponse({
+    success: true,
+    status: "connecting",
+    qr_code: qr.split(",")[1],
+    message: "QR",
+  });
+  expect(direct.publicResult.qrCode).toBe(qr);
+  const plain = parseWhatsappResponse({
+    ok: true,
+    status: "connected",
+    message: "Conectado",
+  });
+  expect(plain.publicResult).toMatchObject({ ok: true, status: "connected" });
 });
 it("rejeita URL externa, SVG, imagem inválida e respostas ambíguas", () => {
   for (const value of [
