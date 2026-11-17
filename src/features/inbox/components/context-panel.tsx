@@ -55,7 +55,8 @@ export function ContextPanel({
             <div>
               <dt>Conexão</dt>
               <dd>
-                {conversation.connection.name} · +{conversation.connection.phone}
+                {conversation.connection.name} · +
+                {conversation.connection.phone}
               </dd>
             </div>
             <div>
@@ -67,11 +68,12 @@ export function ContextPanel({
             <div>
               <dt>Responsável</dt>
               <dd>
-                {conversation.ownerId
-                  ? conversation.mine
-                    ? "Você"
-                    : "Outro atendente"
-                  : "Não atribuído"}
+                {conversation.ownerName ||
+                  (conversation.ownerId
+                    ? conversation.mine
+                      ? "Você"
+                      : "Outro atendente"
+                    : "Não atribuído")}
               </dd>
             </div>
             <div>

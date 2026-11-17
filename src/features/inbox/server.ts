@@ -1,4 +1,5 @@
 import "server-only";
+import { ownerLabels } from "@/lib/supabase/owner-labels";
 import type { sessionOrganizationContext } from "@/lib/supabase/organization-session";
 import {
   destinationUrl,
@@ -36,10 +37,7 @@ type RpcError = { code?: string; message?: string };
 
 function mapSendError(error: RpcError) {
   const text = error.message ?? "";
-  if (
-    error.code === "42501" ||
-    /FORBIDDEN|NOT_AUTHENTICATED/.test(text)
-  )
+  if (error.code === "42501" || /FORBIDDEN|NOT_AUTHENTICATED/.test(text))
     return new InboxError(
       "Você não tem permissão para enviar nesta conversa.",
       403,
@@ -92,7 +90,8 @@ export async function listConversations(
     .eq("organization_id", auth.organizationId)
     .order("last_message_at", { ascending: false, nullsFirst: false })
     .limit(300);
-  if (error) throw new InboxError("Não foi possível carregar as conversas.", 500);
+  if (error)
+    throw new InboxError("Não foi possível carregar as conversas.", 500);
   const rows = (data ?? []) as ConversationRow[];
   if (!rows.length) return [];
 
@@ -142,6 +141,10 @@ export async function listConversations(
       : { data: [], error: null },
   ]);
 
+  const labels = await ownerLabels(
+    auth,
+    (leads.data ?? []).map((l) => l.owner_id),
+  );
   const leadById = new Map((leads.data ?? []).map((l) => [l.id as string, l]));
   const clientById = new Map(
     (clients.data ?? []).map((c) => [c.id as string, c]),
@@ -178,17 +181,19 @@ export async function listConversations(
           phone: connection.phone as string,
           status: connection.status as string,
         },
-        contactName:
-          (lead.name as string).trim() || `+${row.phone}`,
+        contactName: (lead.name as string).trim() || `+${row.phone}`,
         phone: row.phone,
         stage: lead.stage as string,
         source: lead.source as string,
         ownerId: (lead.owner_id as string | null) ?? null,
         mine,
+        ownerName: lead.owner_id
+          ? (labels.get(lead.owner_id) ??
+            (mine ? "Você" : "Responsável da equipe"))
+          : null,
         professionalName:
           (professionalById.get(lead.professional_id as string)?.name as
-            | string
-            | undefined) ?? null,
+            string | undefined) ?? null,
         status: row.status,
         unreadCount: row.unread_count,
         lastMessageAt: row.last_message_at,
@@ -262,7 +267,8 @@ export async function listMessages(
     .limit(MESSAGE_PAGE_SIZE + 1);
   if (before) query = query.lt("occurred_at", before);
   const { data, error } = await query;
-  if (error) throw new InboxError("Não foi possível carregar as mensagens.", 500);
+  if (error)
+    throw new InboxError("Não foi possível carregar as mensagens.", 500);
   const rows = (data ?? []) as MessageRow[];
   const hasMore = rows.length > MESSAGE_PAGE_SIZE;
   return {

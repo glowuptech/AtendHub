@@ -1,6 +1,7 @@
 // Isolated browser harness: real components, simulated persistence only.
 import { useEffect, useState } from "react";
 import { WhatsappSettings } from "@/features/whatsapp/settings";
+import { Inbox } from "@/features/inbox/components/inbox";
 import { Queue } from "@/features/queue/queue";
 import { createRoot } from "react-dom/client";
 import { EditorWorkspace } from "@/features/forms/components/editor";
@@ -17,14 +18,94 @@ const queueLead = () => ({
   source: "form",
   stage: queueOwner ? "in_progress" : "new",
   owner_id: queueOwner,
+  owner_name: queueOwner ? "Ana Atendente" : null,
   created_at: new Date().toISOString(),
   capture_status: "completed",
   claimed_at: queueOwner ? new Date().toISOString() : null,
+});
+const inboxLead = {
+  id: "00000000-0000-4000-8000-000000000600",
+  name: "Adriele",
+  phone: "16999990000",
+  clientId: clients[0].id,
+  clientName: clients[0].name,
+  operationCode: "prescrita",
+  operationName: "Prescrita",
+  stage: "in_progress",
+  connections: [
+    {
+      id: "00000000-0000-4000-8000-000000000601",
+      name: "Recepção",
+      phone: "5516900000000",
+      status: "connected",
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000602",
+      name: "Segunda linha",
+      phone: "5516900000001",
+      status: "connected",
+    },
+  ],
+};
+const inboxConversation = () => ({
+  ...JSON.parse(localStorage.getItem("test-started-conversation") ?? "null"),
 });
 const stored = localStorage.getItem("editor-test-draft");
 const original = window.fetch.bind(window);
 window.fetch = async (input, init) => {
   const url = String(input);
+  if (url === "/api/inbox/assigned-leads")
+    return Response.json(
+      localStorage.getItem("test-started-conversation") ? [] : [inboxLead],
+    );
+  if (url === "/api/inbox/conversations") {
+    if (init?.method === "POST") {
+      const body = JSON.parse(String(init.body));
+      const chosen = inboxLead.connections.find(
+        (c) => c.id === body.connectionId,
+      )!;
+      const conversation = {
+        id: "00000000-0000-4000-8000-000000000603",
+        leadId: inboxLead.id,
+        clientId: inboxLead.clientId,
+        clientName: inboxLead.clientName,
+        operationCode: "prescrita",
+        operationName: "Prescrita",
+        connection: chosen,
+        contactName: inboxLead.name,
+        phone: inboxLead.phone,
+        stage: "in_progress",
+        source: "manual",
+        ownerId: "user",
+        ownerName: "Ana Atendente",
+        mine: true,
+        professionalName: null,
+        status: "open",
+        unreadCount: 0,
+        lastMessageAt: null,
+        lastMessagePreview: "",
+        lastInboundAt: null,
+        lastOutboundAt: null,
+        createdAt: new Date().toISOString(),
+        canSend: true,
+        sendBlockedReason: null,
+      };
+      localStorage.setItem(
+        "test-started-conversation",
+        JSON.stringify(conversation),
+      );
+      return Response.json({ id: conversation.id });
+    }
+    return Response.json(
+      localStorage.getItem("test-started-conversation")
+        ? [inboxConversation()]
+        : [],
+    );
+  }
+  if (url.startsWith("/api/inbox/conversations/") && url.includes("/messages"))
+    return Response.json({ messages: [], hasMore: false });
+  if (url.startsWith("/api/inbox/conversations/") && url.endsWith("/read"))
+    return Response.json({ ok: true });
   if (url.startsWith("/api/whatsapp/connections")) {
     const connections = JSON.parse(
       localStorage.getItem("test-whatsapp") ?? "[]",
@@ -143,7 +224,9 @@ function EditorHarness() {
 
 createRoot(document.getElementById("root")!).render(
   <main style={{ padding: 24 }}>
-    {new URLSearchParams(location.search).has("whatsapp") ? (
+    {new URLSearchParams(location.search).has("inbox") ? (
+      <Inbox />
+    ) : new URLSearchParams(location.search).has("whatsapp") ? (
       <WhatsappSettings />
     ) : new URLSearchParams(location.search).has("queue") ? (
       <Queue />

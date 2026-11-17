@@ -11,8 +11,18 @@ export type PersistedLead = {
   email: string;
   source: string;
   capture_status: "in_progress" | "incomplete" | "completed";
-  stage: "new" | "in_progress" | "waiting" | "scheduled" | "awaiting_scheduling" | "confirmed" | "rescheduling" | "recovery" | "lost";
+  stage:
+    | "new"
+    | "in_progress"
+    | "waiting"
+    | "scheduled"
+    | "awaiting_scheduling"
+    | "confirmed"
+    | "rescheduling"
+    | "recovery"
+    | "lost";
   owner_id: string | null;
+  owner_name?: string | null;
   form_id: string | null;
   form_version_id: string | null;
   origin_submission_id: string | null;
@@ -31,22 +41,51 @@ export type PersistedLead = {
   professional?: { id: string; name: string } | null;
 };
 
-const fetcher = async <T,>(url: string): Promise<T> => {
+const fetcher = async <T>(url: string): Promise<T> => {
   const response = await fetch(url);
   const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? "Não foi possível carregar os leads.");
+  if (!response.ok)
+    throw new Error(body.error ?? "Não foi possível carregar os leads.");
   return body;
 };
 
 export function useLead(leadId: string) {
-  return useSWR<PersistedLead & { events?: Array<{ id: string; event_type: string; from_stage: string | null; to_stage: string | null; created_at: string }>; responses?: Array<{ id: string; question_id: string; question_snapshot: { label?: string; options?: Array<{ id: string; label: string }> }; value: unknown; captured_at: string }> }>(`/api/leads/${leadId}`, fetcher, { revalidateOnFocus: false });
+  return useSWR<
+    PersistedLead & {
+      events?: Array<{
+        id: string;
+        event_type: string;
+        from_stage: string | null;
+        to_stage: string | null;
+        created_at: string;
+      }>;
+      responses?: Array<{
+        id: string;
+        question_id: string;
+        question_snapshot: {
+          label?: string;
+          options?: Array<{ id: string; label: string }>;
+        };
+        value: unknown;
+        captured_at: string;
+      }>;
+    }
+  >(`/api/leads/${leadId}`, fetcher, { revalidateOnFocus: false });
 }
 
-export function useLeads(params: { clientId?: string | null; search?: string; stage?: string } = {}) {
+export function useLeads(
+  params: { clientId?: string | null; search?: string; stage?: string } = {},
+) {
   const query = new URLSearchParams();
   if (params.clientId) query.set("clientId", params.clientId);
   if (params.search) query.set("search", params.search);
   if (params.stage && params.stage !== "all") query.set("stage", params.stage);
-  const key = params.clientId === null ? null : `/api/leads${query.size ? `?${query}` : ""}`;
-  return useSWR<PersistedLead[]>(key, fetcher, { revalidateOnFocus: false, refreshInterval: 15000 });
+  const key =
+    params.clientId === null
+      ? null
+      : `/api/leads${query.size ? `?${query}` : ""}`;
+  return useSWR<PersistedLead[]>(key, fetcher, {
+    revalidateOnFocus: false,
+    refreshInterval: 15000,
+  });
 }

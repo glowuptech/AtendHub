@@ -28,11 +28,6 @@ export function Queue() {
     error: leadsError,
     mutate: mutateLeads,
   } = useLeads();
-  function converse() {
-    setMessage(
-      "O Inbox ainda não está conectado a um provedor de mensagens. Nenhuma mensagem foi simulada.",
-    );
-  }
   const [now, setNow] = useState<number | null>(null),
     [message, setMessage] = useState(""),
     [claimingId, setClaimingId] = useState<string | null>(null),
@@ -216,7 +211,10 @@ export function Queue() {
                     ) : (
                       <>
                         <p>
-                          Responsável: <strong>{l.owner_id}</strong>
+                          Responsável:{" "}
+                          <strong>
+                            {l.owner_name || "Responsável da equipe"}
+                          </strong>
                         </p>
                         {l.claimed_at && <Badge>Atendimento assumido</Badge>}
                         <label>
@@ -261,7 +259,10 @@ export function Queue() {
                       >
                         Abrir lead
                       </Button>
-                      <Button variant="outline" onClick={converse}>
+                      <Button
+                        variant="outline"
+                        onClick={() => router.push(`/app/inbox?leadId=${l.id}`)}
+                      >
                         Conversar
                       </Button>
                     </div>
