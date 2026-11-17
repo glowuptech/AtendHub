@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Heading, Badge } from "@/components/layout/shared";
 import { WebhookSettings } from "@/features/webhooks/settings";
+import { WhatsappSettings } from "@/features/whatsapp/settings";
 import { TeamPage } from "@/features/team/team";
 import { ServiceCalendar } from "./calendar";
 const tabs = [
@@ -115,9 +116,12 @@ export function SettingsPage() {
             >
               <Icon size={18} aria-hidden="true" />
               <span>{title}</span>
-              {id !== "calendar" && id !== "team" && id !== "webhooks" && (
-                <span className="settings-soon">Em breve</span>
-              )}
+              {id !== "calendar" &&
+                id !== "team" &&
+                id !== "webhooks" &&
+                id !== "whatsapp" && (
+                  <span className="settings-soon">Em breve</span>
+                )}
             </button>
           ))}
         </div>
@@ -132,6 +136,8 @@ export function SettingsPage() {
             <ServiceCalendar />
           ) : selected === "webhooks" ? (
             <WebhookSettings />
+          ) : selected === "whatsapp" ? (
+            <WhatsappSettings />
           ) : selected === "team" ? (
             <TeamPage />
           ) : (

@@ -1,5 +1,6 @@
 // Isolated browser harness: real components, simulated persistence only.
 import { useEffect, useState } from "react";
+import { WhatsappSettings } from "@/features/whatsapp/settings";
 import { Queue } from "@/features/queue/queue";
 import { createRoot } from "react-dom/client";
 import { EditorWorkspace } from "@/features/forms/components/editor";
@@ -24,9 +25,45 @@ const stored = localStorage.getItem("editor-test-draft");
 const original = window.fetch.bind(window);
 window.fetch = async (input, init) => {
   const url = String(input);
+  if (url.startsWith("/api/whatsapp/connections")) {
+    const connections = JSON.parse(
+      localStorage.getItem("test-whatsapp") ?? "[]",
+    );
+    if (init?.method === "POST") {
+      const body = JSON.parse(String(init.body));
+      if (url === "/api/whatsapp/connections")
+        connections.push({
+          id: crypto.randomUUID(),
+          client_id: body.clientId,
+          name: body.name,
+          instance_name: "cliente-" + body.name,
+          phone: "55" + body.phone.replace(/\D/g, ""),
+          status: "awaiting_confirmation",
+        });
+      else {
+        const connection = connections.find((c: { id: string }) =>
+          url.endsWith(c.id),
+        );
+        if (connection)
+          connection.status =
+            body.action === "confirm"
+              ? "confirming"
+              : body.action === "delete"
+                ? "delete_pending"
+                : connection.status;
+      }
+      localStorage.setItem("test-whatsapp", JSON.stringify(connections));
+      return Response.json({ delivery: "delivered" });
+    }
+    return Response.json(connections);
+  }
   if (url === "/api/settings/calendar") return Response.json(null);
   if (url.endsWith("/claim")) {
-    if (new URLSearchParams(location.search).has("denied")) return Response.json({error:"Sua conta não tem permissão para assumir este atendimento."}, {status:403});
+    if (new URLSearchParams(location.search).has("denied"))
+      return Response.json(
+        { error: "Sua conta não tem permissão para assumir este atendimento." },
+        { status: 403 },
+      );
     queueOwner = "test-user";
     return Response.json(queueLead());
   }
@@ -73,7 +110,9 @@ function EditorHarness() {
 
 createRoot(document.getElementById("root")!).render(
   <main style={{ padding: 24 }}>
-    {new URLSearchParams(location.search).has("queue") ? (
+    {new URLSearchParams(location.search).has("whatsapp") ? (
+      <WhatsappSettings />
+    ) : new URLSearchParams(location.search).has("queue") ? (
       <Queue />
     ) : new URLSearchParams(location.search).has("list") ? (
       <FormsList id={clients[0].id} />

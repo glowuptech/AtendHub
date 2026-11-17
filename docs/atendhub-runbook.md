@@ -8,6 +8,7 @@
 | Leads e fila | Persistido e funcional (base) | Tabelas `atendhub_leads`, `atendhub_lead_events` e APIs de criação, consulta, edição, assunção atômica e movimentação. Assunção, distribuição e movimentação usam permissões distintas no servidor. |
 | Calendário de SLA | Persistido e funcional | `atendhub_service_calendars` é lido/salvo pela configuração; o cálculo usa `created_at` do servidor, fuso, dias, feriados e exceções. Sem calendário salvo, o prazo fica indisponível; a assunção pode ser solicitada e a RPC valida a permissão. |
 | Formulários e respostas | Editor/listagem persistidos; público pendente | CRUD de formulários e versões usa Supabase/RLS; cadastro manual usa versão, respostas históricas e estado incompleto. A rota pública ainda não está conectada. |
+| Conexão WhatsApp e destinos de webhook | Código persistido preparado; ativação pendente | Migration 20261117000000, variáveis de assinatura e configuração n8n pendentes no servidor real. Ver docs/runbooks/whatsapp-n8n.md. |
 | Inbox e mensagens | Dependente de integração externa | Nenhuma mensagem é simulada; WhatsApp/SMS permanecem desligados. |
 | Agendamentos | Sem dados fictícios, ainda não conectado | Não são criados automaticamente por Leads. |
 | Indicadores, gráficos e investimentos | Sem dados fictícios, ainda não conectado | Não usar os valores demonstrativos restantes em telas não migradas. |

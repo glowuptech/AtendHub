@@ -12,7 +12,12 @@ export const webhookDestinations = [
     title: "Conexão de WhatsApp",
     description:
       "Solicitação de uma nova conexão de WhatsApp. O n8n conduz a conexão com a Evolution, vinculada ao cliente e à instância correspondente.",
-    events: ["whatsapp.connection.requested"],
+    events: [
+      "whatsapp.connection.create_requested",
+      "whatsapp.connection.confirm_requested",
+      "whatsapp.connection.update_requested",
+      "whatsapp.connection.delete_requested",
+    ],
   },
   {
     id: "inboxMessages",
