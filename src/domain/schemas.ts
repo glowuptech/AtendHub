@@ -107,10 +107,11 @@ export const ClientSchema = z.object({
   vertical: z.enum(["healthcare", "legal"]),
   status: z.enum(["active", "paused"]),
   branding: z.enum(["prescrita", "sage"]),
-  externalSchedulingUrl: z
-    .string()
-    .url()
-    .refine((v) => new URL(v).protocol === "https:", "A agenda deve usar HTTPS"),
+  externalSchedulingName: z.string().trim().max(120).optional(),
+  externalSchedulingUrl: z.string().max(2000).refine(value => {
+    if (!value) return true;
+    try { const u=new URL(value);return u.protocol==="https:" && !u.username && !u.password; } catch {return false;}
+  }, "Informe uma URL HTTPS válida, sem credenciais no endereço."),
   description: z.string(),
   category: z
     .enum(["clinic", "doctor_male", "doctor_female"])

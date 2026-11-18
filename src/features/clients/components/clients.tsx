@@ -10,6 +10,8 @@ import { LeadTable } from "@/features/leads/components/lead-table";
 import { ClientOverview } from "./overview";
 import { ClientInformation } from "./information";
 import { FormsList } from "@/features/forms/components/forms-list";
+import { ClientAccesses } from "./client-accesses";
+import { ExternalScheduling } from "./external-scheduling";
 import { KnowledgeBase } from "./knowledge-base";
 export { Clients } from "./directory";
 export function ClientProfile({ id }: { id: string }) {
@@ -17,8 +19,20 @@ export function ClientProfile({ id }: { id: string }) {
   const { data: clients, error, isLoading } = useClients();
   const [tab, setTab] = useState("Visão geral");
   if (id !== clientId) return <Denied />;
-  if (isLoading) return <Card><p role="status">Carregando cliente persistido…</p></Card>;
-  if (error) return <Card><p role="alert" className="field-error">{error.message}</p></Card>;
+  if (isLoading)
+    return (
+      <Card>
+        <p role="status">Carregando cliente persistido…</p>
+      </Card>
+    );
+  if (error)
+    return (
+      <Card>
+        <p role="alert" className="field-error">
+          {error.message}
+        </p>
+      </Card>
+    );
   const c = clients?.find((client) => client.id === id);
   if (!c) return <Denied />;
   return (
@@ -36,6 +50,7 @@ export function ClientProfile({ id }: { id: string }) {
           "Leads",
           "Formulários",
           "Agendamento externo",
+          "Acessos",
         ].map((t) => (
           <Button
             key={t}
@@ -55,27 +70,20 @@ export function ClientProfile({ id }: { id: string }) {
         />
       ) : tab === "Informações" ? (
         <ClientInformation key={id} client={c} />
-  ) : tab === "Leads" ? (
-    <Card>
-      <LeadTable leads={scope.clientIds.includes(id) ? repositories.leads.list(id) : []} />
-    </Card>
+      ) : tab === "Leads" ? (
+        <Card>
+          <LeadTable
+            leads={
+              scope.clientIds.includes(id) ? repositories.leads.list(id) : []
+            }
+          />
+        </Card>
       ) : tab === "Formulários" ? (
         <FormsList id={id} />
       ) : tab === "Agendamento externo" ? (
-        <Card title="A agenda oficial é externa">
-          <p>
-            Este link abre apenas example.com, um endereço seguro de prévia. Não
-            representa a agenda de uma médica.
-          </p>
-          <a
-            className="button button-primary"
-            href={c.externalSchedulingUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Abrir sistema de agenda
-          </a>
-        </Card>
+        <ExternalScheduling key={id} clientId={id} />
+      ) : tab === "Acessos" ? (
+        <ClientAccesses key={id} clientId={id} />
       ) : tab === "Base de conhecimento" ? (
         <KnowledgeBase key={id} client={c} />
       ) : null}

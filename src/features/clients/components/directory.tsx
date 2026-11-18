@@ -444,7 +444,7 @@ function CreateClinic({
             status,
             vertical: "healthcare",
             branding: "prescrita",
-            externalSchedulingUrl: "https://example.com/agenda-demo",
+            externalSchedulingUrl: "",
             doctors: doctors.map((d) => ({
               id: crypto.randomUUID(),
               name: d.name,

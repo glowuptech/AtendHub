@@ -1,5 +1,7 @@
 // Isolated browser harness: real components, simulated persistence only.
 import { useEffect, useState } from "react";
+import { ExternalScheduling } from "@/features/clients/components/external-scheduling";
+import { ClientAccesses } from "@/features/clients/components/client-accesses";
 import { WhatsappSettings } from "@/features/whatsapp/settings";
 import { Inbox } from "@/features/inbox/components/inbox";
 import { Queue } from "@/features/queue/queue";
@@ -54,6 +56,50 @@ const stored = localStorage.getItem("editor-test-draft");
 const original = window.fetch.bind(window);
 window.fetch = async (input, init) => {
   const url = String(input);
+  if (url.endsWith("/scheduling")) {
+    if (init?.method === "PUT") {
+      const body = JSON.parse(String(init.body));
+      localStorage.setItem("test-scheduling", JSON.stringify(body));
+      return Response.json({ ...body, canEdit: true });
+    }
+    return Response.json({
+      ...JSON.parse(
+        localStorage.getItem("test-scheduling") ?? '{"name":"","url":""}',
+      ),
+      canEdit: true,
+    });
+  }
+  if (url.includes("/accesses")) {
+    const rows = JSON.parse(localStorage.getItem("test-accesses") ?? "[]");
+    const base = url.endsWith("/accesses");
+    if (init?.method === "POST" && !base)
+      return Response.json({ password: "senha-de-teste" });
+    if (init?.method === "POST" || init?.method === "PATCH") {
+      const { password, ...body } = JSON.parse(String(init.body));
+      void password;
+      const item = {
+        ...body,
+        id: base ? crypto.randomUUID() : url.split("/").at(-1),
+        updated_at: new Date().toISOString(),
+      };
+      localStorage.setItem(
+        "test-accesses",
+        JSON.stringify([
+          ...rows.filter((r: { id: string }) => r.id !== item.id),
+          item,
+        ]),
+      );
+      return Response.json(item);
+    }
+    if (init?.method === "DELETE") {
+      localStorage.setItem(
+        "test-accesses",
+        JSON.stringify(rows.filter((r: { id: string }) => !url.endsWith(r.id))),
+      );
+      return Response.json({ ok: true });
+    }
+    return Response.json(rows);
+  }
   if (url === "/api/inbox/assigned-leads")
     return Response.json(
       localStorage.getItem("test-started-conversation") ? [] : [inboxLead],
@@ -224,7 +270,12 @@ function EditorHarness() {
 
 createRoot(document.getElementById("root")!).render(
   <main style={{ padding: 24 }}>
-    {new URLSearchParams(location.search).has("inbox") ? (
+    {new URLSearchParams(location.search).has("client-access") ? (
+      <>
+        <ExternalScheduling clientId={clients[0].id} />
+        <ClientAccesses clientId={clients[0].id} />
+      </>
+    ) : new URLSearchParams(location.search).has("inbox") ? (
       <Inbox />
     ) : new URLSearchParams(location.search).has("whatsapp") ? (
       <WhatsappSettings />
