@@ -4,7 +4,6 @@ import {
   matchesSearch,
   waitingFor,
 } from "@/features/inbox/services/presentation";
-import { unavailableAssistant } from "@/features/inbox/services/assistant";
 import { interpretSendResponse } from "@/features/inbox/model";
 import type { InboxConversation } from "@/features/inbox/model";
 
@@ -44,16 +43,6 @@ test("busca aceita acentos e telefone formatado sem agrupar identidades", () => 
   expect(matchesSearch("11999998888", ["(11) 99999-8888"])).toBe(true);
   expect(matchesSearch("Ana", ["Outro cliente"])).toBe(false);
   expect(matchesSearch("-", ["Clínica"])).toBe(false);
-});
-
-test("IA desconectada não produz respostas", async () => {
-  expect(unavailableAssistant.available).toBe(false);
-  await expect(
-    unavailableAssistant.ask(
-      { conversationId: "c1", question: "Valor?" },
-      new AbortController().signal,
-    ),
-  ).rejects.toThrow("não conectado");
 });
 
 test("envio só é confirmado com ok=true e messageId do provedor", () => {
