@@ -1,9 +1,16 @@
-import type { Lead, AppointmentMirror } from "@/domain/schemas";
 import { localDay, shiftDay } from "@/features/clients/services/overview";
+export type BookingLead = {
+  id: string;
+  clientId: string;
+  name: string;
+  createdAt: string;
+  contact?: { phone?: string | null; email?: string | null } | null;
+};
+export type BookingRef = { clientId: string; leadId: string };
 export type LeadFilter = "all" | "unbooked" | "recent7" | "recent30";
-export function searchBookingLeads(
-  leads: Lead[],
-  appointments: AppointmentMirror[],
+export function searchBookingLeads<T extends BookingLead>(
+  leads: T[],
+  appointments: BookingRef[],
   input: { clientId: string; query: string; filter: LeadFilter; today: string },
 ) {
   const normalize = (s: string) =>

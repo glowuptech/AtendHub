@@ -1,10 +1,14 @@
 "use client";
 import { useId, useState } from "react";
 import { Search } from "lucide-react";
-import type { Lead, AppointmentMirror } from "@/domain/schemas";
 import { Button } from "@/components/ui/button";
 import { localDay } from "@/features/clients/services/overview";
-import { searchBookingLeads, type LeadFilter } from "../services/lead-search";
+import {
+  searchBookingLeads,
+  type BookingLead,
+  type BookingRef,
+  type LeadFilter,
+} from "../services/lead-search";
 export function LeadPicker({
   leads,
   appointments,
@@ -12,8 +16,8 @@ export function LeadPicker({
   value,
   onChange,
 }: {
-  leads: Lead[];
-  appointments: AppointmentMirror[];
+  leads: BookingLead[];
+  appointments: BookingRef[];
   clientId: string;
   value: string;
   onChange: (id: string) => void;

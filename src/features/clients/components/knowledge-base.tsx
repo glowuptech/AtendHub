@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import useSWR, { mutate as mutateCache } from "swr";
 import type { Client, KnowledgeEntry } from "@/domain/schemas";
 import { Card } from "@/components/layout/shared";
@@ -66,6 +66,8 @@ export function KnowledgeBase({ client }: { client: Client }) {
   const [status, setStatus] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
   const knowledge = data?.knowledge ?? [];
   const canEdit = data?.canEdit ?? false;
   const entries = [
@@ -84,15 +86,16 @@ export function KnowledgeBase({ client }: { client: Client }) {
     setMessage("");
   };
 
-  async function save(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!draft || !canEdit) return;
+  async function save() {
+    if (!draft || !canEdit || saving) return;
     const updated = { ...draft, updatedAt: new Date().toISOString() };
     const nextKnowledge = [
       ...knowledge.filter((entry) => entry.id !== draft.id),
       updated,
     ];
     setError("");
+    setMessage("");
+    setSaving(true);
     try {
       const response = await fetch(url, {
         method: "PATCH",
@@ -112,6 +115,8 @@ export function KnowledgeBase({ client }: { client: Client }) {
           ? cause.message
           : "Confira os campos e tente novamente.",
       );
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -148,7 +153,14 @@ export function KnowledgeBase({ client }: { client: Client }) {
 
       {draft && canEdit && (
         <Card title={draft.id.startsWith("standard-") ? "Editar resposta padrão" : "Editar pergunta ou serviço"}>
-          <form onSubmit={(event) => void save(event)}>
+          <form
+            ref={formRef}
+            aria-busy={saving}
+            onSubmit={(event) => {
+              event.preventDefault();
+              void save();
+            }}
+          >
             <div className="profile-info-grid">
               <label>Pergunta ou nome do serviço<input required minLength={3} maxLength={300} value={draft.question} onChange={(event) => patch({ question: event.target.value })} /></label>
               <label>Categoria<input required maxLength={100} value={draft.category} onChange={(event) => patch({ category: event.target.value })} /></label>
@@ -160,8 +172,18 @@ export function KnowledgeBase({ client }: { client: Client }) {
             </div>
             <p>Em caso de divergência, registre as duas versões e marque “Confirmar com a clínica”. Campo vazio significa não informado, nunca gratuidade ou cobertura confirmada.</p>
             {error && <p role="alert" className="field-error">{error}</p>}
+            {saving && <p role="status">Salvando resposta…</p>}
             <div className="tabs">
-              <Button type="submit">Salvar resposta</Button>
+              <Button
+                type="submit"
+                disabled={saving}
+                onClick={(event) => {
+                  event.preventDefault();
+                  if (formRef.current?.reportValidity()) void save();
+                }}
+              >
+                {saving ? "Salvando…" : "Salvar resposta"}
+              </Button>
               <Button type="button" variant="outline" onClick={() => { setDraft(null); setError(""); }}>Cancelar</Button>
             </div>
           </form>

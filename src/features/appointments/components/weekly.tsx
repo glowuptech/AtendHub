@@ -1,6 +1,12 @@
 "use client";
 import { LeadPicker } from "./lead-picker";
-import { useState, useRef, useEffect, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -18,98 +24,124 @@ import {
 } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
 import { localDay, shiftDay } from "@/features/clients/services/overview";
+import { useLeads } from "@/features/leads/hooks";
 import {
   weekDays,
   monday,
   timeLabel,
-  endsAt,
   overlaps,
   minutes,
+  type Availability,
   type Booking,
 } from "../services/schedule";
+import { intervalsToSlots, slotsToIntervals } from "../services/intervals";
+import {
+  changeAppointment,
+  createAppointment,
+  saveAvailability,
+  useAgenda,
+  type AgendaAppointment,
+  type AppointmentChange,
+} from "../hooks";
 import { AvailabilityEditor, shortDay } from "./availability";
-import type { AppointmentMirror } from "@/domain/schemas";
-import { z } from "zod";
+import type { BookingLead } from "../services/lead-search";
+
 const subscribe = () => () => {};
+const brazilMinutes = (iso: string) => {
+  const local = new Date(Date.parse(iso) - 3 * 3600000);
+  return local.getUTCHours() * 60 + local.getUTCMinutes();
+};
+const message = (e: unknown, fallback = "Confira os campos.") =>
+  e instanceof Error ? e.message : fallback;
+const durationOf = (a: AgendaAppointment) =>
+  Math.round((Date.parse(a.endsAt) - Date.parse(a.startsAt)) / 60000);
+
 export function WeeklyAppointments() {
   const ready = useSyncExternalStore(
     subscribe,
     () => true,
     () => false,
   );
-  const { clientId, scope, authorizedClients } = useDemo();
+  const { clientId, authorizedClients } = useDemo();
+  const client = authorizedClients.find((item) => item.id === clientId);
 
-  if (!ready || !clientId) {
+  if (!ready || !clientId || !client) {
     return <LoadingState label="Carregando agenda…" />;
   }
-
-  if (!scope.clientIds.includes(clientId)) {
-    const selectedClient = authorizedClients.find(
-      (client) => client.id === clientId,
-    );
-
-    return (
-      <>
-        <Heading
-          title="Agendamentos"
-          eyebrow="WORKSPACE"
-          description={`${selectedClient?.name ?? "Clínica selecionada"} · agenda por profissional · America/Sao_Paulo`}
-        />
-        <Empty
-          title="Agenda indisponível para esta clínica"
-          description="Esta clínica está autorizada, mas não possui dados no repositório de demonstração. Nenhum dado de outra clínica será exibido."
-        />
-      </>
-    );
-  }
-
-  return <WeeklyWorkspace key={clientId} />;
+  return (
+    <WeeklyWorkspace
+      key={clientId}
+      clientId={clientId}
+      clientName={client.name}
+      doctors={client.doctors}
+    />
+  );
 }
-function WeeklyWorkspace() {
-  const { repositories, clientId, refresh } = useDemo();
-  const client = repositories.clients.get(clientId),
-    schedule = repositories.schedule;
-  const [doctor, setDoctor] = useState(client.doctors[0]?.id ?? ""),
+
+function WeeklyWorkspace({
+  clientId,
+  clientName,
+  doctors,
+}: {
+  clientId: string;
+  clientName: string;
+  doctors: { id: string; name: string }[];
+}) {
+  const [doctor, setDoctor] = useState(doctors[0]?.id ?? ""),
     [week, setWeek] = useState(() =>
       monday(localDay(new Date().toISOString())),
     ),
     [config, setConfig] = useState(false),
     [notice, setNotice] = useState(""),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false);
   const [booking, setBooking] = useState<Booking | null>(null),
-    [opened, setOpened] = useState<AppointmentMirror | null>(null);
-  const days = weekDays(week),
-    all = schedule.list(clientId),
-    availability = doctor ? schedule.get(clientId, doctor, week) : null;
-  const weekAppointments = all.filter((a) =>
-      days.includes(localDay(a.scheduledAt)),
-    ),
-    appointments = weekAppointments.filter(
-      (a) => schedule.doctorId(a) === doctor,
-    ),
-    unassigned = weekAppointments.filter((a) => !schedule.doctorId(a));
+    [openedId, setOpenedId] = useState<string | null>(null),
+    [reschedule, setReschedule] = useState<{
+      day: string;
+      time: string;
+      duration: number;
+    } | null>(null);
+  const agenda = useAgenda(clientId, doctor || null, week);
+  const { data, error: loadError, isLoading, mutate } = agenda;
+  const leadsQuery = useLeads({ clientId: booking ? clientId : null });
+  const days = weekDays(week);
+  const today = localDay(new Date().toISOString());
+  const appointments = useMemo(() => data?.appointments ?? [], [data]);
+  const opened = appointments.find((a) => a.id === openedId) ?? null;
+  const availability = useMemo<Availability | null>(
+    () =>
+      data && doctor
+        ? {
+            doctorId: doctor,
+            week,
+            slots: intervalsToSlots(data.intervals),
+            defaultDuration: data.settings.defaultDuration,
+            displayStep: data.settings.displayStep,
+          }
+        : null,
+    [data, doctor, week],
+  );
+  const bookingLeads = useMemo<BookingLead[]>(
+    () =>
+      (leadsQuery.data ?? []).map((lead) => ({
+        id: lead.id,
+        clientId,
+        name: lead.name,
+        createdAt: lead.created_at,
+        contact: { phone: lead.phone, email: lead.email },
+      })),
+    [leadsQuery.data, clientId],
+  );
+  const bookedRefs = useMemo(
+    () => (data?.bookedLeadIds ?? []).map((leadId) => ({ clientId, leadId })),
+    [data, clientId],
+  );
   const slotSet = new Set(availability?.slots ?? []);
+  const step = availability?.displayStep ?? 30;
   const rawMinutes = [
     ...(availability?.slots ?? []).map((s) => minutes(s.slice(11))),
-    ...appointments.map((a) => {
-      const d = new Date(a.scheduledAt);
-      return (
-        Number(
-          new Intl.DateTimeFormat("en-GB", {
-            hour: "2-digit",
-            hourCycle: "h23",
-            timeZone: "America/Sao_Paulo",
-          }).format(d),
-        ) *
-          60 +
-        Number(
-          new Intl.DateTimeFormat("en-GB", {
-            minute: "2-digit",
-            timeZone: "America/Sao_Paulo",
-          }).format(d),
-        )
-      );
-    }),
+    ...appointments.map((a) => brazilMinutes(a.startsAt)),
   ];
   const from = Math.min(480, ...rawMinutes),
     to = Math.min(
@@ -117,15 +149,12 @@ function WeeklyWorkspace() {
       Math.max(
         1080,
         ...rawMinutes.map((n) => n + 60),
-        ...appointments.map((a) => {
-          const local = new Date(Date.parse(endsAt(a)) - 3 * 3600000);
-          return local.getUTCHours() * 60 + local.getUTCMinutes() || 1440;
-        }),
+        ...appointments.map((a) => brazilMinutes(a.endsAt) || 1440),
       ),
     );
   const rows = Array.from(
-    { length: Math.ceil((to - from) / (availability?.displayStep ?? 30)) },
-    (_, i) => from + i * (availability?.displayStep ?? 30),
+    { length: Math.ceil((to - from) / step) },
+    (_, i) => from + i * step,
   );
   function newBooking(day = days[0], time = "08:00") {
     setError("");
@@ -139,42 +168,78 @@ function WeeklyWorkspace() {
       notes: "",
     });
   }
-  function saveBooking() {
-    if (!booking) return;
+  async function saveBooking() {
+    if (!booking || busy) return;
+    if (!booking.leadId) return setError("Selecione um lead para agendar.");
+    setBusy(true);
     try {
-      schedule.book(clientId, booking);
-      refresh();
+      await createAppointment(clientId, booking.id, {
+        professionalId: booking.doctorId,
+        leadId: booking.leadId,
+        day: booking.day,
+        time: booking.time,
+        duration: booking.duration,
+        notes: booking.notes,
+      });
+      await mutate();
       setBooking(null);
-      setNotice(
-        "Agendamento salvo. Evento de notificação registrado na fila em memória; envio externo pendente.",
-      );
+      setError("");
+      setNotice("Agendamento salvo.");
     } catch (e) {
-      setError(
-        e instanceof z.ZodError
-          ? e.issues[0].message
-          : e instanceof Error
-            ? e.message
-            : "Confira os campos.",
-      );
+      setError(message(e));
+    } finally {
+      setBusy(false);
     }
   }
-  function attendance(
-    a: AppointmentMirror,
-    value: AppointmentMirror["attendance"],
+  async function change(
+    a: AgendaAppointment,
+    body: AppointmentChange,
+    done: string,
   ) {
-    repositories.appointments.setAttendance(clientId, a.id, value);
-    refresh();
-    setOpened({ ...a, attendance: value });
-    setNotice("Comparecimento atualizado nesta sessão.");
+    if (busy) return;
+    setBusy(true);
+    try {
+      await changeAppointment(a.id, body);
+      await mutate();
+      setError("");
+      setReschedule(null);
+      if (body.action === "status" && body.status === "cancelled")
+        setOpenedId(null);
+      setNotice(done);
+    } catch (e) {
+      setError(message(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function saveConfig(value: Availability) {
+    try {
+      await saveAvailability(clientId, {
+        professionalId: doctor,
+        week,
+        defaultDuration: value.defaultDuration,
+        displayStep: value.displayStep,
+        intervals: slotsToIntervals(value.slots),
+      });
+      await mutate();
+      setConfig(false);
+      setNotice("Disponibilidade salva para esta semana.");
+      setError("");
+    } catch (e) {
+      setError(message(e, "Confira os horários."));
+    }
   }
   return (
     <>
       <Heading
         title="Agendamentos"
         eyebrow="WORKSPACE"
-        description={`${client.name} · agenda por profissional · America/Sao_Paulo`}
+        description={`${clientName} · agenda por profissional · America/Sao_Paulo`}
         action={
-          <Button disabled={!doctor} onClick={() => newBooking()}>
+          <Button
+            disabled={!doctor || !availability}
+            onClick={() => newBooking()}
+          >
             <Plus size={16} />
             Criar agendamento
           </Button>
@@ -191,10 +256,10 @@ function WeeklyWorkspace() {
               setError("");
             }}
           >
-            {!client.doctors.length && (
+            {!doctors.length && (
               <option value="">Nenhum profissional cadastrado</option>
             )}
-            {client.doctors.map((d) => (
+            {doctors.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
               </option>
@@ -240,7 +305,7 @@ function WeeklyWorkspace() {
           <Button
             variant="ghost"
             onClick={() => {
-              setWeek(monday(localDay(new Date().toISOString())));
+              setWeek(monday(today));
               setConfig(false);
             }}
           >
@@ -249,7 +314,12 @@ function WeeklyWorkspace() {
         </div>
         <Button
           variant="outline"
-          disabled={!doctor}
+          disabled={!doctor || !availability || !data?.canManageAvailability}
+          title={
+            data && !data.canManageAvailability
+              ? "Seu perfil não pode configurar a disponibilidade."
+              : undefined
+          }
           onClick={() => setConfig(!config)}
         >
           <SlidersHorizontal size={16} />
@@ -285,22 +355,17 @@ function WeeklyWorkspace() {
           key={`${clientId}:${doctor}:${week}`}
           value={availability}
           onCancel={() => setConfig(false)}
-          onSave={(value) => {
-            try {
-              schedule.save(clientId, value);
-              refresh();
-              setConfig(false);
-              setNotice("Disponibilidade salva para esta semana.");
-              setError("");
-            } catch (e) {
-              setError(e instanceof Error ? e.message : "Confira os horários.");
-            }
-          }}
+          onSave={saveConfig}
         />
       )}
-      {error && !booking && (
+      {error && !booking && !opened && (
         <p role="alert" className="field-error">
           {error}
+        </p>
+      )}
+      {loadError && (
+        <p role="alert" className="field-error">
+          {message(loadError, "Não foi possível carregar a agenda.")}
         </p>
       )}
       {!doctor ? (
@@ -308,6 +373,10 @@ function WeeklyWorkspace() {
           title="Cadastre um profissional para configurar a agenda"
           description="Adicione os profissionais nas informações do cliente."
         />
+      ) : isLoading || !availability ? (
+        loadError ? null : (
+          <LoadingState label="Carregando agenda…" />
+        )
       ) : (
         <>
           <div
@@ -317,12 +386,10 @@ function WeeklyWorkspace() {
           >
             <div
               className="schedule-grid"
-              data-has-today={days.includes(localDay(new Date().toISOString()))}
+              data-has-today={days.includes(today)}
               style={
                 {
-                  "--today-index": days.indexOf(
-                    localDay(new Date().toISOString()),
-                  ),
+                  "--today-index": days.indexOf(today),
                 } as React.CSSProperties
               }
             >
@@ -331,24 +398,19 @@ function WeeklyWorkspace() {
                 <div
                   className="schedule-day-heading"
                   key={day}
-                  data-today={day === localDay(new Date().toISOString())}
-                  aria-current={
-                    day === localDay(new Date().toISOString())
-                      ? "date"
-                      : undefined
-                  }
+                  data-today={day === today}
+                  aria-current={day === today ? "date" : undefined}
                 >
                   <strong>
                     {shortDay(day)}
-                    {day === localDay(new Date().toISOString()) && (
+                    {day === today && (
                       <span className="schedule-today-label">Hoje</span>
                     )}
                   </strong>
                   <small>
                     {
-                      appointments.filter(
-                        (a) => localDay(a.scheduledAt) === day,
-                      ).length
+                      appointments.filter((a) => localDay(a.startsAt) === day)
+                        .length
                     }{" "}
                     agendamentos
                   </small>
@@ -358,13 +420,15 @@ function WeeklyWorkspace() {
                 <ScheduleRow
                   key={minute}
                   minute={minute}
-                  step={availability?.displayStep ?? 30}
+                  step={step}
                   days={days}
+                  today={today}
                   slots={slotSet}
                   appointments={appointments}
                   onBook={newBooking}
                   onOpen={(a) => {
-                    setOpened(a);
+                    setOpenedId(a.id);
+                    setReschedule(null);
                     setError("");
                   }}
                 />
@@ -372,27 +436,10 @@ function WeeklyWorkspace() {
             </div>
           </div>
           <small className="schedule-note">
-            Intervalo visual: {availability?.displayStep ?? 30} minutos. Apenas
-            os intervalos liberados na configuração ficam disponíveis. Dados
-            desta sessão, sem sincronização com a agenda externa.
+            Intervalo visual: {step} minutos. Apenas os intervalos liberados na
+            configuração ficam disponíveis. Horários em America/Sao_Paulo.
           </small>
         </>
-      )}
-      {!!unassigned.length && (
-        <section className="team-note">
-          <h2>Registros sem profissional vinculado</h2>
-          <p>Estes registros não bloqueiam a agenda de um médico específico.</p>
-          {unassigned.map((a) => (
-            <Button
-              key={a.id}
-              variant="outline"
-              size="sm"
-              onClick={() => setOpened(a)}
-            >
-              {a.name} · {dateTime(a.scheduledAt)}
-            </Button>
-          ))}
-        </section>
       )}
       <details>
         <summary>
@@ -402,15 +449,19 @@ function WeeklyWorkspace() {
           appointments.map((a) => (
             <div className="schedule-record" key={a.id}>
               <span>
-                <strong>{a.name}</strong>
+                <strong>{a.leadName}</strong>
                 <small>
-                  {dateTime(a.scheduledAt)} ·{" "}
-                  {a.endsAt
-                    ? `${(Date.parse(a.endsAt) - Date.parse(a.scheduledAt)) / 60000} min`
-                    : "30 min de referência (registro anterior)"}
+                  {dateTime(a.startsAt)} · {durationOf(a)} min
                 </small>
               </span>
-              <Button variant="outline" size="sm" onClick={() => setOpened(a)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setOpenedId(a.id);
+                  setReschedule(null);
+                }}
+              >
                 Ver agendamento
               </Button>
             </div>
@@ -431,19 +482,19 @@ function WeeklyWorkspace() {
             noValidate
             onSubmit={(e) => {
               e.preventDefault();
-              saveBooking();
+              void saveBooking();
             }}
           >
             <p>
               Profissional:{" "}
               <strong>
-                {client.doctors.find((d) => d.id === booking.doctorId)?.name}
+                {doctors.find((d) => d.id === booking.doctorId)?.name}
               </strong>
             </p>
             <LeadPicker
               clientId={clientId}
-              leads={repositories.leads.list(clientId)}
-              appointments={all}
+              leads={bookingLeads}
+              appointments={bookedRefs}
               value={booking.leadId}
               onChange={(leadId) => setBooking({ ...booking, leadId })}
             />
@@ -503,7 +554,9 @@ function WeeklyWorkspace() {
               </p>
             )}
             <div className="actions">
-              <Button type="submit">Salvar agendamento</Button>
+              <Button type="submit" disabled={busy}>
+                {busy ? "Salvando…" : "Salvar agendamento"}
+              </Button>
               <Button
                 variant="outline"
                 type="button"
@@ -521,50 +574,188 @@ function WeeklyWorkspace() {
       {opened && (
         <ScheduleDialog
           title="Detalhes do agendamento"
-          onClose={() => setOpened(null)}
+          onClose={() => {
+            setOpenedId(null);
+            setReschedule(null);
+            setError("");
+          }}
         >
-          <h3>{opened.name}</h3>
+          <h3>{opened.leadName}</h3>
           <p>
-            {dateTime(opened.scheduledAt)} até {dateTime(endsAt(opened))}
+            {dateTime(opened.startsAt)} até {dateTime(opened.endsAt)}
           </p>
           <p>
-            {client.doctors.find((d) => d.id === schedule.doctorId(opened))
-              ?.name ?? "Sem profissional vinculado"}
+            {doctors.find((d) => d.id === opened.professionalId)?.name ??
+              "Sem profissional vinculado"}
           </p>
-          {!opened.endsAt && (
-            <small>
-              Duração de referência de 30 minutos para registro anterior sem
-              término informado.
-            </small>
+          {opened.notes && <p className="preserve-lines">{opened.notes}</p>}
+          <div className="actions">
+            <Badge>
+              {opened.status === "confirmed"
+                ? "Confirmado"
+                : opened.status === "rescheduling"
+                  ? "Em remarcação"
+                  : "Aguardando confirmação"}
+            </Badge>
+            <Badge>
+              {opened.attendance === "present"
+                ? "Compareceu"
+                : opened.attendance === "absent"
+                  ? "Não compareceu"
+                  : "Comparecimento não informado"}
+            </Badge>
+          </div>
+          {error && (
+            <p className="field-error" role="alert">
+              {error}
+            </p>
           )}
-          <p className="preserve-lines">{opened.notes}</p>
-          <Badge>
-            {opened.attendance === "present"
-              ? "Compareceu"
-              : opened.attendance === "absent"
-                ? "Não compareceu"
-                : "Comparecimento não informado"}
-          </Badge>
           <div className="actions">
             <Button
               variant="outline"
-              onClick={() => attendance(opened, "present")}
+              disabled={busy}
+              onClick={() =>
+                change(
+                  opened,
+                  { action: "attendance", attendance: "present" },
+                  "Comparecimento atualizado.",
+                )
+              }
             >
               Compareceu
             </Button>
             <Button
               variant="outline"
-              onClick={() => attendance(opened, "absent")}
+              disabled={busy}
+              onClick={() =>
+                change(
+                  opened,
+                  { action: "attendance", attendance: "absent" },
+                  "Comparecimento atualizado.",
+                )
+              }
             >
               Não compareceu
             </Button>
             <Button
               variant="ghost"
-              onClick={() => attendance(opened, "unknown")}
+              disabled={busy}
+              onClick={() =>
+                change(
+                  opened,
+                  { action: "attendance", attendance: "unknown" },
+                  "Comparecimento atualizado.",
+                )
+              }
             >
               Confirmar depois
             </Button>
           </div>
+          <div className="actions">
+            {opened.status !== "confirmed" && (
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() =>
+                  change(
+                    opened,
+                    { action: "status", status: "confirmed" },
+                    "Agendamento confirmado.",
+                  )
+                }
+              >
+                Confirmar agendamento
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={() =>
+                setReschedule(
+                  reschedule
+                    ? null
+                    : {
+                        day: localDay(opened.startsAt),
+                        time: timeLabel(brazilMinutes(opened.startsAt)),
+                        duration: durationOf(opened),
+                      },
+                )
+              }
+            >
+              Remarcar
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={() => {
+                if (window.confirm("Cancelar este agendamento?"))
+                  void change(
+                    opened,
+                    { action: "status", status: "cancelled" },
+                    "Agendamento cancelado.",
+                  );
+              }}
+            >
+              Cancelar agendamento
+            </Button>
+          </div>
+          {reschedule && (
+            <form
+              noValidate
+              onSubmit={(e) => {
+                e.preventDefault();
+                void change(
+                  opened,
+                  { action: "reschedule", ...reschedule },
+                  "Agendamento remarcado.",
+                );
+              }}
+            >
+              <div className="form-columns">
+                <label>
+                  Nova data
+                  <input
+                    type="date"
+                    value={reschedule.day}
+                    onChange={(e) =>
+                      setReschedule({ ...reschedule, day: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  Novo horário
+                  <input
+                    type="time"
+                    step={60}
+                    value={reschedule.time}
+                    onChange={(e) =>
+                      setReschedule({ ...reschedule, time: e.target.value })
+                    }
+                  />
+                </label>
+              </div>
+              <label>
+                Duração em minutos
+                <input
+                  type="number"
+                  min={1}
+                  max={480}
+                  value={reschedule.duration}
+                  onChange={(e) =>
+                    setReschedule({
+                      ...reschedule,
+                      duration: Number(e.target.value),
+                    })
+                  }
+                />
+              </label>
+              <div className="actions">
+                <Button type="submit" disabled={busy}>
+                  Salvar nova data
+                </Button>
+              </div>
+            </form>
+          )}
         </ScheduleDialog>
       )}
     </>
@@ -574,6 +765,7 @@ function ScheduleRow({
   minute,
   step,
   days,
+  today,
   slots,
   appointments,
   onBook,
@@ -582,10 +774,11 @@ function ScheduleRow({
   minute: number;
   step: number;
   days: string[];
+  today: string;
   slots: Set<string>;
-  appointments: AppointmentMirror[];
+  appointments: AgendaAppointment[];
   onBook: (day: string, time: string) => void;
-  onOpen: (a: AppointmentMirror) => void;
+  onOpen: (a: AgendaAppointment) => void;
 }) {
   return (
     <>
@@ -597,24 +790,20 @@ function ScheduleRow({
             overlaps(
               start,
               start + step * 60000,
-              Date.parse(a.scheduledAt),
-              Date.parse(endsAt(a)),
+              Date.parse(a.startsAt),
+              Date.parse(a.endsAt),
             ),
           ),
           free = slots.has(`${day}T${time}`);
         if (booked.length)
           return (
-            <div
-              className="schedule-cell"
-              key={day}
-              data-today={day === localDay(new Date().toISOString())}
-            >
+            <div className="schedule-cell" key={day} data-today={day === today}>
               {booked.map((a) => (
                 <button
                   key={a.id}
                   className="schedule-slot"
                   data-state="booked"
-                  aria-label={`${shortDay(day)} ${time} Agendado: ${a.name}`}
+                  aria-label={`${shortDay(day)} ${time} Agendado: ${a.leadName}`}
                   onClick={() => onOpen(a)}
                 >
                   <span>
@@ -622,11 +811,11 @@ function ScheduleRow({
                       hour: "2-digit",
                       minute: "2-digit",
                       timeZone: "America/Sao_Paulo",
-                    }).format(new Date(a.scheduledAt))}
+                    }).format(new Date(a.startsAt))}
                   </span>
                   <small>
-                    {a.name}
-                    {Date.parse(a.scheduledAt) < start ? " · continuação" : ""}
+                    {a.leadName}
+                    {Date.parse(a.startsAt) < start ? " · continuação" : ""}
                   </small>
                 </button>
               ))}
@@ -636,7 +825,7 @@ function ScheduleRow({
           <button
             key={day}
             className="schedule-slot"
-            data-today={day === localDay(new Date().toISOString())}
+            data-today={day === today}
             data-state={free ? "free" : "blocked"}
             disabled={!free}
             aria-label={`${shortDay(day)} ${time} ${free ? "Disponível" : "Indisponível"}`}
