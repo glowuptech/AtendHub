@@ -9,11 +9,17 @@ export type AgendaAppointment = {
   startsAt: string;
   endsAt: string;
   notes: string;
+  service?: {
+    description: string;
+    amountCents: number | null;
+    currency: "BRL";
+  };
   status: "awaiting_confirmation" | "confirmed" | "rescheduling" | "cancelled";
   attendance: "unknown" | "present" | "absent";
 };
 
 export type Agenda = {
+  capabilities?: { bookingDetails?: boolean };
   settings: { defaultDuration: number; displayStep: number };
   intervals: AvailabilityInterval[];
   appointments: AgendaAppointment[];
@@ -25,7 +31,9 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   const body = await response.json().catch(() => ({}));
   if (!response.ok)
-    throw new Error(body.error ?? "Não foi possível concluir a operação da agenda.");
+    throw new Error(
+      body.error ?? "Não foi possível concluir a operação da agenda.",
+    );
   return body as T;
 }
 
@@ -71,18 +79,37 @@ export const createAppointment = (
     time: string;
     duration: number;
     notes: string;
+    conversationId?: string;
+    personalData?: import("@/features/leads/registration/model").Registration;
+    service?: {
+      description: string;
+      amountCents: number | null;
+      currency: "BRL";
+    };
   },
 ) =>
-  request<{ created: boolean }>(`/api/clients/${clientId}/appointments`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
-    body: JSON.stringify(body),
-  });
+  request<{ created: boolean; bookingDetailsSaved?: boolean }>(
+    `/api/clients/${clientId}/appointments`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(body),
+    },
+  );
 
 export type AppointmentChange =
   | { action: "attendance"; attendance: AgendaAppointment["attendance"] }
   | { action: "status"; status: AgendaAppointment["status"]; reason?: string }
-  | { action: "reschedule"; day: string; time: string; duration: number; reason?: string };
+  | {
+      action: "reschedule";
+      day: string;
+      time: string;
+      duration: number;
+      reason?: string;
+    };
 
 export const changeAppointment = (id: string, body: AppointmentChange) =>
   request<unknown>(`/api/appointments/${id}`, {

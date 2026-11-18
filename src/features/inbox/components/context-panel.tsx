@@ -1,5 +1,5 @@
 "use client";
-import { UserRound, ExternalLink, X } from "lucide-react";
+import { UserRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge, dateTime, stageLabels } from "@/components/layout/shared";
 import type { InboxConversation } from "../model";
@@ -7,12 +7,10 @@ import { AssistantPanel } from "./assistant-panel";
 
 export function ContextPanel({
   conversation,
-  onOpenLead,
   onInsert,
   onClose,
 }: {
   conversation: InboxConversation;
-  onOpenLead: () => void;
   onInsert: (text: string) => void;
   onClose: () => void;
 }) {
@@ -87,12 +85,6 @@ export function ContextPanel({
               </div>
             )}
           </dl>
-        </div>
-        <div className="inbox-lead-actions">
-          <Button variant="outline" size="sm" onClick={onOpenLead}>
-            <ExternalLink size={14} />
-            Abrir lead e campos
-          </Button>
         </div>
       </section>
       <AssistantPanel

@@ -1,4 +1,10 @@
 "use client";
+import { BookingDetailsFields } from "./booking-details";
+import {
+  prepareBookingDetails,
+  validationMessage,
+  type BookingDetailsDraft,
+} from "@/features/leads/registration/model";
 import { LeadPicker } from "./lead-picker";
 import {
   useEffect,
@@ -52,7 +58,7 @@ const brazilMinutes = (iso: string) => {
   return local.getUTCHours() * 60 + local.getUTCMinutes();
 };
 const message = (e: unknown, fallback = "Confira os campos.") =>
-  e instanceof Error ? e.message : fallback;
+  validationMessage(e, fallback);
 const durationOf = (a: AgendaAppointment) =>
   Math.round((Date.parse(a.endsAt) - Date.parse(a.startsAt)) / 60000);
 
@@ -78,14 +84,18 @@ export function WeeklyAppointments() {
   );
 }
 
-function WeeklyWorkspace({
+export function WeeklyWorkspace({
   clientId,
   clientName,
   doctors,
+  initialLeadId,
+  conversationId,
 }: {
   clientId: string;
   clientName: string;
   doctors: { id: string; name: string }[];
+  initialLeadId?: string;
+  conversationId?: string;
 }) {
   const [doctor, setDoctor] = useState(doctors[0]?.id ?? ""),
     [week, setWeek] = useState(() =>
@@ -95,6 +105,7 @@ function WeeklyWorkspace({
     [notice, setNotice] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const [bookingDetails, setBookingDetails] = useState<BookingDetailsDraft>({});
   const [booking, setBooking] = useState<Booking | null>(null),
     [openedId, setOpenedId] = useState<string | null>(null),
     [reschedule, setReschedule] = useState<{
@@ -158,10 +169,11 @@ function WeeklyWorkspace({
   );
   function newBooking(day = days[0], time = "08:00") {
     setError("");
+    setBookingDetails({});
     setBooking({
       id: crypto.randomUUID(),
       doctorId: doctor,
-      leadId: "",
+      leadId: initialLeadId ?? "",
       day,
       time,
       duration: availability?.defaultDuration ?? 30,
@@ -173,7 +185,20 @@ function WeeklyWorkspace({
     if (!booking.leadId) return setError("Selecione um lead para agendar.");
     setBusy(true);
     try {
-      await createAppointment(clientId, booking.id, {
+      const details = {
+        ...prepareBookingDetails(bookingDetails),
+        ...(conversationId &&
+        booking.leadId === initialLeadId &&
+        data?.capabilities?.bookingDetails
+          ? { conversationId }
+          : {}),
+      };
+      if (Object.keys(details).length && !data?.capabilities?.bookingDetails)
+        throw new Error(
+          "Os campos adicionais ainda não foram ativados no servidor.",
+        );
+      const saved = await createAppointment(clientId, booking.id, {
+        ...details,
         professionalId: booking.doctorId,
         leadId: booking.leadId,
         day: booking.day,
@@ -181,6 +206,10 @@ function WeeklyWorkspace({
         duration: booking.duration,
         notes: booking.notes,
       });
+      if (Object.keys(details).length && saved.bookingDetailsSaved !== true)
+        throw new Error(
+          "O servidor não confirmou os dados adicionais. Confira a agenda antes de tentar novamente.",
+        );
       await mutate();
       setBooking(null);
       setError("");
@@ -496,7 +525,10 @@ function WeeklyWorkspace({
               leads={bookingLeads}
               appointments={bookedRefs}
               value={booking.leadId}
-              onChange={(leadId) => setBooking({ ...booking, leadId })}
+              onChange={(leadId) => {
+                setBooking({ ...booking, leadId });
+                setBookingDetails({});
+              }}
             />
             <div className="form-columns">
               <label>
@@ -544,6 +576,13 @@ function WeeklyWorkspace({
                 }
               />
             </label>
+            <BookingDetailsFields
+              key={booking.id + booking.leadId}
+              leadId={booking.leadId}
+              enabled={data?.capabilities?.bookingDetails === true}
+              value={bookingDetails}
+              onChange={setBookingDetails}
+            />
             <small>
               O lead pode estar vinculado a outro profissional; este agendamento
               mantém seu próprio vínculo com o médico selecionado.
@@ -589,6 +628,17 @@ function WeeklyWorkspace({
               "Sem profissional vinculado"}
           </p>
           {opened.notes && <p className="preserve-lines">{opened.notes}</p>}
+          {opened.service && (
+            <p>
+              Serviço: {opened.service.description} · Valor previsto:{" "}
+              {opened.service.amountCents == null
+                ? "Não informado"
+                : new Intl.NumberFormat("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  }).format(opened.service.amountCents / 100)}
+            </p>
+          )}
           <div className="actions">
             <Badge>
               {opened.status === "confirmed"
@@ -843,7 +893,9 @@ export function ScheduleDialog({
   title,
   onClose,
   children,
+  wide = false,
 }: {
+  wide?: boolean;
   title: string;
   onClose: () => void;
   children: React.ReactNode;
@@ -863,9 +915,10 @@ export function ScheduleDialog({
   return (
     <dialog
       ref={ref}
-      className="schedule-dialog"
+      className={`schedule-dialog ${wide ? "schedule-dialog-wide" : ""}`}
       aria-label={title}
       onCancel={(e) => {
+        if (e.target !== e.currentTarget) return;
         e.preventDefault();
         onClose();
       }}

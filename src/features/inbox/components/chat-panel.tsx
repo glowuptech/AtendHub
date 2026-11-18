@@ -14,6 +14,7 @@ import {
   TriangleAlert,
   RotateCw,
 } from "lucide-react";
+import { ChatShortcuts, type Shortcut } from "./chat-shortcuts";
 import { Button } from "@/components/ui/button";
 import { stageLabels } from "@/components/layout/shared";
 import { ContactAvatar } from "./avatar";
@@ -49,6 +50,8 @@ export function ChatPanel({
   onBack,
   onContext,
   contextOpen,
+  action,
+  onAction,
 }: {
   conversation: InboxConversation;
   draft: string;
@@ -56,6 +59,8 @@ export function ChatPanel({
   onBack: () => void;
   onContext: () => void;
   contextOpen: boolean;
+  action: Shortcut | null;
+  onAction: (value: Shortcut | null) => void;
 }) {
   const input = useRef<HTMLTextAreaElement>(null),
     history = useRef<HTMLDivElement>(null),
@@ -167,6 +172,13 @@ export function ChatPanel({
               conversation.stage}
           </span>
         </div>
+        <ChatShortcuts
+          key={conversation.id}
+          conversation={conversation}
+          open={action}
+          onOpen={onAction}
+          onClose={() => onAction(null)}
+        />
         <Button
           className="inbox-context-toggle"
           size="sm"

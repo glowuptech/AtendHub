@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Search, SlidersHorizontal, MessagesSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge, stageLabels } from "@/components/layout/shared";
+import type { Shortcut } from "./chat-shortcuts";
 import { StartConversation } from "./start-conversation";
 import { useAssignedInboxLeads } from "../hooks";
 import { useInboxConversations } from "../hooks";
@@ -20,8 +20,7 @@ import { ContextPanel } from "./context-panel";
 import { ContextDrawer } from "./context-drawer";
 
 export function Inbox() {
-  const router = useRouter(),
-    root = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLDivElement>(null);
   const { data, error, isLoading, mutate } = useInboxConversations();
   const {
     data: assigned = [],
@@ -33,6 +32,10 @@ export function Inbox() {
       ? (new URLSearchParams(window.location.search).get("leadId") ?? "")
       : "",
   );
+  const [chatAction, setChatAction] = useState<{
+    conversationId: string;
+    kind: Shortcut;
+  } | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState(""),
     [query, setQuery] = useState(""),
@@ -163,7 +166,6 @@ export function Inbox() {
         if (wide) setShowContext(false);
         else setDrawer(false);
       }}
-      onOpenLead={() => router.push(`/app/leads/${conversation.leadId}`)}
       onInsert={(text) =>
         setDrafts((previous) => ({
           ...previous,
@@ -437,6 +439,16 @@ export function Inbox() {
               }))
             }
             onBack={() => setMobileChat(false)}
+            action={
+              chatAction?.conversationId === conversation.id
+                ? chatAction.kind
+                : null
+            }
+            onAction={(kind) =>
+              setChatAction(
+                kind ? { conversationId: conversation.id, kind } : null,
+              )
+            }
             contextOpen={wide ? showContext : drawer}
             onContext={() => {
               if (wide) setShowContext(!showContext);

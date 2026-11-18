@@ -56,6 +56,77 @@ const stored = localStorage.getItem("editor-test-draft");
 const original = window.fetch.bind(window);
 window.fetch = async (input, init) => {
   const url = String(input);
+  if (url.endsWith("/registration")) {
+    if (new URLSearchParams(location.search).has("pending-fields"))
+      return Response.json({}, { status: 404 });
+    if (init?.method === "PATCH") {
+      const data = JSON.parse(String(init.body));
+      localStorage.setItem("test-registration", JSON.stringify(data));
+      return Response.json({ supported: true, canEdit: true, data });
+    }
+    return Response.json({
+      supported: true,
+      canEdit: true,
+      data: JSON.parse(
+        localStorage.getItem("test-registration") ??
+          '{"fullName":"","cpf":"","rg":"","birthDate":""}',
+      ),
+    });
+  }
+  if (url.endsWith("/value") && url.startsWith("/api/inbox")) {
+    if (new URLSearchParams(location.search).has("pending-fields"))
+      return Response.json({}, { status: 404 });
+    if (init?.method === "PATCH") {
+      const value = JSON.parse(String(init.body));
+      localStorage.setItem("test-conversation-value", JSON.stringify(value));
+      return Response.json({
+        supported: true,
+        canEdit: true,
+        value,
+        appointments: [],
+      });
+    }
+    return Response.json({
+      supported: true,
+      canEdit: true,
+      value: JSON.parse(
+        localStorage.getItem("test-conversation-value") ?? "null",
+      ),
+      appointments: [],
+    });
+  }
+  if (url.endsWith("/appointments") && init?.method === "POST")
+    return original(input, init);
+  if (url.includes("/agenda?"))
+    return Response.json({
+      settings: { defaultDuration: 30, displayStep: 30 },
+      intervals: [],
+      appointments: [],
+      bookedLeadIds: [],
+      canManageAvailability: true,
+      capabilities: {
+        bookingDetails: !new URLSearchParams(location.search).has(
+          "pending-fields",
+        ),
+      },
+    });
+  if (url.startsWith("/api/leads/") && !url.endsWith("/claim"))
+    return Response.json({
+      id: inboxLead.id,
+      client_id: inboxLead.clientId,
+      name: inboxLead.name,
+      phone: inboxLead.phone,
+      email: "",
+      notes: "",
+      stage: "in_progress",
+      source: "manual",
+      owner_id: "user",
+      created_at: new Date().toISOString(),
+      queue_entered_at: new Date().toISOString(),
+      original_captured_at: null,
+      responses: [],
+      events: [],
+    });
   if (url.endsWith("/scheduling")) {
     if (init?.method === "PUT") {
       const body = JSON.parse(String(init.body));
@@ -227,7 +298,20 @@ window.fetch = async (input, init) => {
     queueOwner = "test-user";
     return Response.json(queueLead());
   }
-  if (url.startsWith("/api/leads")) return Response.json([queueLead()]);
+  if (url.startsWith("/api/leads"))
+    return Response.json(
+      new URLSearchParams(location.search).has("inbox")
+        ? [
+            {
+              ...queueLead(),
+              id: inboxLead.id,
+              name: inboxLead.name,
+              phone: inboxLead.phone,
+              client_id: inboxLead.clientId,
+            },
+          ]
+        : [queueLead()],
+    );
   if (url.startsWith("/api/clients")) return Response.json(clients);
   if (url.startsWith("/api/forms")) {
     const current = JSON.parse(
