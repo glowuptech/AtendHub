@@ -97,7 +97,7 @@ export function ContextPanel({
       </section>
       <AssistantPanel
         key={conversation.id}
-        client={{ name: conversation.clientName, knowledge: [] }}
+        clientName={conversation.clientName}
         conversationId={conversation.id}
         onInsert={onInsert}
       />

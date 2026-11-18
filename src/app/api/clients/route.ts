@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ClientSchema, type Client } from "@/domain/schemas";
 import { apiError, organizationContext } from "@/lib/supabase/organization-admin";
 import { sessionOrganizationContext } from "@/lib/supabase/organization-session";
+import { canAccessKnowledge } from "@/features/clients/knowledge-server";
 
 const clientInput = ClientSchema.omit({ id: true, organizationId: true });
 const serialize = (row: { id: string; organization_id: string; name: string; status: string; metadata: unknown }, doctors: Client["doctors"]): Client => ClientSchema.parse({ ...(row.metadata as object), id: row.id, organizationId: row.organization_id, name: row.name, status: row.status, doctors });
@@ -18,6 +19,7 @@ export async function GET() {
   const auth = await sessionOrganizationContext();
   if ("error" in auth) return auth.error;
   try {
+    const canViewKnowledge = await canAccessKnowledge(auth, "view");
     let query = auth.supabase
       .from("atendhub_clients")
       .select("id, organization_id, name, status, metadata")
@@ -40,7 +42,25 @@ export async function GET() {
       ? await auth.supabase.from("atendhub_professionals").select("id, client_id, name, crm, specialties").in("client_id", ids).order("name")
       : { data: [], error: null };
     if (doctorError) throw doctorError;
-    return NextResponse.json((rows ?? []).map((row) => serialize(row, (doctors ?? []).filter((doctor) => doctor.client_id === row.id).map((doctor) => ({ id: doctor.id, name: doctor.name, crm: doctor.crm, uf: "SP", specialties: doctor.specialties ?? [] })))));
+    const clients = (rows ?? []).map((row) =>
+      serialize(
+        row,
+        (doctors ?? [])
+          .filter((doctor) => doctor.client_id === row.id)
+          .map((doctor) => ({
+            id: doctor.id,
+            name: doctor.name,
+            crm: doctor.crm,
+            uf: "SP" as const,
+            specialties: doctor.specialties ?? [],
+          })),
+      ),
+    );
+    return NextResponse.json(
+      canViewKnowledge
+        ? clients
+        : clients.map((client) => ({ ...client, knowledge: [] })),
+    );
   } catch (error) { return apiError(error, 500); }
 }
 

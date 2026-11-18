@@ -6,6 +6,56 @@ test("inbox mantém rascunhos isolados, fontes por cliente e inserção sem envi
   page,
 }) => {
   await page.setViewportSize({ width: 1800, height: 1000 });
+  const assistantHistory = new Map<string, { threadId: string; exchanges: unknown[] }>();
+  const assistantQuestions: string[] = [];
+  await page.route("**/api/inbox/conversations/*/assistant**", async (route) => {
+    const url = new URL(route.request().url());
+    const parts = url.pathname.split("/");
+    const conversationId = parts[parts.length - 2];
+    const current = assistantHistory.get(conversationId);
+    if (route.request().method() === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          conversationId,
+          threadId: current?.threadId ?? null,
+          exchanges: current?.exchanges ?? [],
+          hasMore: false,
+          nextCursor: null,
+          webhookConfigured: true,
+          knowledge: { approvedCount: 1, empty: false, version: "2026-11-18T12:00:00.000Z" },
+        }),
+      });
+      return;
+    }
+    const body = route.request().postDataJSON() as { requestId: string; question: string };
+    assistantQuestions.push(body.question);
+    const threadId = current?.threadId ?? "33333333-3333-4333-8333-333333333333";
+    const exchange = {
+      id: body.requestId,
+      requestId: body.requestId,
+      eventId: body.requestId,
+      question: body.question,
+      status: "succeeded",
+      attemptCount: 1,
+      error: null,
+      answer: "Resposta interna fundamentada na base aprovada.",
+      sources: [{ id: "kb-test", title: "Orientações", reference: "Manual administrativo aprovado" }],
+      suggestedReply: "Leve um documento com foto.",
+      createdAt: "2026-11-18T12:00:00.000Z",
+      updatedAt: "2026-11-18T12:00:00.000Z",
+    };
+    assistantHistory.set(conversationId, {
+      threadId,
+      exchanges: [...(current?.exchanges ?? []), exchange],
+    });
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ threadId, exchange }),
+    });
+  });
   await page.goto(`/app/clientes/${client}`);
   await page
     .getByRole("button", { name: "Base de conhecimento", exact: true })
@@ -43,14 +93,24 @@ test("inbox mantém rascunhos isolados, fontes por cliente e inserção sem envi
   });
   await draft.fill("Olá! ");
   const historyCount = await page.locator(".inbox-message").count();
-  await page.locator(".assistant-knowledge>summary").click();
-  await expect(page.locator(".assistant-knowledge")).toContainText(
-    "Manual administrativo aprovado",
-  );
+  expect(assistantQuestions).toEqual([]);
+  await expect(
+    page.getByRole("textbox", { name: "Pergunta ao assistente interno" }),
+  ).toBeEnabled();
   await page
-    .getByRole("button", { name: "Inserir no WhatsApp", exact: true })
+    .getByRole("textbox", { name: "Pergunta ao assistente interno" })
+    .fill("Quais documentos levar?");
+  await page
+    .getByRole("button", { name: "Enviar pergunta à IA", exact: true })
     .click();
-  await expect(draft).toHaveValue(/Leve um documento com foto/);
+  await expect(page.locator(".assistant-answer")).toContainText(
+    "Resposta interna fundamentada na base aprovada.",
+  );
+  expect(assistantQuestions).toEqual(["Quais documentos levar?"]);
+  await page
+    .getByRole("button", { name: "Inserir sugestão no rascunho", exact: true })
+    .click();
+  await expect(draft).toHaveValue(/Olá![\s\S]*Leve um documento com foto/);
   await expect(page.locator(".inbox-message")).toHaveCount(historyCount);
   await expect(
     page.getByRole("button", { name: "Enviar mensagem", exact: true }),
