@@ -1,0 +1,19 @@
+# Prompt para o v0 — ativar investimentos e validar o dashboard real
+
+Sincronize a `main` mais recente do AtendHub e preserve o dashboard recém-conectado. A página `/app/sistema` agora consulta `GET /api/dashboard/system` com sessão Supabase e RLS. Não deve voltar a usar `useDemo().repositories`, fixtures ou cálculos a partir de estágios fictícios.
+
+A parte operacional já está implementada: clientes reais, leads pela data de entrada, parciais/concluídos, primeira resposta com amostra, responsáveis, formulários, agendamentos ativos e cancelados, presenças/faltas, gráficos, filtros e comparação com período anterior. Investimento e CPL ficam indisponíveis enquanto não houver a tabela persistida. Falta de gasto não significa zero.
+
+Execute esta etapa:
+
+1. Confira o projeto Supabase efetivamente conectado ao Preview, branch e último commit. Inspecione os objetos existentes antes de aplicar SQL. Não altere tabelas legadas de outros sistemas do banco compartilhado.
+2. Aplique pelo fluxo normal de migrations `supabase/migrations/20261119000000_atendhub_dashboard_investments.sql`. Não grave o histórico de migrations à mão. O arquivo cria somente `atendhub_daily_investments` e as duas RPCs `atendhub_save_daily_investment`/`atendhub_remove_daily_investment`, índice, grants e policy.
+3. Confirme RLS ativa, leitura somente para usuários com acesso ao cliente, escrita direta bloqueada para `authenticated`/`anon`, RPCs restritas a membros ativos `super_admin`, organização/cliente coerentes e `search_path = ''`. Não use Service Role para simular um teste de permissão de usuário.
+4. Não habilite a capacidade só no front: a API detecta a tabela real e libera o formulário após a migration. Leituras sem a tabela mantêm os demais indicadores operacionais; erros de permissão/rede não podem ser substituídos por zero.
+5. Com sessão administrativa autorizada, confira os números de um cliente conhecido contra as tabelas reais. Teste os períodos 7/30/90 dias e personalizado em America/Sao_Paulo, cliente/frente, conversão única mesmo com múltiplos agendamentos, consulta futura e cancelamento. Agendamentos são pela data da consulta; conversão é pela coorte de leads.
+6. Teste investimento no grão organização/cliente/dia: salvar R$100,00, editar para R$0,00, recarregar, conferir apenas uma linha, remover e conferir ausência. Não use campanhas/clientes reais como massa de teste sem autorização específica: crie dados isolados de teste ou use uma conta de homologação. Valores são centavos BRL, não mensalidade, receita de consulta, pagamento ou comissão.
+7. Confira CPL geral = soma do gasto / todos os leads recebidos da coorte. Só calcular custos com todos os dias/clientes do filtro explicitamente informados. Zero confirmado é válido; datas sem lançamento permanecem desconhecidas. Não importar anúncios ou atribuir origem de mídia nesta etapa.
+8. Teste com conta somente leitura, outro cliente/organização e sem sessão. O dashboard retorna apenas agregados; telefones, mensagens, respostas de formulário, documentos pessoais e credenciais não devem aparecer no JSON ou CSV.
+9. O indicador histórico “Assunções após o prazo” não tem snapshot de SLA disponível no contrato atual. Por isso aparece como não disponível quando há atribuições. Não calcular um histórico presumido usando o calendário atual. Se quiser conectar essa métrica, inspecione a RPC/evento real de assunção e use exclusivamente o fato de atraso/snapshot que já tiver sido gravado; documente registros sem cobertura.
+
+Execute `npm run typecheck`, `npm run lint`, `npm test` e `npm run build`; teste no navegador autenticado, atualize o runbook e sincronize o commit/branch usada pelo Preview. Testes locais com PGlite e mocks já existem, mas não substituem a comprovação de RLS e persistência no Supabase real. Se a sessão não estiver disponível, informe exatamente o que ficou sem comprovação.

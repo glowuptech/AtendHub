@@ -4,6 +4,13 @@ import { ExternalScheduling } from "@/features/clients/components/external-sched
 import { ClientAccesses } from "@/features/clients/components/client-accesses";
 import { WhatsappSettings } from "@/features/whatsapp/settings";
 import { Inbox } from "@/features/inbox/components/inbox";
+import { SystemDashboard } from "@/features/system-dashboard/dashboard";
+import {
+  aggregateDashboard,
+  type DashboardInvestment,
+} from "@/features/system-dashboard/metrics";
+import { dataset as dashboardDataset } from "../fixtures/dashboard";
+import { shiftDay, daysBetween } from "@/lib/date-range";
 import { ServiceCalendar } from "@/features/settings/calendar";
 import { Queue } from "@/features/queue/queue";
 import { createRoot } from "react-dom/client";
@@ -59,6 +66,55 @@ const stored = localStorage.getItem("editor-test-draft");
 const original = window.fetch.bind(window);
 window.fetch = async (input, init) => {
   const url = String(input);
+  if (url.startsWith("/api/dashboard/system?")) {
+    const params = new URLSearchParams(location.search);
+    if (params.has("dashboard-error"))
+      return Response.json(
+        { error: "Falha de teste ao consultar as métricas." },
+        { status: 500 },
+      );
+    const query = new URL(url, location.origin).searchParams;
+    const range = { from: query.get("from")!, to: query.get("to")! };
+    const prior = {
+      from: shiftDay(range.from, -(daysBetween(range.from, range.to) + 1)),
+      to: shiftDay(range.from, -1),
+    };
+    const data = dashboardDataset();
+    data.investments = JSON.parse(
+      localStorage.getItem("test-dashboard-investments") ?? "[]",
+    );
+    const available = !params.has("no-investments");
+    return Response.json({
+      current: aggregateDashboard(
+        data,
+        range,
+        query.get("vertical")!,
+        query.get("clientId")!,
+      ),
+      previous: aggregateDashboard(
+        data,
+        prior,
+        query.get("vertical")!,
+        query.get("clientId")!,
+      ),
+      clients: data.clients,
+      investmentAvailable: available,
+      canManageInvestments: available,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+  if (url === "/api/dashboard/investments") {
+    const body = JSON.parse(String(init?.body));
+    const entries: DashboardInvestment[] = JSON.parse(
+      localStorage.getItem("test-dashboard-investments") ?? "[]",
+    );
+    const next = entries.filter(
+      (i) => i.clientId !== body.clientId || i.day !== body.day,
+    );
+    if (init?.method === "POST") next.push(body);
+    localStorage.setItem("test-dashboard-investments", JSON.stringify(next));
+    return Response.json({ ok: true });
+  }
   if (url.endsWith("/registration")) {
     if (new URLSearchParams(location.search).has("pending-fields"))
       return Response.json({}, { status: 404 });
@@ -377,6 +433,8 @@ createRoot(document.getElementById("root")!).render(
       <Inbox />
     ) : new URLSearchParams(location.search).has("whatsapp") ? (
       <WhatsappSettings />
+    ) : new URLSearchParams(location.search).has("dashboard") ? (
+      <SystemDashboard />
     ) : new URLSearchParams(location.search).has("queue") ? (
       <>
         {new URLSearchParams(location.search).has("calendar-editor") && (

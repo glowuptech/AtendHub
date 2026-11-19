@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import { useDemo } from "@/components/layout/demo-context";
+import { useSystemDashboard, saveInvestment } from "./hooks";
+import { parseAmount } from "@/features/leads/registration/model";
 import {
   Heading,
   Card,
@@ -9,12 +10,7 @@ import {
   stageLabels,
 } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
-import { systemOverview } from "./service";
-import {
-  localDay,
-  shiftDay,
-  RangeSchema,
-} from "@/features/clients/services/overview";
+import { localDay, shiftDay, RangeSchema } from "@/lib/date-range";
 const money = (c: number | null) =>
   c === null
     ? "Não disponível"
@@ -25,7 +21,6 @@ const pct = (v: number | null) =>
     : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
 const dayLabel = (v: string) => v.split("-").reverse().join("/");
 export function SystemDashboard() {
-  const { repositories, scope, refresh } = useDemo();
   const [today] = useState(() => localDay(new Date().toISOString()));
   const [range, setRange] = useState({ from: shiftDay(today, -29), to: today }),
     [draft, setDraft] = useState(range),
@@ -37,25 +32,48 @@ export function SystemDashboard() {
     [entryDay, setEntryDay] = useState(today),
     [amount, setAmount] = useState(""),
     [notes, setNotes] = useState("");
-  const clients = repositories.clients.list(scope);
-  const data = systemOverview(
-      repositories,
-      scope,
-      range,
-      vertical,
-      clientFilter,
-    ),
-    total = data.total;
-  const previous = systemOverview(
-    repositories,
-    scope,
-    {
-      from: shiftDay(range.from, -data.dates.length),
-      to: shiftDay(range.from, -1),
-    },
-    vertical,
-    clientFilter,
-  ).total;
+  const {
+    data: report,
+    error: loadError,
+    isLoading,
+    isValidating,
+    mutate,
+  } = useSystemDashboard(range, vertical, clientFilter);
+  const [saving, setSaving] = useState(false);
+  if (loadError || !report)
+    return (
+      <div className="system-dashboard">
+        <Heading
+          eyebrow="SISTEMA / DESEMPENHO"
+          title="Dashboard geral"
+          description="Dados reais dos clientes autorizados"
+        />
+        <p role={loadError ? "alert" : "status"}>
+          {loadError
+            ? "Não foi possível carregar as métricas reais. Nenhum zero foi presumido."
+            : "Carregando métricas reais…"}
+        </p>
+        {loadError && <p>{loadError.message}</p>}
+        {loadError && (
+          <div className="actions">
+            <Button onClick={() => void mutate()}>Tentar novamente</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setVertical("all");
+                setClientFilter("");
+              }}
+            >
+              Limpar filtros
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  const clients = report.clients,
+    data = report.current,
+    total = data.total,
+    previous = report.previous.total;
   const entries = data.rows
     .flatMap((r) => r.investment.map((i) => ({ ...i, client: r.client.name })))
     .sort(
@@ -87,8 +105,12 @@ export function SystemDashboard() {
       ...data.rows.map((r) =>
         cells([
           r.client.name,
-          r.client.vertical === "healthcare" ? "Prescrita" : "Veredite",
-          r.leads.length,
+          r.client.vertical === "healthcare"
+            ? "Prescrita"
+            : r.client.vertical === "legal"
+              ? "Veredite"
+              : "Não classificada",
+          r.leads,
           r.converted,
           r.coverage ? (r.spent / 100).toFixed(2) : "",
           r.coverage,
@@ -113,7 +135,7 @@ export function SystemDashboard() {
       <Heading
         eyebrow="SISTEMA / DESEMPENHO"
         title="Dashboard geral"
-        description="Clientes, aquisição e operação em uma visão compartilhada"
+        description="Clientes, aquisição e operação · dados reais autorizados"
         action={
           <Button variant="outline" onClick={exportReport}>
             Exportar relatório
@@ -207,13 +229,25 @@ export function SystemDashboard() {
         </small>
         {error && <p role="alert">{error}</p>}
       </form>
+      <p className="muted" role="status">
+        {isValidating || isLoading
+          ? "Atualizando métricas…"
+          : `Atualizado em ${new Date(report.updatedAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })} · America/Sao_Paulo`}
+      </p>
+      {!report.investmentAvailable && (
+        <p role="status">
+          Investimentos ainda não ativados no banco. Valores de gasto e custos
+          ficam como não disponíveis; os indicadores operacionais usam os dados
+          reais.
+        </p>
+      )}
       <div className="system-summary-bento">
         <div className="system-kpis">
           {[
             [
               "Clientes cadastrados",
               total.clients,
-              `${total.active} ativos · ${total.clients - total.active} pausados`,
+              `${total.active} ativos · ${total.clients - total.active} inativos/pausados`,
             ],
             [
               "Leads recebidos",
@@ -415,8 +449,8 @@ export function SystemDashboard() {
         <Card title="Operação e qualidade">
           <div className="operational-stats">
             {[
-              ["Aguardando responsável", total.unassigned],
-              ["Claims após o prazo", total.lateClaims],
+              ["Sem responsável no período", total.unassigned],
+              ["Assunções após o prazo", total.lateClaims ?? "Não disponível"],
               [
                 "Primeira resposta média",
                 total.response === null
@@ -428,6 +462,7 @@ export function SystemDashboard() {
                 `${total.responseSamples} / ${total.leads}`,
               ],
               ["Agendamentos no período", total.appointments],
+              ["Agendamentos cancelados", total.cancelled],
               ["Presenças informadas", total.present],
               ["Faltas informadas", total.absent],
               ["Presenças pendentes", total.pendingPresence],
@@ -440,8 +475,9 @@ export function SystemDashboard() {
             ))}
           </div>
           <small>
-            Agendamentos pela data da consulta; primeira resposta em tempo
-            corrido. Claims usam o prazo útil registrado ao assumir.
+            Agendamentos ativos pela data da consulta; cancelados são mostrados
+            separadamente. Primeira resposta em tempo corrido. O histórico de
+            SLA de assunções não é presumido pelo calendário atual.
           </small>
         </Card>
         <Card title="Leads por estágio">
@@ -514,21 +550,19 @@ export function SystemDashboard() {
                     <span className={row.client.vertical}>
                       {row.client.vertical === "healthcare"
                         ? "Prescrita"
-                        : "Veredite"}
+                        : row.client.vertical === "legal"
+                          ? "Veredite"
+                          : "Não classificada"}
                     </span>
                   </td>
-                  <td>{row.leads.length}</td>
+                  <td>{row.leads}</td>
                   <td>{money(row.coverage ? row.spent : null)}</td>
                   <td>
                     {row.coverage}/{data.dates.length} dias
                   </td>
                   <td>{money(row.cpl)}</td>
                   <td>
-                    {pct(
-                      row.leads.length
-                        ? (row.converted / row.leads.length) * 100
-                        : null,
-                    )}
+                    {pct(row.leads ? (row.converted / row.leads) * 100 : null)}
                   </td>
                   <td>
                     <Button
@@ -555,75 +589,88 @@ export function SystemDashboard() {
           substitui o valor anterior; zero significa gasto conferido e igual a
           zero.
         </p>
+        {!report.canManageInvestments && (
+          <p role="status">
+            {report.investmentAvailable
+              ? "Somente superadministradores podem editar os investimentos."
+              : "A aplicação da migration de investimentos está pendente. O salvamento será habilitado após a ativação real."}
+          </p>
+        )}
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
+            if (saving || !report.canManageInvestments) return;
+            setSaving(true);
+            setMessage("");
             try {
-              if (!/^\d+(?:[.,]\d{1,2})?$/.test(amount))
-                throw Error(
-                  "Informe um valor positivo ou zero com até duas casas decimais.",
+              const amountCents = parseAmount(amount);
+              if (amountCents === null)
+                throw new Error(
+                  "Informe o valor investido; zero é aceito quando conferido.",
                 );
-              const [whole, decimal = ""] = amount.replace(",", ".").split(".");
-              repositories.investments.save({
-                clientId: entryClient,
-                day: entryDay,
-                amountCents:
-                  Number(whole) * 100 + Number(decimal.padEnd(2, "0")),
-                notes,
-              });
-              refresh();
-              setMessage("Investimento salvo.");
+              await saveInvestment(
+                { clientId: entryClient, day: entryDay, amountCents, notes },
+                "POST",
+              );
+              await mutate();
+              setMessage("Investimento salvo no banco.");
             } catch (err) {
               setMessage(
-                err instanceof Error ? err.message : "Confira os campos",
+                err instanceof Error ? err.message : "Não foi possível salvar.",
               );
+            } finally {
+              setSaving(false);
             }
           }}
         >
-          <div className="system-filter-fields">
-            <label>
-              Cliente do investimento
-              <select
-                required
-                value={entryClient}
-                onChange={(e) => setEntryClient(e.target.value)}
-              >
-                <option value="">Selecione</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Data do investimento
-              <input
-                required
-                type="date"
-                value={entryDay}
-                onChange={(e) => setEntryDay(e.target.value)}
-              />
-            </label>
-            <label>
-              Valor investido (R$)
-              <input
-                required
-                inputMode="decimal"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-            </label>
-            <label>
-              Observação / fonte
-              <input
-                maxLength={500}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </label>
-            <Button type="submit">Salvar investimento</Button>
-          </div>
+          <fieldset disabled={saving || !report.canManageInvestments}>
+            <div className="system-filter-fields">
+              <label>
+                Cliente do investimento
+                <select
+                  required
+                  value={entryClient}
+                  onChange={(e) => setEntryClient(e.target.value)}
+                >
+                  <option value="">Selecione</option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Data do investimento
+                <input
+                  required
+                  type="date"
+                  value={entryDay}
+                  onChange={(e) => setEntryDay(e.target.value)}
+                />
+              </label>
+              <label>
+                Valor investido (R$)
+                <input
+                  required
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+              </label>
+              <label>
+                Observação / fonte
+                <input
+                  maxLength={500}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </label>
+              <Button type="submit">
+                {saving ? "Salvando…" : "Salvar investimento"}
+              </Button>
+            </div>
+          </fieldset>
         </form>
         <p role="status">{message}</p>
         <div
@@ -652,6 +699,7 @@ export function SystemDashboard() {
                   <td>
                     <Button
                       variant="ghost"
+                      disabled={saving || !report.canManageInvestments}
                       onClick={() => {
                         setEntryClient(i.clientId);
                         setEntryDay(i.day);
@@ -663,12 +711,29 @@ export function SystemDashboard() {
                     </Button>
                     <Button
                       variant="ghost"
-                      onClick={() => {
-                        repositories.investments.remove(i.clientId, i.day);
-                        refresh();
-                        setMessage(
-                          "Lançamento removido. O dia voltou a ficar sem informação.",
-                        );
+                      disabled={saving || !report.canManageInvestments}
+                      onClick={async () => {
+                        if (saving) return;
+                        setSaving(true);
+                        setMessage("");
+                        try {
+                          await saveInvestment(
+                            { clientId: i.clientId, day: i.day },
+                            "DELETE",
+                          );
+                          await mutate();
+                          setMessage(
+                            "Lançamento removido do banco. O dia voltou a ficar sem informação.",
+                          );
+                        } catch (cause) {
+                          setMessage(
+                            cause instanceof Error
+                              ? cause.message
+                              : "Não foi possível remover.",
+                          );
+                        } finally {
+                          setSaving(false);
+                        }
                       }}
                     >
                       Remover
@@ -683,9 +748,10 @@ export function SystemDashboard() {
       </details>
       <div className="system-notes">
         <p>
+          Métricas calculadas somente com os registros visíveis para sua conta.
           Clientes e formulários mostram a base atual; leads e investimentos
           seguem o período. Conversão conta uma vez cada lead do período que
-          possui agendamento registrado, mesmo que a consulta seja futura.
+          possui agendamento ativo registrado, mesmo que a consulta seja futura.
         </p>
         <p>
           {total.expected - total.coverage} dias/cliente sem investimento

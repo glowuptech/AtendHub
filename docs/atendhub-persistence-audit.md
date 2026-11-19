@@ -10,7 +10,7 @@ A execução normal é considerada real somente quando a leitura e a gravação 
 
 | Área | Leitura atual | Gravação atual | Fixture/memória em execução | Autorização/RLS | Estado |
 |---|---|---|---|---|---|
-| Dashboard geral `/app/sistema` | `system-dashboard/service` e repositórios mock para vários cards | investimentos ainda mock | Sim, indicadores e investimentos | Membership server; revisar por consulta | Parcial |
+| Dashboard geral `/app/sistema` | `/api/dashboard/system`: clientes, leads, agenda e formulários reais | investimentos com migration preparada, ainda não aplicada nesta sessão | Página de produção sem fixtures | Sessão + organização + RLS; agregados sem PII | Operação conectada; ativação financeira/autenticação real pendentes |
 | Visão geral `/app` | Leads reais migrados nesta auditoria; filtro por cliente/período | Nenhuma | `DemoProvider` ainda fornece contexto | `/api/leads` + RLS | Parcial |
 | Fila `/app/fila` | Repositório mock | tarefas/status mock | Sim | Membership, sem CRUD real completo | Pendente bloco D |
 | Clientes e perfis | `/api/clients`, `/api/clients/[clientId]` para identidade; overview ainda mistura repositório | perfil/profissional usam APIs/RPC existentes | Leads, agenda e formulários do overview ainda mock | Membership, cliente/organização e RLS | Parcial bloco A |
@@ -57,3 +57,5 @@ Objetos próprios AtendHub devem manter o prefixo `atendhub_`, RLS habilitado, v
 ## Continuidade explícita
 
 O bloco A está parcialmente concluído; o Dashboard geral, overview de clientes e configurações restantes ainda precisam deixar os repositórios mockados. O bloco B está parcialmente concluído em leads e formulários, mas respostas/capture e conhecimento ainda não têm persistência completa. C, D, E e F não devem ser declarados concluídos: faltam contratos/tabelas ou worker externo. Próximo passo seguro: finalizar A por dependência, depois respostas/conhecimento de B, aplicando migrations incrementais e testes autenticados por bloco.
+
+Atualização do Dashboard geral: a página deixou os mocks; veja `docs/runbooks/system-dashboard.md`. A tabela/RPC de investimento está preparada em `20261119000000_atendhub_dashboard_investments.sql`, sem aplicação no Supabase nesta sessão. O trecho de prioridades acima é histórico e não comprova o estado dos demais módulos.
