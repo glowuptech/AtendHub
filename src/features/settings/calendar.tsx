@@ -3,13 +3,23 @@ import { startTransition, useEffect, useState } from "react";
 import { useServiceCalendar } from "@/features/queue/use-service-calendar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/layout/shared";
-import { CalendarSchema } from "@/features/queue/calendar";
+import {
+  CLAIM_TARGET_MINUTES,
+  CalendarSchema,
+  PersistedCalendarSchema,
+} from "@/features/queue/calendar";
 export function ServiceCalendar() {
-  const { calendar, error: calendarError, isLoading } = useServiceCalendar();
+  const {
+    calendar,
+    error: calendarError,
+    isLoading,
+    mutate,
+  } = useServiceCalendar();
   const [draft, setDraft] = useState(calendar),
     [holidays, setHolidays] = useState(calendar.holidays.join("\n")),
     [error, setError] = useState(""),
-    [message, setMessage] = useState("");
+    [message, setMessage] = useState(""),
+    [saving, setSaving] = useState(false);
   useEffect(() => {
     startTransition(() => {
       setDraft(calendar);
@@ -26,11 +36,14 @@ export function ServiceCalendar() {
         <Badge>{draft.timezone}</Badge>
       </div>
       {isLoading && <p role="status">Carregando configuração persistida…</p>}
-      {calendarError && <p role="alert">Não foi possível carregar o calendário persistido.</p>}
+      {calendarError && (
+        <p role="alert">Não foi possível carregar o calendário persistido.</p>
+      )}
       <form
         noValidate
         onSubmit={async (e) => {
           e.preventDefault();
+          if (saving || isLoading || calendarError) return;
           const parsed = CalendarSchema.safeParse({
             ...draft,
             holidays: holidays
@@ -43,15 +56,45 @@ export function ServiceCalendar() {
             setMessage("");
             return;
           }
-          const response = await fetch("/api/settings/calendar", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ timezone: parsed.data.timezone, weekdays: parsed.data.days, workStart: parsed.data.start, workEnd: parsed.data.end, holidays: parsed.data.holidays, exceptions: parsed.data.exceptions }) });
-          if (!response.ok) {
-            const body = await response.json().catch(() => null);
-            setError(body?.error ?? "Não foi possível salvar o calendário.");
-            setMessage("");
-            return;
-          }
+          setSaving(true);
           setError("");
-          setMessage("Calendário salvo. Os prazos da fila serão recalculados a partir do horário persistido.");
+          setMessage("");
+          try {
+            const response = await fetch("/api/settings/calendar", {
+              method: "PUT",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                timezone: parsed.data.timezone,
+                weekdays: parsed.data.days,
+                workStart: parsed.data.start,
+                workEnd: parsed.data.end,
+                holidays: parsed.data.holidays,
+                exceptions: parsed.data.exceptions,
+              }),
+            });
+            const body = await response.json().catch(() => null);
+            if (!response.ok)
+              throw new Error(
+                body?.error ?? "Não foi possível salvar o calendário.",
+              );
+            const saved = PersistedCalendarSchema.safeParse(body);
+            if (!saved.success)
+              throw new Error(
+                "O servidor não confirmou os horários salvos. Atualize a página para conferir.",
+              );
+            await mutate(saved.data, { revalidate: false });
+            setMessage(
+              "Calendário salvo. Os prazos da fila foram atualizados.",
+            );
+          } catch (cause) {
+            setError(
+              cause instanceof Error
+                ? cause.message
+                : "Não foi possível salvar o calendário.",
+            );
+          } finally {
+            setSaving(false);
+          }
         }}
       >
         <div className="settings-time-fields">
@@ -119,7 +162,9 @@ export function ServiceCalendar() {
           fila fica pausado.
         </small>
         <div className="settings-calendar-note">
-          <strong>Prazo para assumir: 10 minutos úteis</strong>
+          <strong>
+            Prazo para assumir: {CLAIM_TARGET_MINUTES} minutos úteis
+          </strong>
           <p>
             A contagem pausa fora do expediente, nos dias não selecionados e nos
             feriados cadastrados. Atendimentos já assumidos preservam o
@@ -129,10 +174,16 @@ export function ServiceCalendar() {
         {error && <p role="alert">{error}</p>}
         <p role="status">{message}</p>
         <div className="actions">
-          <Button type="submit">Salvar calendário</Button>
+          <Button
+            type="submit"
+            disabled={saving || isLoading || Boolean(calendarError)}
+          >
+            {saving ? "Salvando…" : "Salvar calendário"}
+          </Button>
           <Button
             type="button"
             variant="outline"
+            disabled={saving}
             onClick={() => {
               setDraft(calendar);
               setHolidays(calendar.holidays.join("\n"));

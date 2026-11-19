@@ -5,7 +5,12 @@ import { useClients } from "@/features/clients/hooks";
 import { useLeads } from "@/features/leads/hooks";
 import { Heading, Badge, stageLabels } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
-import { claimSla, clock, inBusinessTime } from "./calendar";
+import {
+  CLAIM_TARGET_MINUTES,
+  claimSla,
+  clock,
+  inBusinessTime,
+} from "./calendar";
 import { useBoardPan } from "./use-board-pan";
 import { useServiceCalendar } from "./use-service-calendar";
 const stages = [
@@ -23,7 +28,13 @@ export function Queue() {
   const router = useRouter();
   const boardPan = useBoardPan();
   const claimLock = useRef(false);
-  const { calendar, error: calendarError, isConfigured } = useServiceCalendar();
+  const {
+    calendar,
+    error: calendarError,
+    isConfigured,
+    isReady,
+    isLoading: calendarLoading,
+  } = useServiceCalendar();
   const { data: clients = [], error: clientsError } = useClients();
   const {
     data: persistedLeads = [],
@@ -36,9 +47,20 @@ export function Queue() {
     [search, setSearch] = useState(""),
     [filter, setFilter] = useState("");
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
+    const update = () => setNow(Date.now());
+    const timer = setInterval(update, 1000);
+    // Also update immediately after a background tab or suspended machine resumes.
+    const initial = setTimeout(update, 0);
+    window.addEventListener("focus", update);
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      clearInterval(timer);
+      clearTimeout(initial);
+      window.removeEventListener("focus", update);
+      document.removeEventListener("visibilitychange", update);
+    };
   }, []);
+  const paused = isReady && now !== null && !inBusinessTime(now, calendar);
   const leads = persistedLeads
     .map((lead) => ({
       ...lead,
@@ -74,11 +96,11 @@ export function Queue() {
           indisponível; você ainda pode assumir atendimentos autorizados.
         </p>
       )}
-      {!isConfigured && !calendarError && (
+      {!isConfigured && isReady && (
         <p role="status">
-          O calendário de SLA ainda não foi configurado. Você pode assumir
-          atendimentos; o prazo útil ficará indisponível até configurar o
-          calendário em Configurações.
+          Usando calendário padrão: segunda a sexta, das 09:00 às 17:00
+          (America/Sao_Paulo). Salve os horários e feriados da empresa em
+          Configurações → Calendário de atendimento.
         </p>
       )}
       <div className="toolbar">
@@ -97,10 +119,8 @@ export function Queue() {
             ))}
           </select>
         </label>
-        <Badge>Prazo para assumir: 10 minutos úteis</Badge>
-        {isConfigured && now && !inBusinessTime(now, calendar) && (
-          <Badge>Relógio pausado · fora do expediente</Badge>
-        )}
+        <Badge>Prazo para assumir: {CLAIM_TARGET_MINUTES} minutos úteis</Badge>
+        {paused && <Badge>Relógio pausado · fora do expediente</Badge>}
       </div>
       <p role="status">{message}</p>
       <div
@@ -129,7 +149,7 @@ export function Queue() {
               .filter((l) => l.stage === stage)
               .map((l) => {
                 const sla =
-                  isConfigured && now
+                  isReady && now !== null
                     ? claimSla(l.created_at, now, calendar)
                     : null;
                 return (
@@ -159,14 +179,18 @@ export function Queue() {
                         >
                           <strong>
                             {sla
-                              ? sla.overdue
-                                ? `Atraso ${clock(sla.elapsedMs - 600000)}`
-                                : `${clock(sla.remainingMs)} restantes`
-                              : isConfigured
+                              ? clock(sla.remainingMs)
+                              : calendarLoading || (isReady && now === null)
                                 ? "Calculando prazo…"
                                 : "Prazo indisponível"}
                           </strong>
-                          <small>Tempo útil para assumir</small>
+                          <small>
+                            {sla?.overdue
+                              ? "Lead sem atendimento · atenção"
+                              : sla && paused
+                                ? "Pausado · aguarda o próximo expediente"
+                                : "Tempo útil para assumir"}
+                          </small>
                         </div>
                         <Button
                           disabled={claimingId !== null}

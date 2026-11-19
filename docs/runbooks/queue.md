@@ -27,3 +27,16 @@ Validação desta revisão: 28 testes unitários aprovados, fluxo E2E do modal (
 O quadro persistido permite clicar e segurar em áreas livres ou textos dos cards e arrastar para os lados. O cursor indica a interação com mão aberta/fechada. O arraste começa após 6 px de movimento horizontal; cliques simples, movimentos predominantemente verticais, botões, links, labels e campos não iniciam a rolagem. Soltar fora do quadro ou tirar o foco da janela encerra o gesto. Touch, roda/trackpad, barra de rolagem e teclado continuam nativos.
 
 Esta interação apenas desloca a visualização; não altera estágio, responsável ou dados do lead. Validação no Chromium: arraste nos dois sentidos, liberação fora do quadro, clique em assumir após arraste, seletor de estágio, rolagem por teclado e fluxos existentes de permissão/assunção (4 cenários no harness, com dados simulados). TypeScript e lint dos arquivos alterados aprovados.
+
+
+## Contador de SLA persistido — correção de novembro de 2026
+
+O prazo vigente continua em 10 minutos úteis (`CLAIM_TARGET_MINUTES`), contado desde o `created_at` do servidor. A fila atualiza a cada segundo e ao retomar a janela/aba. O mostrador usa MM:SS, iniciando em 10:00, e não reinicia ao recarregar. No vencimento exato fica em 00:00, vermelho, com “Lead sem atendimento · atenção”, e permanece assim enquanto não houver responsável.
+
+O tempo só é consumido dentro das janelas do calendário da organização: pausa em fechamento, dias não selecionados, feriados e exceções fechadas; saldo parcial retoma na abertura seguinte. Aberturas excepcionais são respeitadas, mas uma data marcada como feriado continua fechada. O cálculo utiliza a data local do fuso, e não o dia UTC. Leads antigos não são truncados artificialmente em 370 dias.
+
+A causa do mostrador “Prazo indisponível” no fluxo sem configuração era o bloqueio por `isConfigured`. Agora um GET bem-sucedido sem calendário retorna o padrão já existente — segunda a sexta, 09:00–17:00, America/Sao_Paulo — e a fila informa explicitamente esse uso e onde configurar os horários/feriados reais. Isso não grava uma configuração em nome da empresa. Erro de rede, autorização ou formato inválido não aplica esse padrão silenciosamente: o SLA continua indisponível e a mensagem informa a falha.
+
+O hook passou a devolver uma referência estável do calendário: antes, recriava o objeto em cada render e disparava o efeito que resetava os campos de Configurações. Salvar agora valida a resposta, trata falhas de rede e atualiza o cache compartilhado usado pela fila. TIME vindo do banco com segundos é normalizado para HH:mm. Fuso e exceções inválidos são rejeitados. GET/PUT usam sessão/membership e RLS existentes, sem exigir Service Role para essas operações.
+
+Não houve migration ou alteração de registros Supabase nesta correção. Os testes do navegador usam respostas simuladas: cobrem contagem por segundo, vencimento/alerta visual, reload, pausa/retomada, edição/salvamento do calendário, falhas de leitura e regressões de arraste/assunção. A confirmação de salvamento com uma sessão real no Supabase continua dependendo de teste autenticado no Preview.

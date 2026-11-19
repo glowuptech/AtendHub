@@ -7,9 +7,7 @@ test("assumir independe do calendário e atualiza responsável", async ({
     name: "Assumir atendimento",
     exact: true,
   });
-  await expect(
-    page.getByText(/O calendário de SLA ainda não foi configurado/),
-  ).toBeVisible();
+  await expect(page.getByText(/Usando calendário padrão/)).toBeVisible();
   await expect(button).toBeEnabled();
   await button.click();
   await expect(

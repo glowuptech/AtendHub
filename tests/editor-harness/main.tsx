@@ -4,6 +4,7 @@ import { ExternalScheduling } from "@/features/clients/components/external-sched
 import { ClientAccesses } from "@/features/clients/components/client-accesses";
 import { WhatsappSettings } from "@/features/whatsapp/settings";
 import { Inbox } from "@/features/inbox/components/inbox";
+import { ServiceCalendar } from "@/features/settings/calendar";
 import { Queue } from "@/features/queue/queue";
 import { createRoot } from "react-dom/client";
 import { EditorWorkspace } from "@/features/forms/components/editor";
@@ -12,6 +13,8 @@ import { FormsList } from "@/features/forms/components/forms-list";
 import { clients } from "@/lib/mocks/fixtures";
 import "@/app/globals.css";
 let queueOwner: string | null = null;
+const queueCreatedAt =
+  localStorage.getItem("test-queue-created-at") ?? new Date().toISOString();
 const queueLead = () => ({
   id: "00000000-0000-4000-8000-000000000123",
   client_id: clients[0].id,
@@ -21,7 +24,7 @@ const queueLead = () => ({
   stage: queueOwner ? "in_progress" : "new",
   owner_id: queueOwner,
   owner_name: queueOwner ? "Ana Atendente" : null,
-  created_at: new Date().toISOString(),
+  created_at: queueCreatedAt,
   capture_status: "completed",
   claimed_at: queueOwner ? new Date().toISOString() : null,
 });
@@ -288,7 +291,18 @@ window.fetch = async (input, init) => {
     }
     return Response.json(connections);
   }
-  if (url === "/api/settings/calendar") return Response.json(null);
+  if (url === "/api/settings/calendar") {
+    if (new URLSearchParams(location.search).has("calendar-error"))
+      return Response.json({ error: "Falha de teste" }, { status: 503 });
+    if (init?.method === "PUT") {
+      const body = JSON.parse(String(init.body));
+      localStorage.setItem("test-service-calendar", JSON.stringify(body));
+      return Response.json(body);
+    }
+    return Response.json(
+      JSON.parse(localStorage.getItem("test-service-calendar") ?? "null"),
+    );
+  }
   if (url.endsWith("/claim")) {
     if (new URLSearchParams(location.search).has("denied"))
       return Response.json(
@@ -364,7 +378,12 @@ createRoot(document.getElementById("root")!).render(
     ) : new URLSearchParams(location.search).has("whatsapp") ? (
       <WhatsappSettings />
     ) : new URLSearchParams(location.search).has("queue") ? (
-      <Queue />
+      <>
+        {new URLSearchParams(location.search).has("calendar-editor") && (
+          <ServiceCalendar />
+        )}
+        <Queue />
+      </>
     ) : new URLSearchParams(location.search).has("list") ? (
       <FormsList id={clients[0].id} />
     ) : (

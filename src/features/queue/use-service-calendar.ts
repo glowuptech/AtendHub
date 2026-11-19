@@ -1,16 +1,35 @@
 "use client";
 import useSWR from "swr";
-import { defaultCalendar, type BusinessCalendar } from "./calendar";
+import {
+  defaultCalendar,
+  PersistedCalendarSchema,
+  type BusinessCalendar,
+} from "./calendar";
 
-type PersistedCalendar = { timezone: string; weekdays: number[]; workStart: string; workEnd: string; holidays: string[]; exceptions: Record<string, { start: string | null; end: string | null }> } | null;
-const fetcher = async (url: string): Promise<PersistedCalendar> => {
-  const response = await fetch(url);
+// Parse once in the fetcher: a stable calendar reference prevents the settings
+// editor from resetting its draft on every input/render.
+export async function fetchServiceCalendar(
+  url: string,
+): Promise<BusinessCalendar | null> {
+  const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) throw new Error("Não foi possível carregar o calendário.");
-  return response.json();
-};
+  const body = await response.json();
+  if (body === null) return null;
+  const parsed = PersistedCalendarSchema.safeParse(body);
+  if (!parsed.success)
+    throw new Error(
+      "O calendário salvo possui dados inválidos. Revise as configurações.",
+    );
+  return parsed.data;
+}
 export function useServiceCalendar() {
-  const result = useSWR("/api/settings/calendar", fetcher, { revalidateOnFocus: false });
-  const persisted = result.data;
-  const calendar: BusinessCalendar = persisted ? { start: persisted.workStart, end: persisted.workEnd, days: persisted.weekdays, holidays: persisted.holidays, timezone: persisted.timezone, exceptions: persisted.exceptions } : { ...defaultCalendar, timezone: "America/Sao_Paulo", exceptions: {} };
-  return { ...result, calendar, isConfigured: Boolean(persisted) };
+  const result = useSWR("/api/settings/calendar", fetchServiceCalendar, {
+    revalidateOnFocus: true,
+  });
+  return {
+    ...result,
+    calendar: result.data ?? defaultCalendar,
+    isConfigured: Boolean(result.data),
+    isReady: result.data !== undefined && !result.error,
+  };
 }
