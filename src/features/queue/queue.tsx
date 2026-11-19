@@ -6,6 +6,7 @@ import { useLeads } from "@/features/leads/hooks";
 import { Heading, Badge, stageLabels } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
 import { claimSla, clock, inBusinessTime } from "./calendar";
+import { useBoardPan } from "./use-board-pan";
 import { useServiceCalendar } from "./use-service-calendar";
 const stages = [
   "new",
@@ -20,6 +21,7 @@ const stages = [
 ] as const;
 export function Queue() {
   const router = useRouter();
+  const boardPan = useBoardPan();
   const claimLock = useRef(false);
   const { calendar, error: calendarError, isConfigured } = useServiceCalendar();
   const { data: clients = [], error: clientsError } = useClients();
@@ -102,6 +104,7 @@ export function Queue() {
       </div>
       <p role="status">{message}</p>
       <div
+        {...boardPan}
         className="queue-board"
         tabIndex={0}
         role="region"

@@ -21,3 +21,9 @@ Conversar usa leadId e clientId para localizar/criar uma conversa única no Inbo
 Estágios adicionais: aguardando agendamento, agendamento confirmado, reagendamento e recuperação. Estágios mantêm histórico e não criam/confirmam agendamentos nem comparecimento automaticamente. Colunas usam cores por estágio: âmbar (novos/aguardando agendamento), azul (atendimento), lilás (aguardando resposta), verdes (agendado/confirmado), laranja (reagendamento), vermelhos (recuperação/perdido). Nomes textuais continuam identificando cada estágio.
 
 Validação desta revisão: 28 testes unitários aprovados, fluxo E2E do modal (respostas, tarefas, Escape/foco, Inbox correto) e fluxo anterior fila/Inbox/portal aprovados. Contraste WCAG aprovado após ajustar os títulos das colunas; build, lint e TypeScript aprovados. Capturas atualizadas em `screenshots/queue-kanban.png` e `screenshots/lead-modal.png`.
+
+## Arraste horizontal com mouse
+
+O quadro persistido permite clicar e segurar em áreas livres ou textos dos cards e arrastar para os lados. O cursor indica a interação com mão aberta/fechada. O arraste começa após 6 px de movimento horizontal; cliques simples, movimentos predominantemente verticais, botões, links, labels e campos não iniciam a rolagem. Soltar fora do quadro ou tirar o foco da janela encerra o gesto. Touch, roda/trackpad, barra de rolagem e teclado continuam nativos.
+
+Esta interação apenas desloca a visualização; não altera estágio, responsável ou dados do lead. Validação no Chromium: arraste nos dois sentidos, liberação fora do quadro, clique em assumir após arraste, seletor de estágio, rolagem por teclado e fluxos existentes de permissão/assunção (4 cenários no harness, com dados simulados). TypeScript e lint dos arquivos alterados aprovados.

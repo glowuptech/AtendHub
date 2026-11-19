@@ -34,3 +34,84 @@ test("permissão negada é informada e permite nova tentativa", async ({
   ).toBeVisible();
   await expect(button).toBeEnabled();
 });
+
+test("kanban desliza com o mouse nos dois sentidos e preserva ações dos cards", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1100, height: 900 });
+  await page.goto("/tests/editor-harness/index.html?queue");
+  const board = page.getByRole("region", { name: "Kanban de atendimento" });
+  const title = board.getByRole("heading", {
+    name: "Lead de teste",
+    exact: true,
+  });
+  const cardText = await title.boundingBox();
+  expect(cardText).not.toBeNull();
+  const x = cardText!.x + cardText!.width - 8;
+  const y = cardText!.y + cardText!.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  // Small movements are still clicks, rather than accidental scrolling.
+  await page.mouse.move(x - 3, y);
+  expect(await board.evaluate((el) => el.scrollLeft)).toBe(0);
+  await page.mouse.move(x - 170, y, { steps: 12 });
+  await expect(board).toHaveAttribute("data-panning", "true");
+  expect(await board.evaluate((el) => el.scrollLeft)).toBeGreaterThan(150);
+  await page.mouse.up();
+  await expect(board).not.toHaveAttribute("data-panning");
+  // The header of the next column remains a safe place to drag back.
+  const bounds = (await board.boundingBox())!;
+  await page.mouse.move(bounds.x + 100, bounds.y + 25);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + 290, bounds.y + 25, { steps: 12 });
+  await page.mouse.up();
+  expect(await board.evaluate((el) => el.scrollLeft)).toBe(0);
+  await board
+    .getByRole("button", { name: "Assumir atendimento", exact: true })
+    .click();
+  await expect(
+    page.getByText("Atendimento de Lead de teste assumido e salvo."),
+  ).toBeVisible();
+  const select = board.getByLabel("Mover Lead de teste");
+  const selectBounds = (await select.boundingBox())!;
+  await page.mouse.move(
+    selectBounds.x + selectBounds.width / 2,
+    selectBounds.y + 10,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    selectBounds.x + selectBounds.width / 2 - 70,
+    selectBounds.y + 10,
+    { steps: 8 },
+  );
+  await page.mouse.up();
+  await page.keyboard.press("Escape");
+  expect(await board.evaluate((el) => el.scrollLeft)).toBe(0);
+  await expect(board).not.toHaveAttribute("data-panning");
+});
+
+test("arraste termina fora do quadro e rolagem por teclado continua disponível", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1100, height: 900 });
+  await page.goto("/tests/editor-harness/index.html?queue");
+  const board = page.getByRole("region", { name: "Kanban de atendimento" });
+  const bounds = (await board.boundingBox())!;
+  await page.mouse.move(bounds.x + 300, bounds.y + 25);
+  await page.mouse.down();
+  await page.mouse.move(1, bounds.y - 20, { steps: 15 });
+  await page.mouse.up();
+  await expect(board).not.toHaveAttribute("data-panning");
+  const stopped = await board.evaluate((el) => el.scrollLeft);
+  expect(stopped).toBeGreaterThan(0);
+  await page.mouse.move(bounds.x + 500, bounds.y + 25);
+  expect(await board.evaluate((el) => el.scrollLeft)).toBe(stopped);
+  await board.evaluate((el) => {
+    el.scrollLeft = 0;
+  });
+  await board.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect
+    .poll(() => board.evaluate((el) => el.scrollLeft))
+    .toBeGreaterThan(0);
+});
