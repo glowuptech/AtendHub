@@ -467,7 +467,7 @@ describe("confirmação da véspera", () => {
     `);
     await db.exec(
       await readFile(
-        "supabase/migrations/20261121000000_atendhub_eve_confirmations.sql",
+        "supabase/migrations/20261120160151_20261121000000_atendhub_eve_confirmations.sql",
         "utf8",
       ),
     );
