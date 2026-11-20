@@ -797,6 +797,9 @@ it("usa o domínio ativo da clínica e rejeita a confirmação por outro subdom�
 it("registra o texto real e enfileira cada resposta por link uma única vez", async () => {
   await admin();
   await db.exec(await readFile("supabase/migrations/20261121180000_atendhub_appointment_response_events.sql", "utf8"));
+  await db.exec("alter table atendhub_clients add column metadata jsonb");
+  await db.query("update atendhub_clients set metadata=$2::jsonb where id=$1",[CLIENT_A,JSON.stringify({contactPhone:"+55 (16) 99999-0000"})]);
+  await db.exec(await readFile("supabase/migrations/20261121190000_atendhub_appointment_response_contacts.sql", "utf8"));
   await db.exec("update atendhub_appointments set status='cancelled' where status<>'cancelled'");
   for (const [n, decision] of [[9820,"confirm"],[9821,"decline"]] as const) {
     await admin();
@@ -824,6 +827,9 @@ it("registra o texto real e enfileira cada resposta por link uma única vez", as
     const claim=async ()=>(await db.query<{r:Json|null}>("select atendhub_claim_appointment_response($1) r",[eventId])).rows[0].r;
     expect(await claim()).toMatchObject({id:eventId,appointmentId:id(n),eventType:decision==="confirm"?"appointment.patient_confirmed":"appointment.reschedule_requested"});
     expect(await claim()).toBeNull();
+    await as(null,"atendhub_integration");
+    const contacts=await db.query("select atendhub_appointment_response_contacts($1) details",[eventId]);
+    expect(contacts.rows[0]).toMatchObject({details:{id:eventId,clinicName:"Cliente A",clinicPhone:"5516999990000",patientName:expect.any(String),patient:{phone:expect.any(String)}}});
     await db.query("select atendhub_ack_appointment_response($1)",[eventId]);
     await admin();
     expect((await db.query<{stage:string}>("select stage from atendhub_leads where id=$1",[lead.leadId])).rows[0].stage).toBe(decision==="confirm"?"confirmed":"rescheduling");
