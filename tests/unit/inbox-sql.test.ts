@@ -793,3 +793,40 @@ it("usa o domínio ativo da clínica e rejeita a confirmação por outro subdom�
   await as(null,"service_role");
   expect((await db.query<{r:{state:string}}>(query,[newToken,CLIENT_A])).rows[0].r.state).toBe("pending");
 });
+
+it("registra o texto real e enfileira cada resposta por link uma única vez", async () => {
+  await admin();
+  await db.exec(await readFile("supabase/migrations/20261121180000_atendhub_appointment_response_events.sql", "utf8"));
+  await db.exec("update atendhub_appointments set status='cancelled' where status<>'cancelled'");
+  for (const [n, decision] of [[9820,"confirm"],[9821,"decline"]] as const) {
+    await admin();
+    const lead=await ingest({jid:`551698879${n}@s.whatsapp.net`,pmid:`event-contact-${n}`});
+    await db.query(`insert into atendhub_appointments(id,organization_id,client_id,professional_id,lead_id,created_by_id,starts_at,timezone)
+      values($1,$2,$3,$4,$5,$6,now()+interval '45 minutes',
+      case when (now() at time zone 'UTC')::time>time '23:00' then 'America/Sao_Paulo' else 'UTC' end)`,
+      [id(n),ORG,CLIENT_A,id(9700),lead.leadId,USER_OWNER]);
+    await as(null,"atendhub_integration");
+    const reservation=(await db.query<{r:{requestId:string;confirmationUrl:string}}>("select atendhub_eve_claim($1,'inst-a','https://atendehub.app') r",[CLIENT_A])).rows[0].r;
+    const body="Texto original enviado. "+reservation.confirmationUrl;
+    const providerId=`event-ack-${n}`;
+    const ack="select atendhub_eve_sent($1,'inst-a',$2,now(),$3)";
+    await expect(db.query(ack,[reservation.requestId,providerId,"link de outra reserva"])).rejects.toThrow("DELIVERY_LINK_MISMATCH");
+    await db.query(ack,[reservation.requestId,providerId,body]);
+    await admin();
+    expect((await db.query<{body:string}>("select body from atendhub_inbox_messages where provider_message_id=$1",[providerId])).rows[0].body).toBe(body);
+    const token=(await db.query<{token:string}>("select public_token token from atendhub_eve_reminders where id=$1",[reservation.requestId])).rows[0].token;
+    await as(null,"service_role");
+    const action=async (answer:string|null)=>(await db.query<{r:{eventId:string|null}}>("select atendhub_confirmation_public($1,$2,$3) r",[token,answer,CLIENT_A])).rows[0].r;
+    expect((await action(null)).eventId).toBeNull();
+    const {eventId}=await action(decision);
+    expect(eventId).toBeTruthy();
+    expect((await action(decision)).eventId).toBe(eventId);
+    const claim=async ()=>(await db.query<{r:Json|null}>("select atendhub_claim_appointment_response($1) r",[eventId])).rows[0].r;
+    expect(await claim()).toMatchObject({id:eventId,appointmentId:id(n),eventType:decision==="confirm"?"appointment.patient_confirmed":"appointment.reschedule_requested"});
+    expect(await claim()).toBeNull();
+    await db.query("select atendhub_ack_appointment_response($1)",[eventId]);
+    await admin();
+    expect((await db.query<{stage:string}>("select stage from atendhub_leads where id=$1",[lead.leadId])).rows[0].stage).toBe(decision==="confirm"?"confirmed":"rescheduling");
+    await db.query("update atendhub_appointments set status='cancelled' where id=$1",[id(n)]);
+  }
+});
