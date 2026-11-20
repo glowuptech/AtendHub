@@ -10,6 +10,7 @@ type DomainInfo = {
   domain: { slug: string; active: boolean } | null;
   origin: string | null;
   dnsTarget: string | null;
+  dnsSource: "hosting" | "panel" | null;
 };
 const fetchDomain = async (
   url: string,
@@ -70,6 +71,14 @@ export function ClientDomainSettings({ clientId }: { clientId: string }) {
       setBusy(false);
     }
   }
+  async function copy(value: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setNotice(label + " copiado.");
+    } catch {
+      setNotice("Selecione o valor e copie manualmente.");
+    }
+  }
   if (error) return <p role="alert">{error.message}</p>;
   if (!data) return <p role="status">Carregando domínio…</p>;
   const valid = slugPattern.test(slug) && !reserved.includes(slug);
@@ -94,16 +103,48 @@ export function ClientDomainSettings({ clientId }: { clientId: string }) {
         </p>
       )}
       {valid && (
-        <dl>
-          <dt>Tipo</dt>
-          <dd>CNAME</dd>
-          <dt>Nome</dt>
-          <dd>{slug}</dd>
-          <dt>Destino</dt>
-          <dd>
-            {data.dnsTarget ?? "Use o destino CNAME indicado pela hospedagem."}
-          </dd>
-        </dl>
+        <>
+          <h3>Registro para o provedor de DNS</h3>
+          <dl>
+            <dt>Tipo</dt>
+            <dd>CNAME</dd>
+            <dt>Nome na zona {rootDomain}</dt>
+            <dd>
+              <code>{slug}</code>{" "}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => copy(slug, "Nome")}
+              >
+                Copiar nome
+              </Button>
+            </dd>
+            <dt>Destino</dt>
+            <dd>
+              {data.dnsTarget ? (
+                <>
+                  <code>{data.dnsTarget}</code>{" "}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => copy(data.dnsTarget!, "Destino")}
+                  >
+                    Copiar destino
+                  </Button>
+                </>
+              ) : (
+                "O destino não está disponível. Configure ATENDHUB_DNS_TARGET com o CNAME indicado pela hospedagem."
+              )}
+            </dd>
+          </dl>
+          {data.dnsSource === "panel" && (
+            <p>
+              Destino consultado no DNS do painel. Se a hospedagem indicar um
+              valor específico para este subdomínio, use o valor indicado por
+              ela.
+            </p>
+          )}
+        </>
       )}
       <p>
         Se o DNS e o certificado coringa de {rootDomain} já estiverem

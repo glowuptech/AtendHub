@@ -1,3 +1,4 @@
+import { Resolver } from "node:dns/promises";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { sessionOrganizationContext } from "@/lib/supabase/organization-session";
@@ -11,11 +12,24 @@ import {
 import { publicOrigin } from "@/features/client-domains/server";
 
 type Context = { params: Promise<{ clientId: string }> };
-const config = {
-  rootDomain,
-  panelDomain,
-  dnsTarget: process.env.ATENDHUB_DNS_TARGET?.trim() || null,
-};
+async function dnsConfig() {
+  const configured = process.env.ATENDHUB_DNS_TARGET?.trim();
+  if (configured) return { dnsTarget: configured, dnsSource: "hosting" };
+  try {
+    const targets = await new Resolver({ timeout: 800, tries: 1 }).resolveCname(
+      panelDomain,
+    );
+    if (
+      targets.length === 1 &&
+      targets[0].toLowerCase().replace(/\.$/, "") !== rootDomain
+    ) {
+      return { dnsTarget: targets[0].replace(/\.$/, ""), dnsSource: "panel" };
+    }
+  } catch {
+    // A flattened record has no visible CNAME. Show the hosting setup instructions.
+  }
+  return { dnsTarget: null, dnsSource: null };
+}
 const json = (data: unknown, status = 200) =>
   NextResponse.json(data, { status, headers: { "Cache-Control": "no-store" } });
 const input = z.object({
@@ -60,7 +74,7 @@ async function route(request: Request, context: Context) {
     );
   if (request.method === "GET")
     return json({
-      ...config,
+      ...(await dnsConfig()),
       canEdit,
       domain: current.data,
       origin: publicOrigin(current.data),
@@ -92,7 +106,7 @@ async function route(request: Request, context: Context) {
     return json({ error: "Esse subdomínio já está em uso." }, 409);
   if (error) return json({ error: "Não foi possível salvar o domínio." }, 500);
   return json({
-    ...config,
+    ...(await dnsConfig()),
     canEdit,
     domain: { slug, active },
     origin: publicOrigin({ slug, active }),
