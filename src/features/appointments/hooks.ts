@@ -27,13 +27,23 @@ export type Agenda = {
   canManageAvailability: boolean;
 };
 
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
+export async function requestAppointment<T>(
+  url: string,
+  init?: RequestInit,
+): Promise<T> {
   const response = await fetch(url, init);
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok)
-    throw new Error(
-      body.error ?? "Não foi possível concluir a operação da agenda.",
-    );
+  const body = await response.json().catch(() => undefined);
+  if (!response.ok || body === undefined) {
+    if (typeof body?.error === "string" && body.error.trim())
+      throw new Error(body.error);
+    if (response.status === 401)
+      throw new Error("Sua sessão expirou. Entre novamente no Atend&Hub.");
+    if (body === undefined || response.status >= 500)
+      throw new Error(
+        "A agenda está temporariamente indisponível. Confira o horário atual antes de tentar novamente.",
+      );
+    throw new Error("Não foi possível concluir a operação da agenda.");
+  }
   return body as T;
 }
 
@@ -46,10 +56,14 @@ export function useAgenda(
     clientId && professionalId
       ? `/api/clients/${clientId}/agenda?${new URLSearchParams({ professionalId, week })}`
       : null;
-  const swr = useSWR<Agenda>(key, (url: string) => request<Agenda>(url), {
-    revalidateOnFocus: false,
-    refreshInterval: 30000,
-  });
+  const swr = useSWR<Agenda>(
+    key,
+    (url: string) => requestAppointment<Agenda>(url),
+    {
+      revalidateOnFocus: false,
+      refreshInterval: 30000,
+    },
+  );
   return { ...swr, key };
 }
 
@@ -63,7 +77,7 @@ export const saveAvailability = (
     intervals: AvailabilityInterval[];
   },
 ) =>
-  request<{ ok: true }>(`/api/clients/${clientId}/agenda`, {
+  requestAppointment<{ ok: true }>(`/api/clients/${clientId}/agenda`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -88,7 +102,7 @@ export const createAppointment = (
     };
   },
 ) =>
-  request<{ created: boolean; bookingDetailsSaved?: boolean }>(
+  requestAppointment<{ created: boolean; bookingDetailsSaved?: boolean }>(
     `/api/clients/${clientId}/appointments`,
     {
       method: "POST",
@@ -112,7 +126,7 @@ export type AppointmentChange =
     };
 
 export const changeAppointment = (id: string, body: AppointmentChange) =>
-  request<unknown>(`/api/appointments/${id}`, {
+  requestAppointment<unknown>(`/api/appointments/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

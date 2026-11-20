@@ -4,6 +4,7 @@ import useSWR from "swr";
 import { useDemo } from "@/components/layout/demo-context";
 import { CadenceWorkspace } from "@/features/automation/pages";
 import { Heading, dateTime, Badge } from "@/components/layout/shared";
+import { requestAppointment } from "../hooks";
 import { Button } from "@/components/ui/button";
 
 type Reminder = {
@@ -22,12 +23,9 @@ type Reminder = {
   purpose?: "confirmation" | "reminder";
 };
 const endpoint = "/api/appointments/confirmations";
-async function read(url: string): Promise<Reminder[]> {
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok)
-    throw new Error((await res.json()).error || "Falha ao carregar lembretes.");
-  return res.json();
-}
+const read = (url: string) =>
+  requestAppointment<Reminder[]>(url, { cache: "no-store" });
+
 export function ConfirmationsList({
   clientId,
   appointmentId,
@@ -48,12 +46,11 @@ export function ConfirmationsList({
     setProblem("");
     setBusy(true);
     try {
-      const res = await fetch(endpoint, {
+      await requestAppointment(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, action }),
       });
-      if (!res.ok) throw new Error((await res.json()).error);
       await onChange?.();
     } catch (e) {
       setProblem(e instanceof Error ? e.message : "Falha ao registrar.");
@@ -173,14 +170,8 @@ type Preferences = {
 
 function ReminderPreferences({ clientId }: { clientId: string }) {
   const key = endpoint + "?settings&clientId=" + clientId;
-  const { data, error, mutate } = useSWR<Preferences>(
-    key,
-    async (url: string) => {
-      const res = await fetch(url);
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error);
-      return body;
-    },
+  const { data, error, mutate } = useSWR<Preferences>(key, (url: string) =>
+    requestAppointment<Preferences>(url, { cache: "no-store" }),
   );
   const [draft, setDraft] = useState<Preferences>();
   const [status, setStatus] = useState("");
@@ -192,13 +183,11 @@ function ReminderPreferences({ clientId }: { clientId: string }) {
     event.preventDefault();
     setSaving(true);
     try {
-      const response = await fetch(endpoint, {
+      const body = await requestAppointment<Preferences>(endpoint, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...values, clientId }),
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error);
       await mutate(body, false);
       setDraft(undefined);
       setStatus("Configuração salva.");
