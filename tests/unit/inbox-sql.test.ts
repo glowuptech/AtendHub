@@ -749,5 +749,9 @@ it("envia o link público no corpo reservado e registra exatamente o texto envia
   expect(item.replyText).toBeNull();
   await db.query("select atendhub_eve_sent($1,'inst-a','auto-link-ack',now())",[item.requestId]);
   await admin();
-  expect((await db.query("select body from atendhub_inbox_messages where provider_message_id='auto-link-ack'")).rows[0].body).toBe(item.body);
+  const sentMessage = await db.query<{ body: string }>(
+    "select body from atendhub_inbox_messages where provider_message_id='auto-link-ack'",
+  );
+  expect(sentMessage.rows).toHaveLength(1);
+  expect(sentMessage.rows[0].body).toBe(item.body);
 });
