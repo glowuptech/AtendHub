@@ -517,6 +517,12 @@ export function Inbox() {
 export { Queue } from "@/features/queue/queue";
 
 function AppointmentTags({ stage }: { stage: string }) {
+  if (stage === "rescheduling")
+    return (
+      <span className="inbox-booking-tags">
+        <span data-rescheduling>Em reagendamento</span>
+      </span>
+    );
   if (stage !== "scheduled" && stage !== "confirmed") return null;
   return (
     <span className="inbox-booking-tags">

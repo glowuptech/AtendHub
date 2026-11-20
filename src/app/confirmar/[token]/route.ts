@@ -1,3 +1,5 @@
+import { after } from "next/server";
+import { deliverAppointmentResponse } from "@/features/appointments/response-webhook";
 import { tenantSlug } from "@/features/client-domains/model";
 import { tenantAtHost } from "@/features/client-domains/server";
 import { z } from "zod";
@@ -86,6 +88,10 @@ async function render(
         "<h1>Link indisponível</h1><p>Peça um novo link à clínica.</p>",
         404,
       );
+    if (decision && typeof data.eventId === "string") {
+      const eventId = data.eventId;
+      after(() => deliverAppointmentResponse(eventId));
+    }
     const heading = `<h1>Confirmar consulta</h1><p>${escape(data.clinic ?? "Clínica")} · <strong>${escape(data.when)}</strong></p>`;
     if (data.state !== "pending")
       return page(
@@ -95,7 +101,7 @@ async function render(
       heading +
         `<p>Responda até ${escape(data.deadline)}.</p>
       <form method="post"><button name="decision" value="confirm">Confirmar presença</button>
-      <button name="decision" value="decline">Não vou conseguir comparecer</button></form>`,
+      <button name="decision" value="decline">Pedir reagendamento</button></form>`,
     );
   } catch {
     return page(
