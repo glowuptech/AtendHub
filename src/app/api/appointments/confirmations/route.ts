@@ -59,10 +59,35 @@ export async function POST(request: Request) {
   const auth = await sessionOrganizationContext();
   if ("error" in auth) return auth.error;
   const input = z
-    .object({ id: z.string().uuid(), action: z.enum(["sent", "confirmed"]) })
+    .object({
+      id: z.string().uuid(),
+      action: z.enum(["sent", "confirmed", "share"]),
+    })
     .safeParse(await request.json().catch(() => null));
   if (!input.success)
     return NextResponse.json({ error: "Lembrete inválido." }, { status: 400 });
+  if (input.data.action === "share") {
+    const { data, error } = await auth.supabase.rpc(
+      "atendhub_confirmation_link",
+      {
+        p_org: auth.organizationId,
+        p_id: input.data.id,
+      },
+    );
+    if (error) return failure(error);
+    if (!data)
+      return NextResponse.json(
+        {
+          error:
+            "O prazo para compartilhar este link terminou ou a consulta mudou.",
+        },
+        { status: 409 },
+      );
+    return NextResponse.json(
+      { path: `/confirmar/${data}` },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  }
   const { error } = await auth.supabase.rpc("atendhub_eve_phone", {
     p_org: auth.organizationId,
     p_id: input.data.id,

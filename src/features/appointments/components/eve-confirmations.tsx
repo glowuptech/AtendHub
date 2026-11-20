@@ -15,6 +15,7 @@ type Reminder = {
   starts_at: string;
   sent_at: string | null;
   confirmed_at: string | null;
+  declined_at?: string | null;
   dispatching: boolean;
   can_edit: boolean;
   is_eve: boolean;
@@ -42,6 +43,27 @@ export function ConfirmationsList({
   );
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState("");
+  const [shared, setShared] = useState<{ id: string; url: string }>();
+  async function share(id: string) {
+    setBusy(true);
+    setProblem("");
+    try {
+      const { path } = await requestAppointment<{ path: string }>(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "share" }),
+      });
+      setShared({ id, url: new URL(path, window.location.origin).href });
+    } catch (error) {
+      setProblem(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível obter o link.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
   async function register(id: string, action: "sent" | "confirmed") {
     setProblem("");
     setBusy(true);
@@ -91,36 +113,60 @@ export function ConfirmationsList({
               </p>
             )}
             <Badge>
-              {r.confirmed_at
-                ? "Paciente confirmou · lead qualificado"
-                : r.sent_at
-                  ? r.purpose === "reminder"
-                    ? "Lembrete enviado"
-                    : "Aguardando resposta"
-                  : r.dispatching
-                    ? "Aguardando retorno do envio"
-                    : "Lembrete pendente"}
+              {r.declined_at
+                ? "Paciente não vai comparecer"
+                : r.confirmed_at
+                  ? "Paciente confirmou · lead qualificado"
+                  : r.sent_at
+                    ? r.purpose === "reminder"
+                      ? "Lembrete enviado"
+                      : "Aguardando resposta"
+                    : r.dispatching
+                      ? "Aguardando retorno do envio"
+                      : "Lembrete pendente"}
             </Badge>
-            {r.can_edit && !r.confirmed_at && r.purpose !== "reminder" && (
-              <div className="actions">
-                {!r.sent_at && !r.dispatching && r.is_eve && (
-                  <Button
-                    disabled={busy}
-                    onClick={() => register(r.id, "sent")}
-                  >
-                    Registrar lembrete feito por telefone
-                  </Button>
-                )}
-                {r.sent_at && (
-                  <Button
-                    disabled={busy}
-                    onClick={() => register(r.id, "confirmed")}
-                  >
-                    Registrar que o paciente confirmou por telefone
-                  </Button>
-                )}
-              </div>
-            )}
+            {r.can_edit &&
+              !r.confirmed_at &&
+              !r.declined_at &&
+              r.purpose !== "reminder" && (
+                <div className="actions">
+                  {(r.slot ?? 1) === 1 && (
+                    <Button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => share(r.id)}
+                    >
+                      Gerar link de confirmação
+                    </Button>
+                  )}
+                  {shared?.id === r.id && (
+                    <label>
+                      Link para compartilhar
+                      <input
+                        readOnly
+                        value={shared.url}
+                        onFocus={(event) => event.currentTarget.select()}
+                      />
+                    </label>
+                  )}
+                  {!r.sent_at && !r.dispatching && r.is_eve && (
+                    <Button
+                      disabled={busy}
+                      onClick={() => register(r.id, "sent")}
+                    >
+                      Registrar lembrete feito por telefone
+                    </Button>
+                  )}
+                  {r.sent_at && (
+                    <Button
+                      disabled={busy}
+                      onClick={() => register(r.id, "confirmed")}
+                    >
+                      Registrar que o paciente confirmou por telefone
+                    </Button>
+                  )}
+                </div>
+              )}
           </article>
         ))}
     </>

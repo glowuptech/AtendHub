@@ -701,3 +701,31 @@ it("envia o aviso mesmo com consulta confirmada e não usa a resposta ao aviso c
   await ingest({jid,pmid:"notice-reply",body:"CONFIRMO "+notice.body.slice(-16),ts:new Date().toISOString()});
   expect(await count("atendhub_leads where qualified_at is not null and id='"+lead.leadId+"'")).toBe(0);
 });
+
+it("confirma ou recusa por link e deixa de aceitar o link após cancelamento", async () => {
+  await admin();
+  await db.exec(await readFile("supabase/migrations/20261121140000_atendhub_public_confirmation_link.sql", "utf8"));
+  for (const [i, decision] of [[9810, "confirm"], [9811, "decline"]] as const) {
+    const lead=await ingest({jid:`551698700${i}@s.whatsapp.net`,pmid:`public-contact-${i}`});
+    await db.query(`insert into atendhub_appointments(id,organization_id,client_id,professional_id,lead_id,created_by_id,starts_at)
+      values($1,$2,$3,$4,$5,$6,now()+interval '2 hours')`,[id(i),ORG,CLIENT_A,id(9700),lead.leadId,USER_OWNER]);
+    const reminder=(await db.query<{id:string}>("select id from atendhub_eve_reminders where appointment_id=$1 and slot=1",[id(i)])).rows[0].id;
+    await as(USER_OTHER);
+    expect((await db.query<{token:string|null}>("select atendhub_confirmation_link($1,$2) token",[ORG,reminder])).rows[0].token).toBeNull();
+    await as(USER_OWNER);
+    const token=(await db.query<{token:string}>("select atendhub_confirmation_link($1,$2) token",[ORG,reminder])).rows[0].token;
+    expect(token).toBeTruthy();
+    await expect(db.query("select atendhub_confirmation_public($1,null)",[token])).rejects.toThrow();
+    await as(null,"service_role");
+    const respond=async (value:string|null)=>(await db.query<{answer:{state:string}|null}>("select atendhub_confirmation_public($1,$2) answer",[token,value])).rows[0].answer?.state;
+    expect(await respond(null)).toBe("pending");
+    expect(await respond(decision)).toBe(decision==="confirm"?"confirmed":"declined");
+    expect(await respond(decision==="confirm"?"decline":"confirm")).toBe(decision==="confirm"?"confirmed":"declined");
+    await admin();
+    const state=(await db.query("select a.status,l.qualified_at is not null qualified from atendhub_appointments a join atendhub_leads l on l.id=a.lead_id where a.id=$1",[id(i)])).rows[0];
+    expect(state).toEqual({status:decision==="confirm"?"confirmed":"rescheduling",qualified:decision==="confirm"});
+    await db.query("update atendhub_appointments set status='cancelled' where id=$1",[id(i)]);
+    await as(null,"service_role");
+    expect(await respond("confirm")).toBeUndefined();
+  }
+});
