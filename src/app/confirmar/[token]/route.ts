@@ -1,3 +1,5 @@
+import { tenantSlug } from "@/features/client-domains/model";
+import { tenantAtHost } from "@/features/client-domains/server";
 import { z } from "zod";
 import { integrationAdmin } from "@/features/whatsapp/server";
 
@@ -39,7 +41,11 @@ function page(content: string, status = 200) {
   );
 }
 
-async function render(context: Context, decision: string | null = null) {
+async function render(
+  request: Request,
+  context: Context,
+  decision: string | null = null,
+) {
   const { token } = await context.params;
   if (!z.string().uuid().safeParse(token).success)
     return page(
@@ -47,9 +53,16 @@ async function render(context: Context, decision: string | null = null) {
       404,
     );
   try {
+    const host = request.headers.get("host");
+    const clientId = tenantSlug(host) ? await tenantAtHost(host) : undefined;
+    if (clientId === null) return page("<h1>Link indisponível</h1>", 404);
     const { data, error } = await integrationAdmin().rpc(
       "atendhub_confirmation_public",
-      { p_token: token, p_decision: decision },
+      {
+        p_token: token,
+        p_decision: decision,
+        ...(clientId ? { p_client: clientId } : {}),
+      },
     );
     if (error) throw error;
     if (!data)
@@ -76,8 +89,8 @@ async function render(context: Context, decision: string | null = null) {
   }
 }
 
-export async function GET(_request: Request, context: Context) {
-  return render(context);
+export async function GET(request: Request, context: Context) {
+  return render(request, context);
 }
 
 export async function POST(request: Request, context: Context) {
@@ -85,5 +98,5 @@ export async function POST(request: Request, context: Context) {
   const decision = form?.get("decision");
   if (decision !== "confirm" && decision !== "decline")
     return page("<h1>Resposta inválida</h1>", 400);
-  return render(context, decision);
+  return render(request, context, decision);
 }

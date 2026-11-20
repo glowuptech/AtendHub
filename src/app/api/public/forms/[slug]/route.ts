@@ -1,3 +1,5 @@
+import { tenantSlug } from "@/features/client-domains/model";
+import { tenantAtHost } from "@/features/client-domains/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
@@ -49,10 +51,12 @@ function publicForm(row: { id: string; organization_id: string; client_id: strin
   return { id: row.id, organizationId: row.organization_id, clientId: row.client_id, doctorId: row.doctor_id, name: row.name, description: row.description, slug: row.slug, status: row.status, activeVersionId, versions: mappedVersions, fields: active?.fields ?? [], clinicName } as unknown as FormDefinition & { clinicName: string };
 }
 
-async function load(slug: string) {
+async function load(slug: string, host: string | null) {
+  const tenant = tenantSlug(host) ? await tenantAtHost(host) : undefined;
+  if (tenant === null) return null;
   const supabase = admin();
   const { data: row, error } = await supabase.from("atendhub_forms").select("id,organization_id,client_id,doctor_id,name,description,slug,status,active_version_id").eq("slug", slug).eq("status", "demo").maybeSingle();
-  if (error || !row) return null;
+  if (error || !row || (tenant && row.client_id !== tenant)) return null;
   const { data: versions, error: versionError } = await supabase.from("atendhub_form_versions").select("id,form_id,organization_id,client_id,number,state,definition,paths,choice_assets").eq("form_id", row.id).eq("id", row.active_version_id).eq("state", "snapshot").limit(1);
   if (versionError || !versions?.[0]) return null;
   const { data: client } = await supabase.from("atendhub_clients").select("name").eq("id", row.client_id).maybeSingle();
@@ -61,15 +65,15 @@ async function load(slug: string) {
   return parsed.success ? form : null;
 }
 
-export async function GET(_request: Request, context: { params: Promise<{ slug: string }> }) {
-  const form = await load((await context.params).slug);
+export async function GET(request: Request, context: { params: Promise<{ slug: string }> }) {
+  const form = await load((await context.params).slug, request.headers.get("host"));
   if (!form) return NextResponse.json({ error: "Formulário não encontrado." }, { status: 404 });
   return NextResponse.json(form, { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } });
 }
 
 export async function POST(request: Request, context: { params: Promise<{ slug: string }> }) {
   const body = await request.json().catch(() => null);
-  const form = await load((await context.params).slug);
+  const form = await load((await context.params).slug, request.headers.get("host"));
   if (!form) return NextResponse.json({ error: "Formulário não encontrado." }, { status: 404 });
   const version = form.versions.find((item) => item.id === form.activeVersionId);
   if (!version) return NextResponse.json({ error: "Versão publicada indisponível." }, { status: 409 });

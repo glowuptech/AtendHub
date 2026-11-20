@@ -755,3 +755,23 @@ it("envia o link público no corpo reservado e registra exatamente o texto envia
   expect(sentMessage.rows).toHaveLength(1);
   expect(sentMessage.rows[0].body).toBe(item.body);
 });
+
+it("usa o domínio ativo da clínica e rejeita a confirmação por outro subdomínio", async () => {
+  await admin();
+  await db.exec("update atendhub_appointments set status='cancelled' where status<>'cancelled'");
+  await db.exec(await readFile("supabase/migrations/20261121160000_atendhub_client_domains.sql", "utf8"));
+  await db.query("insert into atendhub_client_domains(client_id,organization_id,slug,active) values($1,$2,'clinica-teste',true)", [CLIENT_A,ORG]);
+  const lead=await ingest({jid:"5516987009983@s.whatsapp.net",pmid:"domain-contact"});
+  await db.query(`insert into atendhub_appointments(id,organization_id,client_id,professional_id,lead_id,created_by_id,starts_at,timezone)
+    values($1,$2,$3,$4,$5,$6,now()+interval '45 minutes',
+    case when (now() at time zone 'UTC')::time>time '23:00' then 'America/Sao_Paulo' else 'UTC' end)`,[id(9813),ORG,CLIENT_A,id(9700),lead.leadId,USER_OWNER]);
+  await as(null,"atendhub_integration");
+  const result=await db.query<{r:{confirmationUrl:string}}>("select atendhub_eve_claim($1,'inst-a','https://atendehub.app') r",[CLIENT_A]);
+  const url=new URL(result.rows[0].r.confirmationUrl);
+  expect(url.hostname).toBe("clinica-teste.atendehub.app");
+  await as(null,"service_role");
+  const token=url.pathname.split("/").at(-1);
+  const query="select atendhub_confirmation_public($1,null,$2) r";
+  expect((await db.query(query,[token,CLIENT_B])).rows[0]).toEqual({r:null});
+  expect((await db.query<{r:{state:string}}>(query,[token,CLIENT_A])).rows[0].r.state).toBe("pending");
+});
