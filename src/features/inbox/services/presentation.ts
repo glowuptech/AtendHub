@@ -1,6 +1,6 @@
 import type { InboxConversation, InboxMessage } from "../model";
 
-export type QuickFilter = "all" | "reply" | "customer" | "unread";
+export type QuickFilter = "open" | "closed" | "all" | "reply" | "customer" | "unread";
 
 export function waitingFor(
   conversation: Pick<InboxConversation, "lastInboundAt" | "lastOutboundAt">,
@@ -16,7 +16,10 @@ export function matchesQuick(
   conversation: InboxConversation,
   quick: QuickFilter,
 ) {
+  if (quick === "open") return conversation.status === "open";
+  if (quick === "closed") return conversation.status === "closed";
   if (quick === "all") return true;
+  if (conversation.status === "closed") return false;
   if (quick === "unread") return conversation.unreadCount > 0;
   return waitingFor(conversation) === quick;
 }

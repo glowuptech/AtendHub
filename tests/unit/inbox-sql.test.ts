@@ -47,6 +47,7 @@ beforeAll(async () => {
   await db.exec(`
     create role anon; create role authenticated; create role service_role;
     create schema auth;
+    grant usage on schema auth to authenticated;
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('app.user_id',true),'')::uuid $$;
     create table auth.users(id uuid primary key);
     create table atendhub_organizations(id uuid primary key);
@@ -91,6 +92,7 @@ beforeAll(async () => {
     "20261117080000_atendhub_whatsapp_private_credentials",
     "20261118000000_atendhub_inbox",
     "20261118010000_atendhub_start_inbox_conversation",
+    "20261120000000_atendhub_inbox_episodes",
   ])
     await db.exec(await readFile(`supabase/migrations/${f}.sql`, "utf8"));
   await db.exec(`
@@ -378,11 +380,73 @@ describe("conversa proativa sem mensagem recebida",()=>{
   await as(USER_OWNER);
   await expect(db.query("select atendhub_inbox_start_conversation($1,$2)",[lead,CONN_B])).rejects.toThrow("CONNECTION_NOT_FOUND");
  });
- it("não reatribui conversa de outro lead com o mesmo número",async()=>{
-  await admin();
+ it("isola oportunidades no mesmo canal e exige revisão quando a mensagem é ambígua",async()=>{
   const duplicate=id(5001);
-  await db.query("insert into atendhub_leads(id,organization_id,client_id,name,phone,owner_id) values($1,$2,$3,'Outra pessoa','16999990000',$4)",[duplicate,ORG,CLIENT_A,USER_OWNER]);
+  const jid="5516999990000@s.whatsapp.net";
+  await admin();
+  await db.query("insert into atendhub_leads(id,organization_id,client_id,name,phone,owner_id) values($1,$2,$3,'Segunda demanda','16999990000',$4)",[duplicate,ORG,CLIENT_A,USER_OTHER]);
   await as(USER_OWNER);
-  await expect(db.query("select atendhub_inbox_start_conversation($1,$2)",[duplicate,CONN_A])).rejects.toThrow("CONVERSATION_LEAD_CONFLICT");
+  const first=(await db.query<{id:string}>("select atendhub_inbox_start_conversation($1,$2) id",[lead,CONN_A])).rows[0].id;
+  await as(USER_OTHER);
+  const second=(await db.query<{id:string}>("select atendhub_inbox_start_conversation($1,$2) id",[duplicate,CONN_A])).rows[0].id;
+  expect(second).not.toBe(first);
+  expect((await ingest({jid,pmid:"review"})).outcome).toBe("ambiguous_lead");
+  expect((await ingest({jid,pmid:"review"})).outcome).toBe("ambiguous_lead");
+  await as(USER_OTHER);
+  expect(await count("atendhub_inbox_review_items('"+ORG+"') where preview='Olá' and candidates @> '[{\"id\":\""+duplicate+"\"}]'")).toBe(0);
+  await expect(db.query("select atendhub_inbox_change_episode($1,'close')",[first])).rejects.toThrow();
+  await as(USER_SUPERVISOR);
+  const pending=(await db.query<{id:string}>("select id from atendhub_inbox_review_items($1) where candidates @> $2::jsonb",[ORG,JSON.stringify([{id:duplicate}])])).rows[0].id;
+  expect((await db.query<{id:string}>("select atendhub_inbox_route_review($1,$2,$3) id",[ORG,pending,duplicate])).rows[0].id).toBe(second);
+  expect((await ingest({jid,pmid:"review"})).outcome).toBe("duplicate");
+  await as(USER_OWNER);
+  expect(await count("atendhub_inbox_messages where provider_message_id='review'")).toBe(0);
+  await db.query("select atendhub_inbox_change_episode($1,'close')",[first]);
+  expect((await ingest({jid,pmid:"open-only"})).conversationId).toBe(second);
+  await as(USER_OTHER);
+  await db.query("select atendhub_inbox_change_episode($1,'close')",[second]);
+  await expect(db.query("select atendhub_inbox_request_send($1,$2,'oi')",[second,id(6001)])).rejects.toThrow("ATENDIMENTO_ENCERRADO");
+  expect((await ingest({jid,pmid:"after-close"})).outcome).toBe("ambiguous_lead");
+  await as(USER_OWNER);
+  await db.query("select atendhub_inbox_change_episode($1,'resume')",[first]);
+  expect((await ingest({jid,pmid:"after-close"})).outcome).toBe("ambiguous_lead");
+  expect((await ingest({jid,pmid:"after-resume"})).conversationId).toBe(first);
  });
+});
+
+// The deployed lead creation/claim functions are external to the migration tree.
+// These doubles exercise the new RPC's transaction and retry contract locally.
+it("novo atendimento é atômico, reutiliza a chave e conserva o episódio anterior", async () => {
+  await admin();
+  await db.exec(`
+    alter table atendhub_leads add column idempotency_key text unique;
+    create function public.atendhub_create_manual_lead(
+      p_organization_id uuid,p_client_id uuid,p_professional_id uuid,p_name text,p_phone text,
+      p_email text,p_source text,p_capture_status text,p_next_action text,p_notes text,p_form_id uuid,
+      p_form_version_id uuid,p_original_captured_at timestamptz,p_field_values jsonb,p_idempotency_key text,p_actor_id uuid
+    ) returns uuid language sql as $$
+      insert into public.atendhub_leads(organization_id,client_id,name,phone,idempotency_key)
+      values(p_organization_id,p_client_id,p_name,p_phone,p_idempotency_key)
+      on conflict(idempotency_key) do update set name=excluded.name returning id;
+    $$;
+    create function public.atendhub_claim_lead(_organization_id uuid,_lead_id uuid)
+    returns uuid language plpgsql as $$
+    begin
+      if current_setting('app.test_deny_claim',true)='yes' then raise insufficient_privilege; end if;
+      update public.atendhub_leads set owner_id=auth.uid() where id=_lead_id and organization_id=_organization_id;
+      return _lead_id;
+    end $$;
+  `);
+  await as(USER_OWNER);
+  const origin=(await db.query<{id:string}>("select atendhub_inbox_start_conversation($1,$2) id",[id(5000),CONN_A])).rows[0].id;
+  const start=(key:string)=>db.query<{id:string}>("select atendhub_inbox_new_episode($1,$2) id",[origin,key]);
+  await db.exec("set app.test_deny_claim='yes'");
+  await expect(start(id(8100))).rejects.toThrow();
+  expect(await count("atendhub_leads where idempotency_key is not null")).toBe(0);
+  await db.exec("set app.test_deny_claim='no'");
+  const created=(await start(id(8101))).rows[0].id;
+  expect(created).not.toBe(origin);
+  expect((await start(id(8101))).rows[0].id).toBe(created);
+  expect(await count("atendhub_leads where idempotency_key is not null")).toBe(1);
+  expect(await count("atendhub_inbox_messages where conversation_id='"+created+"'")).toBe(0);
 });

@@ -1,0 +1,15 @@
+# Ativação dos atendimentos por oportunidade no Inbox
+
+Atualize o checkout para o commit informado pelo Codex. Confirme que o Preview usa essa revisão e que preserva a revisão da branch v0/activate-dashboard-investments. O projeto Supabase é supabase-finup, ref oskdgymvrptxjrafigna. Use somente objetos atendhub_ desse projeto.
+
+1. Confira o histórico de migrations e as definições implantadas de atendhub_ingest_whatsapp_message, atendhub_inbox_request_send e atendhub_inbox_start_conversation contra as versões anteriores desta migration. Se houver mudanças independentes, reconcilie antes da aplicação. Confira também assinaturas, tipos, privilégios e retornos das RPCs atendhub_create_manual_lead (UUID, parâmetros nomeados da API de leads) e atendhub_claim_lead. Elas existem no banco implantado e não têm implementação versionada neste checkout. A nova RPC de criação é SECURITY INVOKER e depende da sessão e das permissões existentes.
+
+2. Registre contagens agregadas de conversas, mensagens e threads de IA e aplique em transação pelo mecanismo normal de migrations o arquivo supabase/migrations/20261120000000_atendhub_inbox_episodes.sql. Ele mantém IDs, mensagens e threads, altera a chave única para conexão + JID + lead e registra as futuras mudanças de estado. Verifique as contagens e a ausência de registros órfãos, as FKs, RLS e grants após a aplicação.
+
+3. No Preview autenticado, use registros de teste e evite envio de WhatsApp real. Pelo menu Atendimento, crie uma nova oportunidade a partir de uma existente. Verifique novo lead, responsável e cartão de fila. Repita a mesma requisição com o mesmo identificador e confira que retorna o mesmo atendimento. Simule falta de permissão de assumir e confirme o rollback da nova oportunidade. Encerre, recarregue, abra Encerradas e retome. Confirme que outra oportunidade do mesmo número conserva seu estado e que abrir, fechar ou retomar não envia mensagem à Evolution.
+
+4. Em ambiente de teste isolado, simule ingestão com ID de provedor sintético. Para dois atendimentos possíveis no mesmo canal, confira Escolher atendimento. Somente quem enxerga todos os candidatos originais deve visualizar a pendência. Escolha o destino, repita a entrega e confira uma única mensagem no histórico correto. Com dois responsáveis, confirme que mensagens e chat interno de IA de um atendimento são inacessíveis ao outro. Teste supervisor com leitura e sem envio. Repita com outra clínica e outra conexão. Confira o eco de saída correlacionado depois do encerramento.
+
+5. Confira se o workflow ativo usa a RPC de ingestão e encaminhe outcome ambiguous_lead para revisão humana, incluindo quando só existe histórico encerrado. Nenhuma mensagem precisa ser enviada ao lead para essa revisão. Se o workflow ativo estiver inacessível, registre isso. Não associe por telefone via SQL paralelo.
+
+Relate commit implantado, identificação da migration e resultados efetivamente verificados; se faltar sessão de teste, discrimine os testes pendentes. Não publique telefone, mensagens, tokens ou dados pessoais. Lembrete da véspera, qualificação e Meta CAPI são as próximas etapas.

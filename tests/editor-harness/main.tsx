@@ -230,6 +230,7 @@ window.fetch = async (input, init) => {
     }
     return Response.json(rows);
   }
+  if (url === "/api/inbox/episodes" && init?.method !== "POST") return Response.json([]);
   if (url === "/api/inbox/assigned-leads")
     return Response.json(
       localStorage.getItem("test-started-conversation") ? [] : [inboxLead],
