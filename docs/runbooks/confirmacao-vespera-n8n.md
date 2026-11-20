@@ -45,7 +45,7 @@ select public.atendhub_eve_claim($1::uuid, $2::text) as reminder;
 select $1::uuid as "clientId", $2::text as "instance";
 ```
 
-Restabeleça a query de reserva após o teste. A resposta tem uma coluna JSON chamada `reminder`. Configure um nó IF com a expressão booleana `{{ $json.reminder != null }}`. No ramo falso, encerre o processamento desse item. `reminder: null` é um retorno válido. A reserva procura uma consulta de amanhã no fuso da própria consulta, aguardando confirmação, com conexão ativa e atendimento aberto do lead nessa linha. Duas conversas abertas com destinos diferentes para o mesmo lead nessa linha exigem conciliação.
+Restabeleça a query de reserva após o teste. A resposta tem uma coluna JSON chamada `reminder`. Configure um nó IF com a expressão booleana `{{ $json.reminder != null }}`. No ramo falso, encerre o processamento desse item. `reminder: null` é um retorno válido. A reserva procura uma consulta futura aguardando confirmação, cujo lembrete já entrou na janela configurada, com conexão ativa e atendimento aberto do lead nessa linha. Em **Confirmações e lembretes → Configurar lembretes**, defina a antecedência para consultas marcadas no mesmo dia, a antecedência para consultas marcadas em um dia anterior e um ou dois lembretes. Os padrões são 120 minutos no mesmo dia, 1.440 minutos para outro dia e um lembrete. Se a consulta for criada dentro da janela, a próxima execução pode reservar o primeiro lembrete. Um segundo lembrete exige o registro do primeiro envio e pelo menos 30 minutos de intervalo. Duas conversas abertas com destinos diferentes para o mesmo lead nessa linha exigem conciliação.
 
 No ramo verdadeiro, preserve os campos de `reminder` antes da chamada à Evolution:
 

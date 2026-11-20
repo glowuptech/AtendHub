@@ -5,7 +5,7 @@ import { sessionOrganizationContext } from "@/lib/supabase/organization-session"
 function failure(error: { code: string; message: string }) {
   if (error.code === "PGRST202")
     return NextResponse.json(
-      { error: "A confirmação da véspera aguarda ativação no banco." },
+      { error: "A configuração de lembretes aguarda ativação no banco." },
       { status: 503 },
     );
   if (error.code === "42501")
@@ -38,6 +38,15 @@ export async function GET(request: Request) {
       { error: "Selecione o cliente." },
       { status: 400 },
     );
+  if (new URL(request.url).searchParams.has("settings")) {
+    const { data, error } = await auth.supabase.rpc(
+      "atendhub_reminder_preferences",
+      { p_org: auth.organizationId, p_client: client.data },
+    );
+    return error
+      ? failure(error)
+      : NextResponse.json(data, { headers: { "Cache-Control": "no-store" } });
+  }
   const { data, error } = await auth.supabase.rpc("atendhub_eve_list", {
     p_org: auth.organizationId,
     p_client: client.data,
@@ -60,4 +69,41 @@ export async function POST(request: Request) {
     p_action: input.data.action,
   });
   return error ? failure(error) : NextResponse.json({ ok: true });
+}
+
+const preferences = z
+  .object({
+    clientId: z.string().uuid(),
+    advance: z.number().int().min(1).max(10080),
+    sameDay: z.number().int().min(1).max(1439),
+    count: z.union([z.literal(1), z.literal(2)]),
+    second: z.number().int().min(1).max(1439),
+  })
+  .refine((v) => v.count === 1 || v.second < Math.min(v.advance, v.sameDay));
+
+export async function PUT(request: Request) {
+  const auth = await sessionOrganizationContext();
+  if ("error" in auth) return auth.error;
+  const result = preferences.safeParse(await request.json().catch(() => null));
+  if (!result.success)
+    return NextResponse.json(
+      {
+        error:
+          "Confira as antecedências. O segundo lembrete deve ficar mais perto da consulta.",
+      },
+      { status: 400 },
+    );
+  const v = result.data;
+  const { data, error } = await auth.supabase.rpc(
+    "atendhub_reminder_preferences",
+    {
+      p_org: auth.organizationId,
+      p_client: v.clientId,
+      p_advance: v.advance,
+      p_same_day: v.sameDay,
+      p_count: v.count,
+      p_second: v.second,
+    },
+  );
+  return error ? failure(error) : NextResponse.json(data);
 }

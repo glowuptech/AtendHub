@@ -337,6 +337,7 @@ export function Inbox() {
                 <ContactAvatar name={l.name} />
                 <span className="inbox-conversation-content">
                   <strong>{l.name}</strong>
+                  <AppointmentTags stage={l.stage} />
                   <span className="inbox-client">{l.clientName}</span>
                   <span>Pronto para iniciar · Sem mensagens</span>
                 </span>
@@ -363,6 +364,7 @@ export function Inbox() {
                       </time>
                     )}
                   </span>
+                  <AppointmentTags stage={c.stage} />
                   <span className="inbox-professional">
                     {c.professionalName || "Sem profissional vinculado"}
                   </span>
@@ -513,3 +515,15 @@ export function Inbox() {
   );
 }
 export { Queue } from "@/features/queue/queue";
+
+function AppointmentTags({ stage }: { stage: string }) {
+  if (stage !== "scheduled" && stage !== "confirmed") return null;
+  return (
+    <span className="inbox-booking-tags">
+      <span>Agendado</span>
+      <span data-confirmed={stage === "confirmed"}>
+        {stage === "confirmed" ? "Confirmado" : "Sem confirmação"}
+      </span>
+    </span>
+  );
+}

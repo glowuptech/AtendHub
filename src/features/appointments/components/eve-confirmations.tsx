@@ -17,6 +17,8 @@ type Reminder = {
   dispatching: boolean;
   can_edit: boolean;
   is_eve: boolean;
+  due_at?: string;
+  slot?: number;
 };
 const endpoint = "/api/appointments/confirmations";
 async function read(url: string): Promise<Reminder[]> {
@@ -70,16 +72,21 @@ export function ConfirmationsList({
       )}
       {problem && <p role="alert">{problem}</p>}
       {!appointmentId && data?.length === 0 && (
-        <p>Nenhuma consulta futura com lembrete para hoje ou amanhã.</p>
+        <p>Nenhuma consulta futura com lembrete.</p>
       )}
       {data
         ?.filter((r) => !appointmentId || r.appointment_id === appointmentId)
         .map((r) => (
           <article key={r.id} className="automation-section">
-            <h2>{appointmentId ? "Lembrete da véspera" : r.lead_name}</h2>
+            <h2>{appointmentId ? "Lembrete da consulta" : r.lead_name}</h2>
             {!appointmentId && (
               <p>
                 {dateTime(r.starts_at)} · {r.professional}
+              </p>
+            )}
+            {r.due_at && (
+              <p>
+                Lembrete {r.slot} · Envio a partir de {dateTime(r.due_at)}
               </p>
             )}
             <Badge>
@@ -89,9 +96,7 @@ export function ConfirmationsList({
                   ? "Aguardando resposta"
                   : r.dispatching
                     ? "Aguardando retorno do envio"
-                    : r.is_eve
-                      ? "Lembrete da véspera pendente"
-                      : "Sem envio registrado na véspera"}
+                    : "Lembrete pendente"}
             </Badge>
             {r.can_edit && !r.confirmed_at && (
               <div className="actions">
@@ -140,8 +145,130 @@ export function EveConfirmations() {
       {client && showCadence && hasLegacyConfig ? (
         <CadenceWorkspace kind="reminder" />
       ) : (
-        client && <ConfirmationsList key={client.id} clientId={client.id} />
+        client && (
+          <div key={client.id}>
+            <ReminderPreferences clientId={client.id} />
+            <ConfirmationsList clientId={client.id} />
+          </div>
+        )
       )}
     </>
+  );
+}
+
+type Preferences = {
+  advance: number;
+  sameDay: number;
+  count: 1 | 2;
+  second: number;
+  canEdit: boolean;
+};
+
+function ReminderPreferences({ clientId }: { clientId: string }) {
+  const key = endpoint + "?settings&clientId=" + clientId;
+  const { data, error, mutate } = useSWR<Preferences>(
+    key,
+    async (url: string) => {
+      const res = await fetch(url);
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error);
+      return body;
+    },
+  );
+  const [draft, setDraft] = useState<Preferences>();
+  const [status, setStatus] = useState("");
+  const [saving, setSaving] = useState(false);
+  const values = draft ?? data;
+  if (error) return <p role="alert">{error.message}</p>;
+  if (!values) return null;
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      const response = await fetch(endpoint, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...values, clientId }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error);
+      await mutate(body, false);
+      setDraft(undefined);
+      setStatus("Configuração salva.");
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "Falha ao salvar.");
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <details className="automation-section">
+      <summary>Configurar lembretes</summary>
+      <form onSubmit={save}>
+        <fieldset disabled={saving || !values.canEdit}>
+          <label>
+            Quantidade de lembretes por consulta
+            <select
+              value={values.count}
+              onChange={(e) =>
+                setDraft({ ...values, count: e.target.value === "2" ? 2 : 1 })
+              }
+            >
+              <option value={1}>1 lembrete</option>
+              <option value={2}>2 lembretes</option>
+            </select>
+          </label>
+          <label>
+            Marcada para outro dia · minutos de antecedência
+            <input
+              type="number"
+              min={1}
+              max={10080}
+              required
+              value={values.advance}
+              onChange={(e) =>
+                setDraft({ ...values, advance: Number(e.target.value) })
+              }
+            />
+          </label>
+          <label>
+            Marcada para hoje · minutos de antecedência
+            <input
+              type="number"
+              min={1}
+              max={1439}
+              required
+              value={values.sameDay}
+              onChange={(e) =>
+                setDraft({ ...values, sameDay: Number(e.target.value) })
+              }
+            />
+          </label>
+          {values.count === 2 && (
+            <label>
+              Segundo lembrete · minutos de antecedência
+              <input
+                type="number"
+                min={1}
+                max={1439}
+                required
+                value={values.second}
+                onChange={(e) =>
+                  setDraft({ ...values, second: Number(e.target.value) })
+                }
+              />
+            </label>
+          )}
+          <p>
+            Se a consulta for marcada dentro da janela, o primeiro lembrete fica
+            disponível na próxima execução do n8n. O segundo depende do primeiro
+            envio, tem intervalo mínimo de 30 minutos e só sai enquanto a
+            consulta aguarda confirmação.
+          </p>
+          <Button type="submit">Salvar configuração</Button>
+        </fieldset>
+        {status && <p role="status">{status}</p>}
+      </form>
+    </details>
   );
 }

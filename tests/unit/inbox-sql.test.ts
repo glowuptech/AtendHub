@@ -645,3 +645,39 @@ it("reutiliza o histórico fechado e reinicia a fila apenas para uma nova mensag
   expect(await count("atendhub_inbox_messages where conversation_id='" + original.conversationId + "'")).toBe(3);
   expect((await ingest({ jid, pmid: "return-in", ts })).outcome).toBe("duplicate");
 });
+
+it("reserva consulta marcada para hoje e só oferece o segundo lembrete após o primeiro envio", async () => {
+  await admin();
+  await db.exec(`
+    alter table atendhub_appointments add column created_at timestamptz not null default now();
+    create table public.atendhub_appointment_events(appointment_id uuid,event_type text,created_at timestamptz);
+    create function public.atendhub_calendar_manages(uuid,uuid) returns boolean language sql stable
+      as $$select public.atendhub_has_client_access($1,$2)$$;
+    update atendhub_appointments set status='cancelled' where status='awaiting_confirmation';
+  `);
+  await db.exec(await readFile("supabase/migrations/20261121120000_atendhub_reminder_windows.sql", "utf8"));
+  await as(USER_OWNER);
+  await db.query("select atendhub_reminder_preferences($1,$2,1440,120,2,30)", [ORG,CLIENT_A]);
+  await admin();
+  const jid="5516987009876@s.whatsapp.net";
+  const lead=await ingest({jid,pmid:"same-day-new"});
+  await db.query(`insert into atendhub_appointments(id,organization_id,client_id,professional_id,lead_id,created_by_id,starts_at,timezone)
+    values($1,$2,$3,$4,$5,$6,now()+interval '45 minutes',
+      case when (now() at time zone 'UTC')::time>time '23:00' then 'America/Sao_Paulo' else 'UTC' end)`,
+    [id(9800),ORG,CLIENT_A,id(9700),lead.leadId,USER_OWNER]);
+  await as(null,"atendhub_integration");
+  const claim=async()=> (await db.query<{reminder:{requestId:string}|null}>("select atendhub_eve_claim($1,'inst-a') reminder",[CLIENT_A])).rows[0].reminder;
+  const first=await claim();
+  expect(first).not.toBeNull();
+  expect(await claim()).toBeNull();
+  await db.query("select atendhub_eve_sent($1,'inst-a','same-day-ack',now())",[first!.requestId]);
+  expect(await claim()).toBeNull();
+  await admin();
+  await db.query("update atendhub_eve_reminders set sent_at=now()-interval '31 minutes' where id=$1",[first!.requestId]);
+  await db.query("update atendhub_appointments set starts_at=starts_at where id=$1",[id(9800)]);
+  await db.query("update atendhub_reminder_settings set second_minutes=60 where client_id=$1",[CLIENT_A]);
+  await as(null,"atendhub_integration");
+  const second=await claim();
+  expect(second).not.toBeNull();
+  expect(second?.requestId).not.toBe(first!.requestId);
+});
