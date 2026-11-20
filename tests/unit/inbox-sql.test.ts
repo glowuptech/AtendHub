@@ -450,3 +450,179 @@ it("novo atendimento é atômico, reutiliza a chave e conserva o episódio anter
   expect(await count("atendhub_leads where idempotency_key is not null")).toBe(1);
   expect(await count("atendhub_inbox_messages where conversation_id='"+created+"'")).toBe(0);
 });
+
+describe("confirmação da véspera", () => {
+  beforeAll(async () => {
+    await admin();
+    // The appointments migration uses btree_gist, unavailable in PGlite.
+    // Supply its table contract and the restricted calendar-permission boundary.
+    await db.exec(`
+      create table public.atendhub_professionals(id uuid primary key,name text);
+      create table public.atendhub_appointments(id uuid primary key,organization_id uuid,client_id uuid,
+        lead_id uuid,professional_id uuid,created_by_id uuid, starts_at timestamptz,updated_at timestamptz,
+        timezone text default 'America/Sao_Paulo',status text default 'awaiting_confirmation',attendance text default 'unknown');
+      create function public.atendhub_calendar_allows(uuid,uuid,text,uuid,uuid) returns boolean
+        language sql stable as $$select $5=auth.uid()$$;
+      insert into public.atendhub_professionals values ('${id(9700)}','Profissional de teste');
+    `);
+    await db.exec(
+      await readFile(
+        "supabase/migrations/20261121000000_atendhub_eve_confirmations.sql",
+        "utf8",
+      ),
+    );
+  });
+  async function booking(number: number, lead: string) {
+    await db.query(
+      `insert into atendhub_appointments(id,organization_id,client_id,professional_id,lead_id,created_by_id,starts_at)
+      values($1,$2,$3,$4,$5,$6,(((now() at time zone 'America/Sao_Paulo')::date+1)+time '12:00') at time zone 'America/Sao_Paulo')`,
+      [id(number), ORG, CLIENT_A, id(9700), lead, USER_OWNER],
+    );
+    return (
+      await db.query<{ id: string }>(
+        "select id from atendhub_eve_reminders where appointment_id=$1 and invalidated_at is null",
+        [id(number)],
+      )
+    ).rows[0].id;
+  }
+  it("seleciona a oportunidade pelo código, inclusive quando a resposta chega antes do retorno de envio", async () => {
+    await admin();
+    const phone = "5516987654321";
+    for (const n of [9701, 9702]) {
+      await db.query(
+        "insert into atendhub_leads(id,organization_id,client_id,name,phone,owner_id) values($1,$2,$3,'Teste',$4,$5)",
+        [id(n), ORG, CLIENT_A, phone, USER_OWNER],
+      );
+      await as(USER_OWNER);
+      await db.query("select atendhub_inbox_start_conversation($1,$2)", [
+        id(n),
+        CONN_A,
+      ]);
+      await admin();
+    }
+    const ticket = await booking(9703, id(9702));
+    await as(null, "atendhub_integration");
+    const claim = async () =>
+      (
+        await db.query<{ r: { requestId: string; body: string } | null }>(
+          "select atendhub_eve_claim($1,'inst-a') r",
+          [CLIENT_A],
+        )
+      ).rows[0].r;
+    const work = await claim();
+    expect(work?.requestId).toBe(ticket);
+    expect(await claim()).toBeNull();
+    const body = work!.body.slice(work!.body.lastIndexOf("CONFIRMO"));
+    await admin();
+    const ts = (
+      await db.query<{ ts: string }>("select clock_timestamp()::text ts")
+    ).rows[0].ts;
+    const event = {
+      jid: phone + "@s.whatsapp.net",
+      pmid: "eve-reply",
+      body,
+      ts,
+    };
+    expect(
+      (await ingest({ ...event, pmid: "eve-sim", body: "Sim" })).outcome,
+    ).toBe("ambiguous_lead");
+    expect(
+      (
+        await ingest({
+          ...event,
+          pmid: "eve-other-phone",
+          jid: "5516987650000@s.whatsapp.net",
+        })
+      ).leadId,
+    ).not.toBe(id(9702));
+    expect((await ingest(event)).leadId).toBe(id(9702));
+    expect(await count("atendhub_leads where qualified_at is not null")).toBe(
+      0,
+    );
+    await as(null, "atendhub_integration");
+    await db.query("select atendhub_eve_sent($1,'inst-a','provider-out',$2)", [
+      ticket,
+      ts,
+    ]);
+    expect((await ingest(event)).outcome).toBe("duplicate");
+    expect(
+      await count(
+        "atendhub_leads where qualified_at is not null and id='" +
+          id(9702) +
+          "'",
+      ),
+    ).toBe(1);
+    expect(
+      await count(
+        "atendhub_leads where qualified_at is not null and id='" +
+          id(9701) +
+          "'",
+      ),
+    ).toBe(0);
+    await db.query(
+      "update atendhub_appointments set status='cancelled',attendance='absent' where id=$1",
+      [id(9703)],
+    );
+    expect(await count("atendhub_leads where qualified_at is not null")).toBe(
+      1,
+    );
+  });
+  it("exige lembrete, sessão autorizada e ocorrência vigente para confirmação por telefone", async () => {
+    await admin();
+    const ticket = await booking(9704, id(9701));
+    const phone = (action: string) =>
+      db.query("select atendhub_eve_phone($1,$2,$3)", [ORG, ticket, action]);
+    await as(USER_OTHER);
+    await expect(
+      db.query("update atendhub_leads set qualified_at=now() where id=$1", [
+        id(9701),
+      ]),
+    ).rejects.toThrow();
+    await expect(phone("sent")).rejects.toThrow();
+    await as(USER_OWNER);
+    await expect(phone("confirmed")).rejects.toThrow("STALE_REMINDER");
+    await phone("sent");
+    await admin();
+    await db.query(
+      "update atendhub_appointments set starts_at=starts_at+interval '1 hour' where id=$1",
+      [id(9704)],
+    );
+    await as(USER_OWNER);
+    await expect(phone("confirmed")).rejects.toThrow("STALE_REMINDER");
+    await admin();
+    const fresh = (
+      await db.query<{ id: string }>(
+        "select id from atendhub_eve_reminders where appointment_id=$1 and invalidated_at is null",
+        [id(9704)],
+      )
+    ).rows[0].id;
+    await db.query(
+      "update atendhub_appointments set status='confirmed' where id=$1",
+      [id(9704)],
+    );
+    expect(
+      await count(
+        "atendhub_leads where id='" +
+          id(9701) +
+          "' and qualified_at is not null",
+      ),
+    ).toBe(0);
+    await as(USER_OWNER);
+    for (const action of ["sent", "confirmed", "confirmed"])
+      await db.query("select atendhub_eve_phone($1,$2,$3)", [
+        ORG,
+        fresh,
+        action,
+      ]);
+    await admin();
+    expect(
+      await count(
+        "atendhub_eve_reminders where id='" +
+          fresh +
+          "' and confirmed_by='" +
+          USER_OWNER +
+          "'",
+      ),
+    ).toBe(1);
+  });
+});

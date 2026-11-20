@@ -35,6 +35,7 @@ export type PersistedLead = {
   created_at: string;
   updated_at: string;
   assigned_at: string | null;
+  qualified_at?: string | null;
   claimed_at: string | null;
   first_response_at: string | null;
   client?: { id: string; name: string; operation_id: string };

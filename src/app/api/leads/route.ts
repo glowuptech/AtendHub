@@ -62,21 +62,30 @@ export async function GET(request: Request) {
   const auth = await sessionOrganizationContext();
   if ("error" in auth) return auth.error;
   const url = new URL(request.url);
-  const query = auth.supabase
-    .from("atendhub_leads")
-    .select(select)
-    .eq("organization_id", auth.organizationId)
-    .order("created_at", { ascending: false });
-  const clientId = url.searchParams.get("clientId");
-  const stage = url.searchParams.get("stage");
-  const search = url.searchParams.get("search")?.trim();
-  if (clientId) query.eq("client_id", clientId);
-  if (stage && stage !== "all") query.eq("stage", stage);
-  if (search)
-    query.or(
-      `name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`,
-    );
-  const { data, error } = await query;
+  const buildQuery = (columns: string) => {
+    const query = auth.supabase
+      .from("atendhub_leads")
+      .select(columns)
+      .eq("organization_id", auth.organizationId)
+      .order("created_at", { ascending: false });
+    const clientId = url.searchParams.get("clientId");
+    const stage = url.searchParams.get("stage");
+    const search = url.searchParams.get("search")?.trim();
+    if (clientId) query.eq("client_id", clientId);
+    if (stage && stage !== "all") query.eq("stage", stage);
+    if (search)
+      query.or(
+        `name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`,
+      );
+    return query.overrideTypes<Array<Record<string, unknown> & { owner_id: string | null }>, { merge: false }>();
+  };
+  let result = await buildQuery(`qualified_at,${select}`);
+  if (
+    result.error?.code === "42703" &&
+    result.error.message.includes("qualified_at")
+  )
+    result = await buildQuery(select);
+  const { data, error } = result;
   if (error) return apiError(error, 500);
   const labels = await ownerLabels(
     auth,

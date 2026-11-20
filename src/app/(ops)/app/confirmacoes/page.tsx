@@ -1,4 +1,4 @@
-import { CadenceWorkspace } from "@/features/automation/pages";
+import { EveConfirmations } from "@/features/appointments/components/eve-confirmations";
 export default function Page() {
-  return <CadenceWorkspace kind="reminder" />;
+  return <EveConfirmations />;
 }

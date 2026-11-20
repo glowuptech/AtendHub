@@ -165,6 +165,7 @@ export function Queue() {
                     <h3>{l.name}</h3>
                     <p>{l.phone || "Telefone não informado"}</p>
                     <small>Origem: {l.source}</small>
+                    {l.qualified_at && <Badge>Qualificado · confirmou a consulta</Badge>}
                     {l.capture_status && l.capture_status !== "completed" && (
                       <Badge>
                         {l.capture_status === "incomplete"

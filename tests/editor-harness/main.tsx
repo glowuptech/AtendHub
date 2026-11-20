@@ -12,6 +12,7 @@ import {
 import { dataset as dashboardDataset } from "../fixtures/dashboard";
 import { shiftDay, daysBetween } from "@/lib/date-range";
 import { ServiceCalendar } from "@/features/settings/calendar";
+import { ConfirmationsList } from "@/features/appointments/components/eve-confirmations";
 import { Queue } from "@/features/queue/queue";
 import { createRoot } from "react-dom/client";
 import { EditorWorkspace } from "@/features/forms/components/editor";
@@ -430,6 +431,8 @@ createRoot(document.getElementById("root")!).render(
         <ExternalScheduling clientId={clients[0].id} />
         <ClientAccesses clientId={clients[0].id} />
       </>
+    ) : new URLSearchParams(location.search).has("confirmations") ? (
+      <ConfirmationsList clientId={clients[0].id} />
     ) : new URLSearchParams(location.search).has("inbox") ? (
       <Inbox />
     ) : new URLSearchParams(location.search).has("whatsapp") ? (
