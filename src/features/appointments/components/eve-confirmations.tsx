@@ -219,43 +219,28 @@ function ReminderPreferences({ clientId }: { clientId: string }) {
             </select>
           </label>
           <label>
-            Marcada para outro dia · minutos de antecedência
-            <input
-              type="number"
-              min={1}
-              max={10080}
-              required
+            Marcada para outro dia · antecedência
+            <ReminderWindow
               value={values.advance}
-              onChange={(e) =>
-                setDraft({ ...values, advance: Number(e.target.value) })
-              }
+              max={10080}
+              onChange={(minutes) => setDraft({ ...values, advance: minutes })}
             />
           </label>
           <label>
-            Marcada para hoje · minutos de antecedência
-            <input
-              type="number"
-              min={1}
-              max={1439}
-              required
+            Marcada para hoje · antecedência
+            <ReminderWindow
               value={values.sameDay}
-              onChange={(e) =>
-                setDraft({ ...values, sameDay: Number(e.target.value) })
-              }
+              max={1439}
+              onChange={(minutes) => setDraft({ ...values, sameDay: minutes })}
             />
           </label>
           {values.count === 2 && (
             <label>
-              Segundo lembrete · minutos de antecedência
-              <input
-                type="number"
-                min={1}
-                max={1439}
-                required
+              Segundo lembrete · antecedência
+              <ReminderWindow
                 value={values.second}
-                onChange={(e) =>
-                  setDraft({ ...values, second: Number(e.target.value) })
-                }
+                max={1439}
+                onChange={(minutes) => setDraft({ ...values, second: minutes })}
               />
             </label>
           )}
@@ -270,5 +255,50 @@ function ReminderPreferences({ clientId }: { clientId: string }) {
         {status && <p role="status">{status}</p>}
       </form>
     </details>
+  );
+}
+
+const reminderWindows = [
+  15, 30, 45, 60, 120, 180, 300, 600, 720, 1440, 2880, 4320, 10080,
+];
+
+function durationLabel(minutes: number) {
+  const units = [
+    [1440, "dia", "dias"],
+    [60, "hora", "horas"],
+    [1, "minuto", "minutos"],
+  ] as const;
+  return units
+    .flatMap(([size, singular, plural]) => {
+      const count = Math.floor(minutes / size);
+      minutes %= size;
+      return count ? [`${count} ${count === 1 ? singular : plural}`] : [];
+    })
+    .join(" e ");
+}
+
+function ReminderWindow({
+  value,
+  max,
+  onChange,
+}: {
+  value: number;
+  max: number;
+  onChange: (minutes: number) => void;
+}) {
+  const options = [
+    ...new Set([...reminderWindows.filter((minutes) => minutes <= max), value]),
+  ].sort((a, b) => a - b);
+  return (
+    <select
+      value={value}
+      onChange={(event) => onChange(Number(event.target.value))}
+    >
+      {options.map((minutes) => (
+        <option key={minutes} value={minutes}>
+          {durationLabel(minutes)} antes
+        </option>
+      ))}
+    </select>
   );
 }
