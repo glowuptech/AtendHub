@@ -12,6 +12,7 @@ import { ClientInformation } from "./information";
 import { FormsList } from "@/features/forms/components/forms-list";
 import { ClientAccesses } from "./client-accesses";
 import { ExternalScheduling } from "./external-scheduling";
+import { ClientDomainSettings } from "@/features/client-domains/settings";
 import { KnowledgeBase } from "./knowledge-base";
 export { Clients } from "./directory";
 export function ClientProfile({ id }: { id: string }) {
@@ -51,6 +52,7 @@ export function ClientProfile({ id }: { id: string }) {
           "Formulários",
           "Agendamento externo",
           "Acessos",
+          "Domínio público",
         ].map((t) => (
           <Button
             key={t}
@@ -84,6 +86,8 @@ export function ClientProfile({ id }: { id: string }) {
         <ExternalScheduling key={id} clientId={id} />
       ) : tab === "Acessos" ? (
         <ClientAccesses key={id} clientId={id} />
+      ) : tab === "Domínio público" ? (
+        <ClientDomainSettings key={id} clientId={id} />
       ) : tab === "Base de conhecimento" ? (
         <KnowledgeBase key={id} client={c} />
       ) : null}

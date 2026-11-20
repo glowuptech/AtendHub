@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Lembrete inválido." }, { status: 400 });
   if (input.data.action === "share") {
     const { data, error } = await auth.supabase.rpc(
-      "atendhub_confirmation_link",
+      "atendhub_confirmation_share",
       {
         p_org: auth.organizationId,
         p_id: input.data.id,
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     return NextResponse.json(
-      { path: `/confirmar/${data}` },
+      data,
       { headers: { "Cache-Control": "no-store" } },
     );
   }

@@ -1,4 +1,6 @@
 "use client";
+import { rootDomain } from "@/features/client-domains/model";
+import { useClientOrigin } from "@/features/client-domains/settings";
 import {
   useCallback,
   useEffect,
@@ -250,6 +252,7 @@ export function EditorWorkspace({
   source?: FormDefinition;
   client: import("@/domain/schemas").Client;
 }) {
+  const origin = useClientOrigin(client.id);
   const clientId = client.id;
   const [initialEditorState, setInitialEditorState] = useState(() =>
     prepareEditorForm(source, client),
@@ -1119,7 +1122,7 @@ export function EditorWorkspace({
             />
           </EditorAccordion>
           {saved && frozen && (
-            <NavButton href={`/f/${draft.slug}`}>
+            <NavButton href={`${origin ?? `https://${rootDomain}`}/f/${draft.slug}`}>
               Abrir formulário ativo
             </NavButton>
           )}

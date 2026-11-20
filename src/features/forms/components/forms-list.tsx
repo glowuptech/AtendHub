@@ -1,4 +1,6 @@
 "use client";
+import { rootDomain } from "@/features/client-domains/model";
+import { useClientOrigin } from "@/features/client-domains/settings";
 import { useEffect, useState } from "react";
 import { FileText, Plus, Archive, ArchiveRestore } from "lucide-react";
 import { useDemo } from "@/components/layout/demo-context";
@@ -15,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 
 export function FormsList({ id }: { id: string }) {
+  const origin = useClientOrigin(id);
   const { setClientId } = useDemo();
   const {
     data: clients,
@@ -205,7 +208,7 @@ export function FormsList({ id }: { id: string }) {
                       Prévia
                     </NavButton>
                     {form.status === "demo" && (
-                      <NavButton href={`/f/${form.slug}`}>
+                      <NavButton href={`${origin ?? `https://${rootDomain}`}/f/${form.slug}`}>
                         Abrir formulário
                       </NavButton>
                     )}
