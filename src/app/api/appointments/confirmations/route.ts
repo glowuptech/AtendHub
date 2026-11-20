@@ -71,15 +71,14 @@ export async function POST(request: Request) {
   return error ? failure(error) : NextResponse.json({ ok: true });
 }
 
-const preferences = z
-  .object({
-    clientId: z.string().uuid(),
-    advance: z.number().int().min(1).max(10080),
-    sameDay: z.number().int().min(1).max(1439),
-    count: z.union([z.literal(1), z.literal(2)]),
-    second: z.number().int().min(1).max(1439),
-  })
-  .refine((v) => v.count === 1 || v.second < Math.min(v.advance, v.sameDay));
+const preferences = z.object({
+  clientId: z.string().uuid(),
+  advance: z.number().int().min(1).max(10080),
+  sameDay: z.number().int().min(1).max(1439),
+  count: z.union([z.literal(1), z.literal(2)]),
+  second: z.number().int().min(1).max(1439),
+  noticeToday: z.number().int().min(1).max(1439).optional(),
+});
 
 export async function PUT(request: Request) {
   const auth = await sessionOrganizationContext();
@@ -88,8 +87,7 @@ export async function PUT(request: Request) {
   if (!result.success)
     return NextResponse.json(
       {
-        error:
-          "Confira as antecedências. O segundo lembrete deve ficar mais perto da consulta.",
+        error: "Confira as antecedências dos envios.",
       },
       { status: 400 },
     );
@@ -103,6 +101,7 @@ export async function PUT(request: Request) {
       p_same_day: v.sameDay,
       p_count: v.count,
       p_second: v.second,
+      p_notice_today: v.noticeToday ?? v.second,
     },
   );
   return error ? failure(error) : NextResponse.json(data);

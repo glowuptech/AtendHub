@@ -681,3 +681,23 @@ it("reserva consulta marcada para hoje e só oferece o segundo lembrete após o 
   expect(second).not.toBeNull();
   expect(second?.requestId).not.toBe(first!.requestId);
 });
+
+it("envia o aviso mesmo com consulta confirmada e não usa a resposta ao aviso como qualificação", async () => {
+  await admin();
+  const jid = "5516987009877@s.whatsapp.net";
+  const lead = await ingest({ jid, pmid: "notice-contact" });
+  await db.query(`insert into atendhub_appointments(id,organization_id,client_id,professional_id,lead_id,created_by_id,starts_at,status)
+    values($1,$2,$3,$4,$5,$6,now()+interval '10 minutes','confirmed')`, [id(9801),ORG,CLIENT_A,id(9700),lead.leadId,USER_OWNER]);
+  await db.exec(await readFile("supabase/migrations/20261121130000_atendhub_reminder_purposes.sql", "utf8"));
+  await as(USER_OWNER);
+  await db.query("select atendhub_reminder_preferences($1,$2,1440,120,2,60,30)",[ORG,CLIENT_A]);
+  await as(null,"atendhub_integration");
+  const result=await db.query<{reminder:{requestId:string;purpose:string;body:string;replyText:null}}>("select atendhub_eve_claim($1,'inst-a') reminder", [CLIENT_A]);
+  const notice=result.rows[0].reminder;
+  expect(notice.purpose).toBe("reminder");
+  expect(notice.replyText).toBeNull();
+  expect(notice.body).toContain("Lembrete: sua consulta");
+  await db.query("select atendhub_eve_sent($1,'inst-a','notice-ack',now())", [notice.requestId]);
+  await ingest({jid,pmid:"notice-reply",body:"CONFIRMO "+notice.body.slice(-16),ts:new Date().toISOString()});
+  expect(await count("atendhub_leads where qualified_at is not null and id='"+lead.leadId+"'")).toBe(0);
+});

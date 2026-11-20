@@ -45,7 +45,7 @@ select public.atendhub_eve_claim($1::uuid, $2::text) as reminder;
 select $1::uuid as "clientId", $2::text as "instance";
 ```
 
-Restabeleça a query de reserva após o teste. A resposta tem uma coluna JSON chamada `reminder`. Configure um nó IF com a expressão booleana `{{ $json.reminder != null }}`. No ramo falso, encerre o processamento desse item. `reminder: null` é um retorno válido. A reserva procura uma consulta futura aguardando confirmação, cujo lembrete já entrou na janela configurada, com conexão ativa e atendimento aberto do lead nessa linha. Em **Confirmações e lembretes → Configurar lembretes**, defina a antecedência para consultas marcadas no mesmo dia, a antecedência para consultas marcadas em um dia anterior e um ou dois lembretes. Os padrões são 120 minutos no mesmo dia, 1.440 minutos para outro dia e um lembrete. Se a consulta for criada dentro da janela, a próxima execução pode reservar o primeiro lembrete. Um segundo lembrete exige o registro do primeiro envio e pelo menos 30 minutos de intervalo. Duas conversas abertas com destinos diferentes para o mesmo lead nessa linha exigem conciliação.
+Restabeleça a query de reserva após o teste. A resposta tem uma coluna JSON chamada `reminder`. Configure um nó IF com a expressão booleana `{{ $json.reminder != null }}`. No ramo falso, encerre o processamento desse item. `reminder: null` é um retorno válido. A reserva procura um envio pendente para uma consulta futura, dentro da janela configurada, com conexão ativa e atendimento aberto do lead nessa linha. Em **Confirmações e lembretes → Configurar lembretes**, defina a antecedência para consultas marcadas no mesmo dia, a antecedência para consultas marcadas em um dia anterior e se deseja enviar também o lembrete da consulta. Os padrões são 120 minutos no mesmo dia, 1.440 minutos para outro dia e um lembrete. Se a consulta for criada dentro da janela, a próxima execução pode reservar o primeiro lembrete. O pedido de confirmação sai enquanto a consulta aguarda resposta. O lembrete da consulta tem horários próprios e pode sair mesmo após a confirmação, independentemente do envio do pedido. Duas conversas abertas com destinos diferentes para o mesmo lead nessa linha exigem conciliação.
 
 No ramo verdadeiro, preserve os campos de `reminder` antes da chamada à Evolution:
 
@@ -55,7 +55,8 @@ No ramo verdadeiro, preserve os campos de `reminder` antes da chamada à Evoluti
 | `instance` | Instância selecionada pelo banco |
 | `phone` | Número do destinatário |
 | `body` | Texto completo a enviar, com horário e código da consulta |
-| `replyText` | Valor de retorno do botão opcional “Confirmar presença”, se a linha suportar resposta rápida |
+| `purpose` | `confirmation` para pedido de confirmação ou `reminder` para aviso da consulta |
+| `replyText` | Retorno do botão opcional “Confirmar presença” para `confirmation`. Para `reminder`, o campo vem vazio |
 
 ### 3. Registrar o envio aceito pela Evolution
 

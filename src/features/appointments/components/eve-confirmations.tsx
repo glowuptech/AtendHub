@@ -19,6 +19,7 @@ type Reminder = {
   is_eve: boolean;
   due_at?: string;
   slot?: number;
+  purpose?: "confirmation" | "reminder";
 };
 const endpoint = "/api/appointments/confirmations";
 async function read(url: string): Promise<Reminder[]> {
@@ -86,19 +87,24 @@ export function ConfirmationsList({
             )}
             {r.due_at && (
               <p>
-                Lembrete {r.slot} · Envio a partir de {dateTime(r.due_at)}
+                {r.purpose === "reminder"
+                  ? "Lembrete da consulta"
+                  : "Pedido de confirmação"}{" "}
+                · Envio a partir de {dateTime(r.due_at)}
               </p>
             )}
             <Badge>
               {r.confirmed_at
                 ? "Paciente confirmou · lead qualificado"
                 : r.sent_at
-                  ? "Aguardando resposta"
+                  ? r.purpose === "reminder"
+                    ? "Lembrete enviado"
+                    : "Aguardando resposta"
                   : r.dispatching
                     ? "Aguardando retorno do envio"
                     : "Lembrete pendente"}
             </Badge>
-            {r.can_edit && !r.confirmed_at && (
+            {r.can_edit && !r.confirmed_at && r.purpose !== "reminder" && (
               <div className="actions">
                 {!r.sent_at && !r.dispatching && r.is_eve && (
                   <Button
@@ -161,6 +167,7 @@ type Preferences = {
   sameDay: number;
   count: 1 | 2;
   second: number;
+  noticeToday?: number;
   canEdit: boolean;
 };
 
@@ -207,19 +214,21 @@ function ReminderPreferences({ clientId }: { clientId: string }) {
       <form onSubmit={save}>
         <fieldset disabled={saving || !values.canEdit}>
           <label>
-            Quantidade de lembretes por consulta
+            Mensagens por consulta
             <select
               value={values.count}
               onChange={(e) =>
                 setDraft({ ...values, count: e.target.value === "2" ? 2 : 1 })
               }
             >
-              <option value={1}>1 lembrete</option>
-              <option value={2}>2 lembretes</option>
+              <option value={1}>Pedido de confirmação</option>
+              <option value={2}>
+                Pedido de confirmação e lembrete da consulta
+              </option>
             </select>
           </label>
           <label>
-            Marcada para outro dia · antecedência
+            Pedido de confirmação · marcada para outro dia
             <ReminderWindow
               value={values.advance}
               max={10080}
@@ -227,7 +236,7 @@ function ReminderPreferences({ clientId }: { clientId: string }) {
             />
           </label>
           <label>
-            Marcada para hoje · antecedência
+            Pedido de confirmação · marcada para hoje
             <ReminderWindow
               value={values.sameDay}
               max={1439}
@@ -235,20 +244,32 @@ function ReminderPreferences({ clientId }: { clientId: string }) {
             />
           </label>
           {values.count === 2 && (
-            <label>
-              Segundo lembrete · antecedência
-              <ReminderWindow
-                value={values.second}
-                max={1439}
-                onChange={(minutes) => setDraft({ ...values, second: minutes })}
-              />
-            </label>
+            <>
+              <label>
+                Lembrete da consulta · marcada para outro dia
+                <ReminderWindow
+                  value={values.second}
+                  max={1439}
+                  onChange={(minutes) =>
+                    setDraft({ ...values, second: minutes })
+                  }
+                />
+              </label>
+              <label>
+                Lembrete da consulta · marcada para hoje
+                <ReminderWindow
+                  value={values.noticeToday ?? values.second}
+                  max={1439}
+                  onChange={(minutes) =>
+                    setDraft({ ...values, noticeToday: minutes })
+                  }
+                />
+              </label>
+            </>
           )}
           <p>
-            Se a consulta for marcada dentro da janela, o primeiro lembrete fica
-            disponível na próxima execução do n8n. O segundo depende do primeiro
-            envio, tem intervalo mínimo de 30 minutos e só sai enquanto a
-            consulta aguarda confirmação.
+            O pedido coleta a confirmação do paciente. O lembrete informa a data
+            e a hora da consulta e também é enviado a quem já confirmou.
           </p>
           <Button type="submit">Salvar configuração</Button>
         </fieldset>
