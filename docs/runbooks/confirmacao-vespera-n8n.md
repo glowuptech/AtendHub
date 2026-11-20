@@ -1,18 +1,16 @@
 # Lembretes de confirmação pelo n8n
 
-Há dois workflows. O de **envio** começa no Schedule Trigger e precisa obter um par de valores para cada linha habilitada: o UUID do cliente e o nome da instância Evolution. O de **entrada** começa no webhook da Evolution e grava a mensagem recebida no Inbox.
+O workflow de envio começa no Schedule Trigger. O primeiro Postgres lê do Supabase as instâncias conectadas e o cliente associado a cada uma. O workflow de entrada começa no webhook da Evolution e grava a mensagem recebida no Inbox.
 
 ## Workflow de envio
 
-**Schedule Trigger → Listar linhas habilitadas (Postgres) → Reservar lembrete (Postgres) → IF há lembrete → Enviar pela Evolution → Registrar envio (Postgres).**
-
-Para uma única linha fixa, **Edit Fields (Set)** pode substituir **Listar linhas habilitadas**. Configure nele dois campos de texto, `clientId` com o UUID real do cliente e `instance` com o nome exato da instância. O Schedule Trigger sozinho fornece dados de execução e horário. O nome da credencial Postgres também não informa qual cliente será atendido.
+**Schedule Trigger → Buscar conexões (Postgres) → Reservar lembrete (Postgres) → IF há lembrete → Enviar pela Evolution → Registrar envio (Postgres).**
 
 Em cada nó Postgres, selecione **Execute Query**. Cole o bloco SQL em **Query**. Quando houver `$1`, `$2` etc., abra **Options → Query Parameters**, selecione **Expression** e cole a expressão completa, incluindo `{{ }}`. A expressão deve produzir um array com um valor por posição. Configure **Query Batching → Independently** quando o nó receber vários itens, para manter uma reserva e um resultado por linha.
 
-### 1. Listar linhas habilitadas
+### 1. Buscar conexões
 
-Esta consulta inicial pode ser ligada diretamente ao agendador. **Query Parameters fica vazio.** Substitua o texto entre aspas pelo nome de uma instância habilitada para lembretes. Para mais linhas, acrescente os nomes reais à lista, por exemplo `in ('instancia-a', 'instancia-b')`. O Atend&Hub mantém o vínculo entre instância e cliente. A lista no workflow escolhe quais linhas participam do disparo.
+Ligue este nó diretamente ao agendador. Cole a consulta inteira e deixe **Query Parameters** vazio.
 
 ```sql
 select
@@ -20,11 +18,12 @@ select
   w.instance_name as "instance"
 from public.atendhub_whatsapp_connections as w
 where w.status = 'connected'
-  and w.instance_name in ('SUBSTITUA_PELO_NOME_REAL_DA_INSTANCIA')
 order by w.instance_name;
 ```
 
-Cada linha retornada vira um item do n8n com os campos usados pelo próximo nó. Desative **Always Output Data** neste primeiro nó para que zero linhas encerre o ramo. A consulta exige visibilidade de leitura nessa tabela. As migrations concedem ao papel `atendhub_integration` execução das funções de lembrete, mas não lhe concedem explicitamente essa leitura de conexões. Se a credencial só tiver execução das funções, use a variante **Edit Fields** acima. Se houver acesso de leitura autorizado e vierem zero linhas, confira nome da instância, status da conexão e escopo da credencial.
+Cada conexão visível para a credencial gera um item. Desative **Always Output Data** para encerrar o ramo se a consulta voltar vazia. A etapa seguinte verifica se cada conexão tem um lembrete elegível.
+
+A credencial Postgres precisa de leitura sobre a tabela e de visibilidade sobre as linhas. O papel `atendhub_integration` tem execução das funções de lembrete. A leitura dessa tabela depende dos grants e das políticas RLS efetivamente aplicados no banco.
 
 ### 2. Reservar um lembrete
 
