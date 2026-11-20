@@ -774,4 +774,22 @@ it("usa o domínio ativo da clínica e rejeita a confirmação por outro subdom�
   const query="select atendhub_confirmation_public($1,null,$2) r";
   expect((await db.query(query,[token,CLIENT_B])).rows[0]).toEqual({r:null});
   expect((await db.query<{r:{state:string}}>(query,[token,CLIENT_A])).rows[0].r.state).toBe("pending");
+  expect((await db.query<{r:{state:string}}>("select atendhub_confirmation_public($1,'confirm',$2) r",[token,CLIENT_A])).rows[0].r.state).toBe("confirmed");
+  await admin();
+  await db.query("update atendhub_appointments set status='cancelled' where id=$1",[id(9813)]);
+  await db.exec(await readFile("supabase/migrations/20261121170000_atendhub_short_confirmation_links.sql", "utf8"));
+  await db.query(`insert into atendhub_appointments(id,organization_id,client_id,professional_id,lead_id,created_by_id,starts_at,timezone)
+    select $2,organization_id,client_id,professional_id,lead_id,created_by_id,starts_at,timezone
+    from atendhub_appointments where id=$1`,[id(9813),id(9814)]);
+  await as(null,"atendhub_integration");
+  const replacement=(await db.query<{r:{confirmationUrl:string}}>("select atendhub_eve_claim($1,'inst-a','https://atendehub.app') r",[CLIENT_A])).rows[0].r;
+  expect(replacement.confirmationUrl).not.toBe(result.rows[0].r.confirmationUrl);
+  await as(null,"service_role");
+  expect((await db.query(query,[token,CLIENT_A])).rows[0]).toEqual({r:null});
+  const compactToken=new URL(replacement.confirmationUrl).pathname.split("/").at(-1);
+  expect(compactToken).toMatch(/^[A-Za-z0-9_-]{22}$/);
+  await admin();
+  const newToken=(await db.query<{token:string}>("select atendhub_confirmation_token_uuid($1) token",[compactToken])).rows[0].token;
+  await as(null,"service_role");
+  expect((await db.query<{r:{state:string}}>(query,[newToken,CLIENT_A])).rows[0].r.state).toBe("pending");
 });

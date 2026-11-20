@@ -148,3 +148,7 @@ select public.atendhub_inbox_record_message_status(
 ```
 
 Use o ID da mensagem cujo status mudou. O banco pode retornar `stored_for_later` se o recibo chegar antes do registro da mensagem. Nenhum desses nós envia dados à Meta.
+
+Se a mesma pessoa marcar outra consulta, teste a partir de **Buscar conexões** com dados atuais e confira se o `requestId` e a `confirmationUrl` são novos. Desafixe dados de teste nos nós de reserva e envio antes de executar. A Evolution deve usar `$json.reminder.body` do item corrente. O link antigo continua associado à ocorrência anterior e perde validade quando ela é cancelada. Uma retentativa da mesma reserva conserva seu texto e seu link.
+
+Depois que a rota pública aceitar o formato novo, aplique a migration `20261121170000_atendhub_short_confirmation_links.sql`. Ela reduz os novos tokens para 22 caracteres e mantém a rota compatível com o formato UUID antigo.

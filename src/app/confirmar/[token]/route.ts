@@ -41,13 +41,29 @@ function page(content: string, status = 200) {
   );
 }
 
+function expandToken(value: string) {
+  if (z.string().uuid().safeParse(value).success) return value;
+  if (!/^[A-Za-z0-9_-]{22}$/.test(value)) return null;
+  const bytes = Buffer.from(value, "base64url");
+  if (bytes.length !== 16 || bytes.toString("base64url") !== value) return null;
+  const hex = bytes.toString("hex");
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    hex.slice(12, 16),
+    hex.slice(16, 20),
+    hex.slice(20),
+  ].join("-");
+}
+
 async function render(
   request: Request,
   context: Context,
   decision: string | null = null,
 ) {
-  const { token } = await context.params;
-  if (!z.string().uuid().safeParse(token).success)
+  const { token: pathToken } = await context.params;
+  const token = expandToken(pathToken);
+  if (!token)
     return page(
       "<h1>Link indisponível</h1><p>Peça um novo link à clínica.</p>",
       404,
