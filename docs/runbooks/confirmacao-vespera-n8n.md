@@ -30,19 +30,21 @@ A credencial Postgres precisa de leitura sobre a tabela e de visibilidade sobre 
 **Query**
 
 ```sql
-select public.atendhub_eve_claim($1::uuid, $2::text) as reminder;
+select public.atendhub_eve_claim($1::uuid, $2::text, $3::text) as reminder;
 ```
 
 **Query Parameters → Expression**
 
 ```javascript
-{{ [$json.clientId, $json.instance] }}
+{{ [$json.clientId, $json.instance, "https://SEU-DOMINIO-ATENDHUB"] }}
 ```
+
+Use a origem HTTPS pública do Atend&Hub, sem caminho. O pedido usa o link quando ainda faltam mais de 30 minutos para a consulta. Pedidos já reservados preservam o corpo original. O aviso de consulta sai sem link.
 
 **Para diagnosticar “there is no parameter $1”**, selecione primeiro o nó anterior e confira seu OUTPUT. Depois, no nó de reserva, mantenha a expressão acima e troque temporariamente apenas a Query pela consulta abaixo. Ela deve devolver o par recebido e pode ser executada sem reservar uma consulta.
 
 ```sql
-select $1::uuid as "clientId", $2::text as "instance";
+select $1::uuid as "clientId", $2::text as "instance", $3::text as "publicOrigin";
 ```
 
 Restabeleça a query de reserva após o teste. A resposta tem uma coluna JSON chamada `reminder`. Configure um nó IF com a expressão booleana `{{ $json.reminder != null }}`. No ramo falso, encerre o processamento desse item. `reminder: null` é um retorno válido. A reserva procura um envio pendente para uma consulta futura, dentro da janela configurada, com conexão ativa e atendimento aberto do lead nessa linha. Em **Confirmações e lembretes → Configurar lembretes**, defina a antecedência para consultas marcadas no mesmo dia, a antecedência para consultas marcadas em um dia anterior e se deseja enviar também o lembrete da consulta. Os padrões são 120 minutos no mesmo dia, 1.440 minutos para outro dia e um lembrete. Se a consulta for criada dentro da janela, a próxima execução pode reservar o primeiro lembrete. O pedido de confirmação sai enquanto a consulta aguarda resposta. O lembrete da consulta tem horários próprios e pode sair mesmo após a confirmação, independentemente do envio do pedido. Duas conversas abertas com destinos diferentes para o mesmo lead nessa linha exigem conciliação.

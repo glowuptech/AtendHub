@@ -729,3 +729,25 @@ it("confirma ou recusa por link e deixa de aceitar o link após cancelamento", a
     expect(await respond("confirm")).toBeUndefined();
   }
 });
+
+it("envia o link público no corpo reservado e registra exatamente o texto enviado", async () => {
+  await admin();
+  await db.exec("alter table atendhub_professionals add column organization_id uuid, add column client_id uuid");
+  await db.query("update atendhub_professionals set organization_id=$1,client_id=$2 where id=$3",[ORG,CLIENT_A,id(9700)]);
+  await db.exec("update atendhub_appointments set status='cancelled' where status<>'cancelled'");
+  await db.exec(await readFile("supabase/migrations/20261121150000_atendhub_automatic_confirmation_link.sql", "utf8"));
+  const jid="5516987009982@s.whatsapp.net";
+  const lead=await ingest({jid,pmid:"auto-link-contact"});
+  await db.query(`insert into atendhub_appointments(id,organization_id,client_id,professional_id,lead_id,created_by_id,starts_at,timezone)
+      values($1,$2,$3,$4,$5,$6,now()+interval '45 minutes',
+      case when (now() at time zone 'UTC')::time>time '23:00' then 'America/Sao_Paulo' else 'UTC' end)`,
+      [id(9812),ORG,CLIENT_A,id(9700),lead.leadId,USER_OWNER]);
+  await as(null,"atendhub_integration");
+  const item=(await db.query<{r:{requestId:string;body:string;confirmationUrl:string;replyText:null}}>("select atendhub_eve_claim($1,'inst-a','https://agenda.example.com') r",[CLIENT_A])).rows[0].r;
+  expect(item.body).toContain(item.confirmationUrl);
+  expect(item.confirmationUrl).toMatch(/^https:\/\/agenda\.example\.com\/confirmar\/[0-9a-f-]{36}$/);
+  expect(item.replyText).toBeNull();
+  await db.query("select atendhub_eve_sent($1,'inst-a','auto-link-ack',now())",[item.requestId]);
+  await admin();
+  expect((await db.query("select body from atendhub_inbox_messages where provider_message_id='auto-link-ack'")).rows[0].body).toBe(item.body);
+});
