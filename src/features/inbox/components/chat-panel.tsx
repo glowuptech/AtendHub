@@ -14,6 +14,7 @@ import {
   TriangleAlert,
   RotateCw,
 } from "lucide-react";
+import { EpisodeActions } from "./episode-actions";
 import { ChatShortcuts, type Shortcut } from "./chat-shortcuts";
 import { Button } from "@/components/ui/button";
 import { stageLabels } from "@/components/layout/shared";
@@ -44,6 +45,7 @@ function bodyOf(message: InboxMessage) {
 }
 
 export function ChatPanel({
+  onEpisode,
   conversation,
   draft,
   onDraft,
@@ -53,6 +55,7 @@ export function ChatPanel({
   action,
   onAction,
 }: {
+  onEpisode?: (id: string) => Promise<void>;
   conversation: InboxConversation;
   draft: string;
   onDraft: (text: string) => void;
@@ -172,6 +175,9 @@ export function ChatPanel({
               conversation.stage}
           </span>
         </div>
+        {onEpisode && (
+          <EpisodeActions conversation={conversation} onDone={onEpisode} />
+        )}
         <ChatShortcuts
           key={conversation.id}
           conversation={conversation}

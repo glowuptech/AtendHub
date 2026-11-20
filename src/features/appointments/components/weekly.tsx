@@ -1,4 +1,5 @@
 "use client";
+import { ConfirmationsList } from "./eve-confirmations";
 import { BookingDetailsFields } from "./booking-details";
 import {
   prepareBookingDetails,
@@ -627,6 +628,7 @@ export function WeeklyWorkspace({
             {doctors.find((d) => d.id === opened.professionalId)?.name ??
               "Sem profissional vinculado"}
           </p>
+          <ConfirmationsList clientId={clientId} appointmentId={opened.id} onChange={()=>mutate()}/>
           {opened.notes && <p className="preserve-lines">{opened.notes}</p>}
           {opened.service && (
             <p>
@@ -714,7 +716,7 @@ export function WeeklyWorkspace({
                   )
                 }
               >
-                Confirmar agendamento
+                Confirmar administrativamente
               </Button>
             )}
             <Button

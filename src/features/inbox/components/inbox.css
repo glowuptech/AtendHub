@@ -998,3 +998,25 @@
     order: 5;
   }
 }
+
+.inbox-booking-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.inbox-booking-tags > span {
+  padding: 3px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #fef3c7;
+  color: #78350f;
+}
+.inbox-booking-tags > span[data-confirmed="false"] {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.inbox-booking-tags > span[data-confirmed="true"] {
+  background: #dcfce7;
+  color: #166534;
+}

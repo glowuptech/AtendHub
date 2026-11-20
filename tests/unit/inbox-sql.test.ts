@@ -47,6 +47,7 @@ beforeAll(async () => {
   await db.exec(`
     create role anon; create role authenticated; create role service_role;
     create schema auth;
+    grant usage on schema auth to authenticated;
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('app.user_id',true),'')::uuid $$;
     create table auth.users(id uuid primary key);
     create table atendhub_organizations(id uuid primary key);
@@ -91,6 +92,7 @@ beforeAll(async () => {
     "20261117080000_atendhub_whatsapp_private_credentials",
     "20261118000000_atendhub_inbox",
     "20261118010000_atendhub_start_inbox_conversation",
+    "20261120000000_atendhub_inbox_episodes",
   ])
     await db.exec(await readFile(`supabase/migrations/${f}.sql`, "utf8"));
   await db.exec(`
@@ -378,11 +380,374 @@ describe("conversa proativa sem mensagem recebida",()=>{
   await as(USER_OWNER);
   await expect(db.query("select atendhub_inbox_start_conversation($1,$2)",[lead,CONN_B])).rejects.toThrow("CONNECTION_NOT_FOUND");
  });
- it("não reatribui conversa de outro lead com o mesmo número",async()=>{
-  await admin();
+ it("isola oportunidades no mesmo canal e exige revisão quando a mensagem é ambígua",async()=>{
   const duplicate=id(5001);
-  await db.query("insert into atendhub_leads(id,organization_id,client_id,name,phone,owner_id) values($1,$2,$3,'Outra pessoa','16999990000',$4)",[duplicate,ORG,CLIENT_A,USER_OWNER]);
+  const jid="5516999990000@s.whatsapp.net";
+  await admin();
+  await db.query("insert into atendhub_leads(id,organization_id,client_id,name,phone,owner_id) values($1,$2,$3,'Segunda demanda','16999990000',$4)",[duplicate,ORG,CLIENT_A,USER_OTHER]);
   await as(USER_OWNER);
-  await expect(db.query("select atendhub_inbox_start_conversation($1,$2)",[duplicate,CONN_A])).rejects.toThrow("CONVERSATION_LEAD_CONFLICT");
+  const first=(await db.query<{id:string}>("select atendhub_inbox_start_conversation($1,$2) id",[lead,CONN_A])).rows[0].id;
+  await as(USER_OTHER);
+  const second=(await db.query<{id:string}>("select atendhub_inbox_start_conversation($1,$2) id",[duplicate,CONN_A])).rows[0].id;
+  expect(second).not.toBe(first);
+  expect((await ingest({jid,pmid:"review"})).outcome).toBe("ambiguous_lead");
+  expect((await ingest({jid,pmid:"review"})).outcome).toBe("ambiguous_lead");
+  await as(USER_OTHER);
+  expect(await count("atendhub_inbox_review_items('"+ORG+"') where preview='Olá' and candidates @> '[{\"id\":\""+duplicate+"\"}]'")).toBe(0);
+  await expect(db.query("select atendhub_inbox_change_episode($1,'close')",[first])).rejects.toThrow();
+  await as(USER_SUPERVISOR);
+  const pending=(await db.query<{id:string}>("select id from atendhub_inbox_review_items($1) where candidates @> $2::jsonb",[ORG,JSON.stringify([{id:duplicate}])])).rows[0].id;
+  expect((await db.query<{id:string}>("select atendhub_inbox_route_review($1,$2,$3) id",[ORG,pending,duplicate])).rows[0].id).toBe(second);
+  expect((await ingest({jid,pmid:"review"})).outcome).toBe("duplicate");
+  await as(USER_OWNER);
+  expect(await count("atendhub_inbox_messages where provider_message_id='review'")).toBe(0);
+  await db.query("select atendhub_inbox_change_episode($1,'close')",[first]);
+  expect((await ingest({jid,pmid:"open-only"})).conversationId).toBe(second);
+  await as(USER_OTHER);
+  await db.query("select atendhub_inbox_change_episode($1,'close')",[second]);
+  await expect(db.query("select atendhub_inbox_request_send($1,$2,'oi')",[second,id(6001)])).rejects.toThrow("ATENDIMENTO_ENCERRADO");
+  expect((await ingest({jid,pmid:"after-close"})).outcome).toBe("ambiguous_lead");
+  await as(USER_OWNER);
+  await db.query("select atendhub_inbox_change_episode($1,'resume')",[first]);
+  expect((await ingest({jid,pmid:"after-close"})).outcome).toBe("ambiguous_lead");
+  expect((await ingest({jid,pmid:"after-resume"})).conversationId).toBe(first);
  });
+});
+
+// The deployed lead creation/claim functions are external to the migration tree.
+// These doubles exercise the new RPC's transaction and retry contract locally.
+it("novo atendimento é atômico, reutiliza a chave e conserva o episódio anterior", async () => {
+  await admin();
+  await db.exec(`
+    alter table atendhub_leads add column idempotency_key text unique;
+    create function public.atendhub_create_manual_lead(
+      p_organization_id uuid,p_client_id uuid,p_professional_id uuid,p_name text,p_phone text,
+      p_email text,p_source text,p_capture_status text,p_next_action text,p_notes text,p_form_id uuid,
+      p_form_version_id uuid,p_original_captured_at timestamptz,p_field_values jsonb,p_idempotency_key text,p_actor_id uuid
+    ) returns uuid language sql as $$
+      insert into public.atendhub_leads(organization_id,client_id,name,phone,idempotency_key)
+      values(p_organization_id,p_client_id,p_name,p_phone,p_idempotency_key)
+      on conflict(idempotency_key) do update set name=excluded.name returning id;
+    $$;
+    create function public.atendhub_claim_lead(_organization_id uuid,_lead_id uuid)
+    returns uuid language plpgsql as $$
+    begin
+      if current_setting('app.test_deny_claim',true)='yes' then raise insufficient_privilege; end if;
+      update public.atendhub_leads set owner_id=auth.uid() where id=_lead_id and organization_id=_organization_id;
+      return _lead_id;
+    end $$;
+  `);
+  await as(USER_OWNER);
+  const origin=(await db.query<{id:string}>("select atendhub_inbox_start_conversation($1,$2) id",[id(5000),CONN_A])).rows[0].id;
+  const start=(key:string)=>db.query<{id:string}>("select atendhub_inbox_new_episode($1,$2) id",[origin,key]);
+  await db.exec("set app.test_deny_claim='yes'");
+  await expect(start(id(8100))).rejects.toThrow();
+  expect(await count("atendhub_leads where idempotency_key is not null")).toBe(0);
+  await db.exec("set app.test_deny_claim='no'");
+  const created=(await start(id(8101))).rows[0].id;
+  expect(created).not.toBe(origin);
+  expect((await start(id(8101))).rows[0].id).toBe(created);
+  expect(await count("atendhub_leads where idempotency_key is not null")).toBe(1);
+  expect(await count("atendhub_inbox_messages where conversation_id='"+created+"'")).toBe(0);
+});
+
+describe("confirmação da véspera", () => {
+  beforeAll(async () => {
+    await admin();
+    // The appointments migration uses btree_gist, unavailable in PGlite.
+    // Supply its table contract and the restricted calendar-permission boundary.
+    await db.exec(`
+      create table public.atendhub_professionals(id uuid primary key,name text);
+      create table public.atendhub_appointments(id uuid primary key,organization_id uuid,client_id uuid,
+        lead_id uuid,professional_id uuid,created_by_id uuid, starts_at timestamptz,updated_at timestamptz,
+        timezone text default 'America/Sao_Paulo',status text default 'awaiting_confirmation',attendance text default 'unknown');
+      create function public.atendhub_calendar_allows(uuid,uuid,text,uuid,uuid) returns boolean
+        language sql stable as $$select $5=auth.uid()$$;
+      insert into public.atendhub_professionals values ('${id(9700)}','Profissional de teste');
+    `);
+    await db.exec(
+      await readFile(
+        "supabase/migrations/20261120160151_20261121000000_atendhub_eve_confirmations.sql",
+        "utf8",
+      ),
+    );
+  });
+  async function booking(number: number, lead: string) {
+    await db.query(
+      `insert into atendhub_appointments(id,organization_id,client_id,professional_id,lead_id,created_by_id,starts_at)
+      values($1,$2,$3,$4,$5,$6,(((now() at time zone 'America/Sao_Paulo')::date+1)+time '12:00') at time zone 'America/Sao_Paulo')`,
+      [id(number), ORG, CLIENT_A, id(9700), lead, USER_OWNER],
+    );
+    return (
+      await db.query<{ id: string }>(
+        "select id from atendhub_eve_reminders where appointment_id=$1 and invalidated_at is null",
+        [id(number)],
+      )
+    ).rows[0].id;
+  }
+  it("seleciona a oportunidade pelo código, inclusive quando a resposta chega antes do retorno de envio", async () => {
+    await admin();
+    const phone = "5516987654321";
+    for (const n of [9701, 9702]) {
+      await db.query(
+        "insert into atendhub_leads(id,organization_id,client_id,name,phone,owner_id) values($1,$2,$3,'Teste',$4,$5)",
+        [id(n), ORG, CLIENT_A, phone, USER_OWNER],
+      );
+      await as(USER_OWNER);
+      await db.query("select atendhub_inbox_start_conversation($1,$2)", [
+        id(n),
+        CONN_A,
+      ]);
+      await admin();
+    }
+    const ticket = await booking(9703, id(9702));
+    await as(null, "atendhub_integration");
+    const claim = async () =>
+      (
+        await db.query<{ r: { requestId: string; body: string } | null }>(
+          "select atendhub_eve_claim($1,'inst-a') r",
+          [CLIENT_A],
+        )
+      ).rows[0].r;
+    const work = await claim();
+    expect(work?.requestId).toBe(ticket);
+    expect(await claim()).toBeNull();
+    const body = work!.body.slice(work!.body.lastIndexOf("CONFIRMO"));
+    await admin();
+    const ts = (
+      await db.query<{ ts: string }>("select clock_timestamp()::text ts")
+    ).rows[0].ts;
+    const event = {
+      jid: phone + "@s.whatsapp.net",
+      pmid: "eve-reply",
+      body,
+      ts,
+    };
+    expect(
+      (await ingest({ ...event, pmid: "eve-sim", body: "Sim" })).outcome,
+    ).toBe("ambiguous_lead");
+    expect(
+      (
+        await ingest({
+          ...event,
+          pmid: "eve-other-phone",
+          jid: "5516987650000@s.whatsapp.net",
+        })
+      ).leadId,
+    ).not.toBe(id(9702));
+    expect((await ingest(event)).leadId).toBe(id(9702));
+    expect(await count("atendhub_leads where qualified_at is not null")).toBe(
+      0,
+    );
+    await as(null, "atendhub_integration");
+    await db.query("select atendhub_eve_sent($1,'inst-a','provider-out',$2)", [
+      ticket,
+      ts,
+    ]);
+    expect((await ingest(event)).outcome).toBe("duplicate");
+    expect(
+      await count(
+        "atendhub_leads where qualified_at is not null and id='" +
+          id(9702) +
+          "'",
+      ),
+    ).toBe(1);
+    expect(
+      await count(
+        "atendhub_leads where qualified_at is not null and id='" +
+          id(9701) +
+          "'",
+      ),
+    ).toBe(0);
+    await db.query(
+      "update atendhub_appointments set status='cancelled',attendance='absent' where id=$1",
+      [id(9703)],
+    );
+    expect(await count("atendhub_leads where qualified_at is not null")).toBe(
+      1,
+    );
+  });
+  it("exige lembrete, sessão autorizada e ocorrência vigente para confirmação por telefone", async () => {
+    await admin();
+    const ticket = await booking(9704, id(9701));
+    const phone = (action: string) =>
+      db.query("select atendhub_eve_phone($1,$2,$3)", [ORG, ticket, action]);
+    await as(USER_OTHER);
+    await expect(
+      db.query("update atendhub_leads set qualified_at=now() where id=$1", [
+        id(9701),
+      ]),
+    ).rejects.toThrow();
+    await expect(phone("sent")).rejects.toThrow();
+    await as(USER_OWNER);
+    await expect(phone("confirmed")).rejects.toThrow("STALE_REMINDER");
+    await phone("sent");
+    await admin();
+    await db.query(
+      "update atendhub_appointments set starts_at=starts_at+interval '1 hour' where id=$1",
+      [id(9704)],
+    );
+    await as(USER_OWNER);
+    await expect(phone("confirmed")).rejects.toThrow("STALE_REMINDER");
+    await admin();
+    const fresh = (
+      await db.query<{ id: string }>(
+        "select id from atendhub_eve_reminders where appointment_id=$1 and invalidated_at is null",
+        [id(9704)],
+      )
+    ).rows[0].id;
+    await db.query(
+      "update atendhub_appointments set status='confirmed' where id=$1",
+      [id(9704)],
+    );
+    expect(
+      await count(
+        "atendhub_leads where id='" +
+          id(9701) +
+          "' and qualified_at is not null",
+      ),
+    ).toBe(0);
+    await as(USER_OWNER);
+    for (const action of ["sent", "confirmed", "confirmed"])
+      await db.query("select atendhub_eve_phone($1,$2,$3)", [
+        ORG,
+        fresh,
+        action,
+      ]);
+    await admin();
+    expect(
+      await count(
+        "atendhub_eve_reminders where id='" +
+          fresh +
+          "' and confirmed_by='" +
+          USER_OWNER +
+          "'",
+      ),
+    ).toBe(1);
+  });
+});
+
+it("reutiliza o histórico fechado e reinicia a fila apenas para uma nova mensagem recebida", async () => {
+  await admin();
+  await db.exec("alter table atendhub_leads add column assigned_at timestamptz, add column claimed_at timestamptz, add column queue_entered_at timestamptz default now()");
+  await db.exec(await readFile("supabase/migrations/20261120200000_atendhub_requeue_closed_conversations.sql", "utf8"));
+  const jid = "5516987009999@s.whatsapp.net";
+  const original = await ingest({ jid, pmid: "return-original" });
+  await db.query("update atendhub_leads set stage='in_progress',owner_id=$2,queue_entered_at=now()-interval '1 day' where id=$1", [original.leadId, USER_OWNER]);
+  await as(USER_OWNER);
+  await db.query("select atendhub_inbox_change_episode($1,'close')", [original.conversationId]);
+  const ts = new Date().toISOString();
+  expect((await ingest({ jid, pmid: "return-out", fromMe: true, ts })).conversationId).toBe(original.conversationId);
+  expect(await count("atendhub_inbox_conversations where status='closed' and id='" + original.conversationId + "'")).toBe(1);
+  expect((await ingest({ jid, pmid: "return-in", ts })).conversationId).toBe(original.conversationId);
+  const rows = await db.query("select stage,owner_id,queue_entered_at>now()-interval '1 minute' as fresh from atendhub_leads where id=$1", [original.leadId]);
+  expect(rows.rows[0]).toEqual({ stage: "new", owner_id: null, fresh: true });
+  expect(await count("atendhub_inbox_messages where conversation_id='" + original.conversationId + "'")).toBe(3);
+  expect((await ingest({ jid, pmid: "return-in", ts })).outcome).toBe("duplicate");
+});
+
+it("reserva consulta marcada para hoje e só oferece o segundo lembrete após o primeiro envio", async () => {
+  await admin();
+  await db.exec(`
+    alter table atendhub_appointments add column created_at timestamptz not null default now();
+    create table public.atendhub_appointment_events(appointment_id uuid,event_type text,created_at timestamptz);
+    create function public.atendhub_calendar_manages(uuid,uuid) returns boolean language sql stable
+      as $$select public.atendhub_has_client_access($1,$2)$$;
+    update atendhub_appointments set status='cancelled' where status='awaiting_confirmation';
+  `);
+  await db.exec(await readFile("supabase/migrations/20261121120000_atendhub_reminder_windows.sql", "utf8"));
+  await as(USER_OWNER);
+  await db.query("select atendhub_reminder_preferences($1,$2,1440,120,2,30)", [ORG,CLIENT_A]);
+  await admin();
+  const jid="5516987009876@s.whatsapp.net";
+  const lead=await ingest({jid,pmid:"same-day-new"});
+  await db.query(`insert into atendhub_appointments(id,organization_id,client_id,professional_id,lead_id,created_by_id,starts_at,timezone)
+    values($1,$2,$3,$4,$5,$6,now()+interval '45 minutes',
+      case when (now() at time zone 'UTC')::time>time '23:00' then 'America/Sao_Paulo' else 'UTC' end)`,
+    [id(9800),ORG,CLIENT_A,id(9700),lead.leadId,USER_OWNER]);
+  await as(null,"atendhub_integration");
+  const claim=async()=> (await db.query<{reminder:{requestId:string}|null}>("select atendhub_eve_claim($1,'inst-a') reminder",[CLIENT_A])).rows[0].reminder;
+  const first=await claim();
+  expect(first).not.toBeNull();
+  expect(await claim()).toBeNull();
+  await db.query("select atendhub_eve_sent($1,'inst-a','same-day-ack',now())",[first!.requestId]);
+  expect(await claim()).toBeNull();
+  await admin();
+  await db.query("update atendhub_eve_reminders set sent_at=now()-interval '31 minutes' where id=$1",[first!.requestId]);
+  await db.query("update atendhub_appointments set starts_at=starts_at where id=$1",[id(9800)]);
+  await db.query("update atendhub_reminder_settings set second_minutes=60 where client_id=$1",[CLIENT_A]);
+  await as(null,"atendhub_integration");
+  const second=await claim();
+  expect(second).not.toBeNull();
+  expect(second?.requestId).not.toBe(first!.requestId);
+});
+
+it("envia o aviso mesmo com consulta confirmada e não usa a resposta ao aviso como qualificação", async () => {
+  await admin();
+  const jid = "5516987009877@s.whatsapp.net";
+  const lead = await ingest({ jid, pmid: "notice-contact" });
+  await db.query(`insert into atendhub_appointments(id,organization_id,client_id,professional_id,lead_id,created_by_id,starts_at,status)
+    values($1,$2,$3,$4,$5,$6,now()+interval '10 minutes','confirmed')`, [id(9801),ORG,CLIENT_A,id(9700),lead.leadId,USER_OWNER]);
+  await db.exec(await readFile("supabase/migrations/20261121130000_atendhub_reminder_purposes.sql", "utf8"));
+  await as(USER_OWNER);
+  await db.query("select atendhub_reminder_preferences($1,$2,1440,120,2,60,30)",[ORG,CLIENT_A]);
+  await as(null,"atendhub_integration");
+  const result=await db.query<{reminder:{requestId:string;purpose:string;body:string;replyText:null}}>("select atendhub_eve_claim($1,'inst-a') reminder", [CLIENT_A]);
+  const notice=result.rows[0].reminder;
+  expect(notice.purpose).toBe("reminder");
+  expect(notice.replyText).toBeNull();
+  expect(notice.body).toContain("Lembrete: sua consulta");
+  await db.query("select atendhub_eve_sent($1,'inst-a','notice-ack',now())", [notice.requestId]);
+  await ingest({jid,pmid:"notice-reply",body:"CONFIRMO "+notice.body.slice(-16),ts:new Date().toISOString()});
+  expect(await count("atendhub_leads where qualified_at is not null and id='"+lead.leadId+"'")).toBe(0);
+});
+
+it("confirma ou recusa por link e deixa de aceitar o link após cancelamento", async () => {
+  await admin();
+  await db.exec(await readFile("supabase/migrations/20261121140000_atendhub_public_confirmation_link.sql", "utf8"));
+  for (const [i, decision] of [[9810, "confirm"], [9811, "decline"]] as const) {
+    const lead=await ingest({jid:`551698700${i}@s.whatsapp.net`,pmid:`public-contact-${i}`});
+    await db.query(`insert into atendhub_appointments(id,organization_id,client_id,professional_id,lead_id,created_by_id,starts_at)
+      values($1,$2,$3,$4,$5,$6,now()+interval '2 hours')`,[id(i),ORG,CLIENT_A,id(9700),lead.leadId,USER_OWNER]);
+    const reminder=(await db.query<{id:string}>("select id from atendhub_eve_reminders where appointment_id=$1 and slot=1",[id(i)])).rows[0].id;
+    await as(USER_OTHER);
+    expect((await db.query<{token:string|null}>("select atendhub_confirmation_link($1,$2) token",[ORG,reminder])).rows[0].token).toBeNull();
+    await as(USER_OWNER);
+    const token=(await db.query<{token:string}>("select atendhub_confirmation_link($1,$2) token",[ORG,reminder])).rows[0].token;
+    expect(token).toBeTruthy();
+    await expect(db.query("select atendhub_confirmation_public($1,null)",[token])).rejects.toThrow();
+    await as(null,"service_role");
+    const respond=async (value:string|null)=>(await db.query<{answer:{state:string}|null}>("select atendhub_confirmation_public($1,$2) answer",[token,value])).rows[0].answer?.state;
+    expect(await respond(null)).toBe("pending");
+    expect(await respond(decision)).toBe(decision==="confirm"?"confirmed":"declined");
+    expect(await respond(decision==="confirm"?"decline":"confirm")).toBe(decision==="confirm"?"confirmed":"declined");
+    await admin();
+    const state=(await db.query("select a.status,l.qualified_at is not null qualified from atendhub_appointments a join atendhub_leads l on l.id=a.lead_id where a.id=$1",[id(i)])).rows[0];
+    expect(state).toEqual({status:decision==="confirm"?"confirmed":"rescheduling",qualified:decision==="confirm"});
+    await db.query("update atendhub_appointments set status='cancelled' where id=$1",[id(i)]);
+    await as(null,"service_role");
+    expect(await respond("confirm")).toBeUndefined();
+  }
+});
+
+it("envia o link público no corpo reservado e registra exatamente o texto enviado", async () => {
+  await admin();
+  await db.exec("alter table atendhub_professionals add column organization_id uuid, add column client_id uuid");
+  await db.query("update atendhub_professionals set organization_id=$1,client_id=$2 where id=$3",[ORG,CLIENT_A,id(9700)]);
+  await db.exec("update atendhub_appointments set status='cancelled' where status<>'cancelled'");
+  await db.exec(await readFile("supabase/migrations/20261121150000_atendhub_automatic_confirmation_link.sql", "utf8"));
+  const jid="5516987009982@s.whatsapp.net";
+  const lead=await ingest({jid,pmid:"auto-link-contact"});
+  await db.query(`insert into atendhub_appointments(id,organization_id,client_id,professional_id,lead_id,created_by_id,starts_at,timezone)
+      values($1,$2,$3,$4,$5,$6,now()+interval '45 minutes',
+      case when (now() at time zone 'UTC')::time>time '23:00' then 'America/Sao_Paulo' else 'UTC' end)`,
+      [id(9812),ORG,CLIENT_A,id(9700),lead.leadId,USER_OWNER]);
+  await as(null,"atendhub_integration");
+  const item=(await db.query<{r:{requestId:string;body:string;confirmationUrl:string;replyText:null}}>("select atendhub_eve_claim($1,'inst-a','https://agenda.example.com') r",[CLIENT_A])).rows[0].r;
+  expect(item.body).toContain(item.confirmationUrl);
+  expect(item.confirmationUrl).toMatch(/^https:\/\/agenda\.example\.com\/confirmar\/[0-9a-f-]{36}$/);
+  expect(item.replyText).toBeNull();
+  await db.query("select atendhub_eve_sent($1,'inst-a','auto-link-ack',now())",[item.requestId]);
+  await admin();
+  expect((await db.query("select body from atendhub_inbox_messages where provider_message_id='auto-link-ack'")).rows[0].body).toBe(item.body);
 });

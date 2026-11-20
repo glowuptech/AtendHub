@@ -4,6 +4,7 @@ import { Search, SlidersHorizontal, MessagesSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge, stageLabels } from "@/components/layout/shared";
 import type { Shortcut } from "./chat-shortcuts";
+import { RoutingReview } from "./episode-actions";
 import { StartConversation } from "./start-conversation";
 import { useAssignedInboxLeads } from "../hooks";
 import { useInboxConversations } from "../hooks";
@@ -39,7 +40,7 @@ export function Inbox() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState(""),
     [query, setQuery] = useState(""),
-    [quick, setQuick] = useState<QuickFilter>("all");
+    [quick, setQuick] = useState<QuickFilter>(selectedLead ? "all" : "open");
   const [client, setClient] = useState("all"),
     [operation, setOperation] = useState("all"),
     [connection, setConnection] = useState("all"),
@@ -74,6 +75,16 @@ export function Inbox() {
     };
   }, []);
   const all = useMemo(() => data ?? [], [data]);
+  const repeatedContacts = useMemo(() => {
+    const seen = new Set<string>();
+    const repeated = new Set<string>();
+    for (const row of all) {
+      const key = row.connection.id + ":" + row.phone;
+      if (seen.has(key)) repeated.add(key);
+      seen.add(key);
+    }
+    return repeated;
+  }, [all]);
   const options = useMemo(
     () => ({
       clients: [
@@ -131,7 +142,7 @@ export function Inbox() {
   const pending = assigned.filter(
     (l) =>
       !all.some((c) => c.leadId === l.id) &&
-      quick === "all" &&
+      (quick === "all" || quick === "open") &&
       (client === "all" || l.clientId === client) &&
       (operation === "all" || l.operationCode === operation) &&
       (stage === "all" || l.stage === stage) &&
@@ -150,6 +161,13 @@ export function Inbox() {
   const activeFilters = [client, operation, connection, stage].filter(
     (v) => v !== "all",
   ).length;
+  async function selectEpisode(id: string) {
+    await Promise.all([mutate(), mutateAssigned()]);
+    setSelectedLead("");
+    setSelected(id);
+    clearFilters();
+    setMobileChat(true);
+  }
   function clearFilters() {
     setQuery("");
     setQuick("all");
@@ -202,7 +220,9 @@ export function Inbox() {
             <div className="inbox-quick-filters" aria-label="Filtros rápidos">
               {(
                 [
+                  ["open", "Abertas"],
                   ["all", "Todas"],
+                  ["closed", "Encerradas"],
                   ["unread", "Não lidas"],
                   ["reply", "Aguardando resposta"],
                   ["customer", "Aguardando cliente"],
@@ -217,6 +237,7 @@ export function Inbox() {
                 </button>
               ))}
             </div>
+            <RoutingReview onDone={selectEpisode} />
             <details className="inbox-filters">
               <summary>
                 <SlidersHorizontal size={14} />
@@ -316,6 +337,7 @@ export function Inbox() {
                 <ContactAvatar name={l.name} />
                 <span className="inbox-conversation-content">
                   <strong>{l.name}</strong>
+                  <AppointmentTags stage={l.stage} />
                   <span className="inbox-client">{l.clientName}</span>
                   <span>Pronto para iniciar · Sem mensagens</span>
                 </span>
@@ -342,6 +364,7 @@ export function Inbox() {
                       </time>
                     )}
                   </span>
+                  <AppointmentTags stage={c.stage} />
                   <span className="inbox-professional">
                     {c.professionalName || "Sem profissional vinculado"}
                   </span>
@@ -352,6 +375,13 @@ export function Inbox() {
                     {c.clientName}
                     {c.operationName ? ` · ${c.operationName}` : ""}
                   </span>
+                  {repeatedContacts.has(c.connection.id + ":" + c.phone) && (
+                    <small>
+                      Atendimento de{" "}
+                      {new Date(c.createdAt).toLocaleString("pt-BR")} ·{" "}
+                      {c.ownerName || "Sem responsável"}
+                    </small>
+                  )}
                   <span className="inbox-message-preview">
                     {c.lastMessagePreview || "Nenhuma mensagem registrada"}
                   </span>
@@ -362,7 +392,8 @@ export function Inbox() {
                         <span className="sr-only"> não lidas</span>
                       </span>
                     )}
-                    {waitingFor(c) === "reply" && (
+                    {c.status === "closed" && <span>Encerrado</span>}
+                    {c.status !== "closed" && waitingFor(c) === "reply" && (
                       <span className="inbox-reply-status">
                         Aguardando resposta
                       </span>
@@ -429,6 +460,7 @@ export function Inbox() {
           />
         ) : conversation ? (
           <ChatPanel
+            onEpisode={selectEpisode}
             key={conversation.id}
             conversation={conversation}
             draft={drafts[conversation.id] ?? ""}
@@ -483,3 +515,15 @@ export function Inbox() {
   );
 }
 export { Queue } from "@/features/queue/queue";
+
+function AppointmentTags({ stage }: { stage: string }) {
+  if (stage !== "scheduled" && stage !== "confirmed") return null;
+  return (
+    <span className="inbox-booking-tags">
+      <span>Agendado</span>
+      <span data-confirmed={stage === "confirmed"}>
+        {stage === "confirmed" ? "Confirmado" : "Sem confirmação"}
+      </span>
+    </span>
+  );
+}
