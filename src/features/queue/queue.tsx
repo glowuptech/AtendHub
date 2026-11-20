@@ -77,7 +77,11 @@ export function Queue() {
           .toLowerCase()
           .includes(search.toLowerCase()),
     )
-    .sort((a, b) => a.created_at.localeCompare(b.created_at));
+    .sort((a, b) =>
+      (a.queue_entered_at ?? a.created_at).localeCompare(
+        b.queue_entered_at ?? b.created_at,
+      ),
+    );
   return (
     <>
       <Heading
@@ -150,7 +154,11 @@ export function Queue() {
               .map((l) => {
                 const sla =
                   isReady && now !== null
-                    ? claimSla(l.created_at, now, calendar)
+                    ? claimSla(
+                        l.queue_entered_at ?? l.created_at,
+                        now,
+                        calendar,
+                      )
                     : null;
                 return (
                   <article className="queue-card" key={l.id}>
@@ -165,7 +173,9 @@ export function Queue() {
                     <h3>{l.name}</h3>
                     <p>{l.phone || "Telefone não informado"}</p>
                     <small>Origem: {l.source}</small>
-                    {l.qualified_at && <Badge>Qualificado · confirmou a consulta</Badge>}
+                    {l.qualified_at && (
+                      <Badge>Qualificado · confirmou a consulta</Badge>
+                    )}
                     {l.capture_status && l.capture_status !== "completed" && (
                       <Badge>
                         {l.capture_status === "incomplete"

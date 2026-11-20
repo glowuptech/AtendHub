@@ -626,3 +626,22 @@ describe("confirmação da véspera", () => {
     ).toBe(1);
   });
 });
+
+it("reutiliza o histórico fechado e reinicia a fila apenas para uma nova mensagem recebida", async () => {
+  await admin();
+  await db.exec("alter table atendhub_leads add column assigned_at timestamptz, add column claimed_at timestamptz, add column queue_entered_at timestamptz default now()");
+  await db.exec(await readFile("supabase/migrations/20261120200000_atendhub_requeue_closed_conversations.sql", "utf8"));
+  const jid = "5516987009999@s.whatsapp.net";
+  const original = await ingest({ jid, pmid: "return-original" });
+  await db.query("update atendhub_leads set stage='in_progress',owner_id=$2,queue_entered_at=now()-interval '1 day' where id=$1", [original.leadId, USER_OWNER]);
+  await as(USER_OWNER);
+  await db.query("select atendhub_inbox_change_episode($1,'close')", [original.conversationId]);
+  const ts = new Date().toISOString();
+  expect((await ingest({ jid, pmid: "return-out", fromMe: true, ts })).conversationId).toBe(original.conversationId);
+  expect(await count("atendhub_inbox_conversations where status='closed' and id='" + original.conversationId + "'")).toBe(1);
+  expect((await ingest({ jid, pmid: "return-in", ts })).conversationId).toBe(original.conversationId);
+  const rows = await db.query("select stage,owner_id,queue_entered_at>now()-interval '1 minute' as fresh from atendhub_leads where id=$1", [original.leadId]);
+  expect(rows.rows[0]).toEqual({ stage: "new", owner_id: null, fresh: true });
+  expect(await count("atendhub_inbox_messages where conversation_id='" + original.conversationId + "'")).toBe(3);
+  expect((await ingest({ jid, pmid: "return-in", ts })).outcome).toBe("duplicate");
+});
