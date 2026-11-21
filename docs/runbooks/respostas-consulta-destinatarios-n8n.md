@@ -2,7 +2,7 @@
 
 ## 1. Receber o clique
 
-Crie um nó **Webhook da consulta** com método **POST**, path `resposta-consulta` e resposta **Using Respond to Webhook Node**. Ative o workflow e copie a Production URL para `ATENDHUB_APPOINTMENT_RESPONSE_WEBHOOK_URL` na hospedagem do app. Se usar Header Auth, configure a credencial do n8n para o header `Authorization: Bearer <token>` e o mesmo token em `ATENDHUB_APPOINTMENT_RESPONSE_WEBHOOK_TOKEN`.
+Crie um nó **Webhook da consulta** com método **POST**, path `resposta-consulta` e resposta **Using Respond to Webhook Node**. Ative o workflow e cole a Production URL em **Configurações → Webhooks → Respostas de agendamento**. Para usar Header Auth, configure essa mesma URL também em `ATENDHUB_APPOINTMENT_RESPONSE_WEBHOOK_URL` e o token de `Authorization: Bearer <token>` em `ATENDHUB_APPOINTMENT_RESPONSE_WEBHOOK_TOKEN`. A URL do ambiente também serve como destino padrão se a organização ainda não tiver configurado o campo.
 
 O webhook recebe o evento em `$json.body`. O clique **Confirmar presença** gera `appointment.patient_confirmed`; **Pedir reagendamento** gera `appointment.reschedule_requested`. A resposta do paciente já está gravada quando o webhook chega.
 
