@@ -1,7 +1,13 @@
 import { randomBytes, createCipheriv, createDecipheriv } from "node:crypto";
+const keyPattern = /^[a-f0-9]{64}$/i;
+export function accessEncryptionConfigured() {
+  return keyPattern.test(
+    process.env.ATENDHUB_CLIENT_ACCESS_ENCRYPTION_KEY ?? "",
+  );
+}
 function key() {
   const value = process.env.ATENDHUB_CLIENT_ACCESS_ENCRYPTION_KEY;
-  if (!value || !/^[a-f0-9]{64}$/i.test(value))
+  if (!value || !keyPattern.test(value))
     throw new Error("ENCRYPTION_NOT_CONFIGURED");
   return Buffer.from(value, "hex");
 }

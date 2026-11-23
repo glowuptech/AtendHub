@@ -9,6 +9,7 @@ const accountSchema = z.object({
   timezone_name: z.string().min(1).max(100),
 });
 export type MetaAccount = z.infer<typeof accountSchema>;
+export type MetaAccess = { token: string; version: string };
 const actionSchema = z
   .array(
     z.object({ action_type: z.string(), value: z.string().or(z.number()) }),
@@ -46,32 +47,13 @@ export class MetaError extends Error {
     super(message);
   }
 }
-export function metaConfigured(org: string) {
-  return (
-    !!process.env.ATENDHUB_META_ACCESS_TOKEN &&
-    /^v[0-9]+\.[0-9]+$/.test(process.env.ATENDHUB_META_API_VERSION ?? "") &&
-    process.env.ATENDHUB_META_ORGANIZATION_ID === org
-  );
-}
-function access(org: string) {
-  if (!metaConfigured(org))
-    throw new MetaError(
-      "Configure a credencial Meta e a organização autorizada no servidor.",
-      503,
-    );
-  return {
-    token: process.env.ATENDHUB_META_ACCESS_TOKEN!,
-    version: process.env.ATENDHUB_META_API_VERSION!,
-  };
-}
 async function graph<T>(
-  org: string,
+  { token, version }: MetaAccess,
   path: string,
   options: Record<string, string>,
   schema: z.ZodType<T>,
   signal: AbortSignal,
 ): Promise<T> {
-  const { token, version } = access(org);
   const url = new URL(`https://graph.facebook.com/${version}/${path}`);
   url.search = new URLSearchParams(options).toString();
   let response: Response;
@@ -92,7 +74,7 @@ async function graph<T>(
     const code = body?.error?.code;
     if (code === 190)
       throw new MetaError(
-        "A credencial da Meta expirou ou foi revogada. Atualize o token no servidor.",
+        "A credencial da Meta expirou ou foi revogada. Atualize o token em Tráfego pago → Contas vinculadas.",
         503,
       );
     if (response.status === 429 || [4, 17, 32, 613].includes(code))
@@ -112,7 +94,7 @@ async function graph<T>(
   return parsed.data;
 }
 async function pages<T>(
-  org: string,
+  access: MetaAccess,
   path: string,
   query: Record<string, string>,
   row: z.ZodType<T>,
@@ -131,7 +113,7 @@ async function pages<T>(
   let after: string | undefined;
   for (let page = 0; page < 20; page++) {
     const result = await graph(
-      org,
+      access,
       path,
       { ...query, limit: "250", ...(after ? { after } : {}) },
       schema,
@@ -151,22 +133,37 @@ async function pages<T>(
     422,
   );
 }
-export const discoverMetaAccounts = (org: string) =>
+export const discoverMetaAccounts = (access: MetaAccess) =>
   pages(
-    org,
+    access,
     "me/adaccounts",
     { fields: "id,name,currency,timezone_name" },
     accountSchema,
     AbortSignal.timeout(25000),
   );
-export const getMetaAccount = (org: string, id: string) =>
+export const getMetaAccount = (access: MetaAccess, id: string) =>
   graph(
-    org,
+    access,
     id,
     { fields: "id,name,currency,timezone_name" },
     accountSchema,
     AbortSignal.timeout(15000),
   );
+
+export async function validateMetaAccess(access: MetaAccess) {
+  const { data } = await graph(
+    access,
+    "me/adaccounts",
+    { fields: "id", limit: "1" },
+    z.object({ data: z.array(z.object({ id: identifiers.account })) }),
+    AbortSignal.timeout(15_000),
+  );
+  if (!data.length)
+    throw new MetaError(
+      "O token não tem acesso a nenhuma conta de anúncios na Meta.",
+      422,
+    );
+}
 
 function count(actions: z.infer<typeof actionSchema>, types: string[]) {
   for (const type of types) {
@@ -193,7 +190,7 @@ function safeThumbnail(value: string | undefined) {
 }
 
 export async function fetchMetaSnapshot(
-  org: string,
+  access: MetaAccess,
   account: string,
   from: string,
   to: string,
@@ -201,7 +198,7 @@ export async function fetchMetaSnapshot(
   const signal = AbortSignal.timeout(42000);
   const [rows, creatives] = await Promise.all([
     pages(
-      org,
+      access,
       `${account}/insights`,
       {
         time_range: JSON.stringify({ since: from, until: to }),
@@ -214,7 +211,7 @@ export async function fetchMetaSnapshot(
       signal,
     ),
     pages(
-      org,
+      access,
       `${account}/ads`,
       {
         fields:

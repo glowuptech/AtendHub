@@ -2,14 +2,18 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   fetchSnapshot: vi.fn(),
-  configured: vi.fn(),
+  scheduledOrg: vi.fn(),
+  access: vi.fn(),
   rpc: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/features/paid-media/meta", () => ({
   fetchMetaSnapshot: state.fetchSnapshot,
-  metaConfigured: state.configured,
   MetaError: class extends Error {},
+}));
+vi.mock("@/features/paid-media/meta-credentials", () => ({
+  scheduledMetaOrganization: state.scheduledOrg,
+  getMetaAccess: state.access,
 }));
 vi.mock("@/features/paid-media/server", () => ({
   paidMediaAdmin: () => ({ rpc: state.rpc }),
@@ -21,14 +25,15 @@ import { GET } from "@/app/api/cron/meta-sync/route";
 import { MetaError } from "@/features/paid-media/meta";
 
 const org = "00000000-0000-4000-8000-000000000001";
+const credential = { token: "renewed-test-token", version: "v99.0" };
 const started = "2026-11-23T01:30:00Z";
 const url = "https://painel.atendehub.app/api/cron/meta-sync";
 
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv("CRON_SECRET", "cron-test");
-  vi.stubEnv("ATENDHUB_META_ORGANIZATION_ID", org);
-  state.configured.mockReturnValue(true);
+  state.scheduledOrg.mockResolvedValue(org);
+  state.access.mockResolvedValue(credential);
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -37,7 +42,7 @@ it("exige segredo do agendador e organização Meta configurada", async () => {
   const request = new Request(url, {
     headers: { Authorization: "Bearer cron-test" },
   });
-  state.configured.mockReturnValue(false);
+  state.scheduledOrg.mockResolvedValue(null);
   expect((await GET(request)).status).toBe(503);
   expect(state.rpc).not.toHaveBeenCalled();
 });
@@ -82,13 +87,13 @@ it("importa por fuso, registra falhas por conta e continua o lote", async () => 
     timeLimitReached: false,
   });
   expect(state.fetchSnapshot).toHaveBeenCalledWith(
-    org,
+    credential,
     "act_101",
     "2026-11-15",
     "2026-11-22",
   );
   expect(state.fetchSnapshot).toHaveBeenCalledWith(
-    org,
+    credential,
     "act_102",
     "2026-11-16",
     "2026-11-23",

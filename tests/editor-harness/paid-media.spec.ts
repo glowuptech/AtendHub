@@ -5,7 +5,6 @@ import type { MediaReport, Plan } from "../../src/features/paid-media/model";
 const clientId = "00000000-0000-4000-8000-000000000901";
 const empty = {
   canManage: true,
-  metaConfigured: true,
   attributionAvailable: true,
   clients: [{ id: clientId, name: "Clínica de teste", code: null }],
   accounts: [],
@@ -54,11 +53,29 @@ test("vincula uma conta, sincroniza e exibe o indicador de Atração", async ({
   page,
 }) => {
   let linked = false,
-    synced = false;
+    synced = false,
+    credentialSaved = false;
+  const credentialStatus = () => ({
+    configured: credentialSaved,
+    version: credentialSaved ? "v99.0" : null,
+    updatedAt: credentialSaved ? "2026-11-23T13:00:00Z" : null,
+    setupMessage: null,
+  });
   await page.route("**/api/paid-media**", async (route) => {
     const url = new URL(route.request().url());
     if (route.request().method() === "POST") {
       const cmd = route.request().postDataJSON();
+      if (cmd.action === "saveMetaCredential") {
+        expect(cmd.version).toBe("v99.0");
+        if (cmd.token === "test-token-invalid")
+          return route.fulfill({
+            status: 422,
+            json: { error: "Token recusado pela Meta." },
+          });
+        expect(cmd.token).toBe("test-token-valid");
+        credentialSaved = true;
+        return route.fulfill({ json: credentialStatus() });
+      }
       if (cmd.action === "link") {
         expect(cmd).toMatchObject({
           clientId,
@@ -84,6 +101,8 @@ test("vincula uma conta, sincroniza e exibe o indicador de Atração", async ({
           },
         ],
       });
+    if (url.searchParams.get("kind") === "metaCredential")
+      return route.fulfill({ json: credentialStatus() });
     if (url.searchParams.get("kind") === "syncStatus")
       return route.fulfill({
         json: {
@@ -115,6 +134,18 @@ test("vincula uma conta, sincroniza e exibe o indicador de Atração", async ({
     page.getByText("Nenhuma conta vinculada neste recorte."),
   ).toBeVisible();
   await page.getByRole("button", { name: "Contas vinculadas" }).click();
+  const tokenField = page.getByLabel("Token de acesso");
+  await expect(tokenField).toHaveAttribute("type", "password");
+  await page.getByLabel("Versão da Graph API").fill("v99.0");
+  await tokenField.fill("test-token-invalid");
+  await page.getByRole("button", { name: "Salvar token" }).click();
+  await expect(page.getByRole("alert")).toHaveText("Token recusado pela Meta.");
+  await tokenField.fill("test-token-valid");
+  await page.getByRole("button", { name: "Salvar token" }).click();
+  await expect(tokenField).toHaveValue("");
+  await expect(
+    page.getByRole("button", { name: "Atualizar token" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Buscar contas na Meta" }).click();
   await page
     .getByRole("combobox", { name: "Conta", exact: true })
@@ -127,7 +158,9 @@ test("vincula uma conta, sincroniza e exibe o indicador de Atração", async ({
     page.getByText(/Falha na sincronização.*Confira a credencial Meta/),
   ).toBeVisible();
   await page.getByRole("button", { name: "Sincronizar período" }).click();
-  await expect(page.getByRole("status")).toHaveText("Sincronização concluída.");
+  await expect(
+    page.getByText("Sincronização concluída.", { exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Funil AIDA" }).click();
   const attraction = page.locator("section").filter({
     has: page.getByRole("heading", { name: "Atração", exact: true }),
