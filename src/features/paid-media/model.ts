@@ -13,6 +13,19 @@ export const identifiers = {
   account: z.string().regex(/^act_[0-9]{1,30}$/),
   entity: z.string().regex(/^[0-9]{1,30}$/),
 };
+export const metaApiVersion = z
+  .string()
+  .trim()
+  .regex(
+    /^v[0-9]{1,3}\.[0-9]{1,3}$/,
+    "Informe a versão da Graph API no formato vNN.N.",
+  );
+export type MetaCredentialStatus = {
+  configured: boolean;
+  version: string | null;
+  updatedAt: string | null;
+  setupMessage: string | null;
+};
 export const stageMetric: Record<Stage, string> = {
   ATR: "Visitas ao perfil",
   INT: "ThruPlays",
@@ -105,7 +118,6 @@ export type Metrics = Omit<Insight, "day" | "ad_id"> & {
 };
 export type MediaReport = {
   canManage: boolean;
-  metaConfigured: boolean;
   attributionAvailable: boolean;
   clients: Client[];
   accounts: Array<
