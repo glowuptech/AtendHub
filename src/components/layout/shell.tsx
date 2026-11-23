@@ -106,6 +106,7 @@ export function Shell({
     ["/app/calendario", "Calendário", CalendarDays],
     ["/app/automacoes", "Automações", Workflow],
     ["/app/trafego-pago", "Tráfego Pago", Megaphone],
+    ["/app/planejamento-campanhas", "Planejamento de campanhas", FileText],
     ["/app/configuracoes", "Configurações", Settings],
   ] as const;
   const systemPage = !portal && systemLinks.find(([href]) => pathname === href);

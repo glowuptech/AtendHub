@@ -62,10 +62,13 @@ export function PublicForm({ slug }: { slug: string }) {
     view: (input) => sendEvent("view", input.sessionId),
     action: (_input, actionId) => sendEvent("action", actionId),
     capture: (input) => {
+      const query = new URLSearchParams(window.location.search);
+      const campaign = query.get("meta_campaign_id");
+      const ad = query.get("meta_ad_id");
       void fetch(`/api/public/forms/${encodeURIComponent(slug)}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...input, sessionId, idempotencyKey }),
+        body: JSON.stringify({ ...input, sessionId, idempotencyKey, ...(campaign && { campaign, ad }) }),
         keepalive: true,
       });
       return sessionId;
