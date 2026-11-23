@@ -41,6 +41,16 @@ export const webhookDestinations = [
     events: ["appointment.created"],
   },
   {
+    id: "appointmentResponses",
+    title: "Respostas de agendamento",
+    description:
+      "Confirmação de presença ou pedido de reagendamento enviado pelo paciente pelo link público.",
+    events: [
+      "appointment.patient_confirmed",
+      "appointment.reschedule_requested",
+    ],
+  },
+  {
     id: "automations",
     title: "Eventos de automação (opcional)",
     description:
@@ -91,6 +101,7 @@ export const WebhookConfigSchema = z.object({
   automations: url.default(""),
   followups: url.default(""),
   reminders: url.default(""),
+  appointmentResponses: url.default(""),
 });
 export type WebhookConfig = z.infer<typeof WebhookConfigSchema>;
 export const emptyWebhookConfig = (): WebhookConfig => ({
@@ -102,4 +113,5 @@ export const emptyWebhookConfig = (): WebhookConfig => ({
   automations: "",
   followups: "",
   reminders: "",
+  appointmentResponses: "",
 });
