@@ -101,7 +101,9 @@ export function reportFailure(error: unknown) {
   if (error instanceof MediaError)
     return { error: error.message, status: error.status };
   const code = (error as { code?: string } | undefined)?.code;
-  if (code === "42P01" || code === "PGRST205" || code === "PGRST202")
+  if (
+    ["42P01", "42703", "PGRST204", "PGRST205", "PGRST202"].includes(code ?? "")
+  )
     return {
       error:
         "A área aguarda a ativação das migrations de tráfego pago no Supabase.",

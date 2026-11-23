@@ -14,6 +14,7 @@ import {
   stageMetric,
   stages,
   type MediaReport,
+  type MetaAutoSyncStatus,
   type Stage,
   type Campaign,
   type Metrics,
@@ -833,6 +834,14 @@ type Inventory = {
   currency: string;
   timezone_name: string;
 }[];
+const autoSyncLabel = {
+  pending: "Aguardando primeira execução",
+  syncing: "Sincronização em andamento",
+  interrupted: "Execução interrompida",
+  succeeded: "Sincronização concluída",
+  failed: "Falha na sincronização",
+} satisfies Record<MetaAutoSyncStatus["accounts"][number]["state"], string>;
+
 function Accounts({
   data,
   filter,
@@ -852,6 +861,11 @@ function Accounts({
     requestMedia,
     { revalidateOnFocus: false, shouldRetryOnError: false },
   );
+  const { data: autoSync, error: autoSyncError } = useSWR<MetaAutoSyncStatus>(
+    `${endpoint}?kind=syncStatus`,
+    requestMedia,
+    { shouldRetryOnError: false },
+  );
   const [client, setClient] = useState(filter || data.clients[0]?.id || "");
   const [account, setAccount] = useState("");
   const [mode, setMode] = useState("exclusive");
@@ -860,6 +874,9 @@ function Accounts({
   const code = data.clients.find((c) => c.id === client)?.code;
   const prefix = code ? `[${code}][${stage}]` : "";
   const rangeFits = daysBetween(range.from, range.to) < 31;
+  const attempts = new Map(
+    autoSync?.accounts.map((item) => [item.accountId, item]),
+  );
   return (
     <>
       <Card title="Vincular conta de anúncios">
@@ -999,66 +1016,87 @@ function Accounts({
         {copied && <p role="status">{copied}</p>}
       </Card>
       <Card title="Contas cadastradas">
+        {autoSync && (
+          <p>
+            {autoSync.configured
+              ? "Sincronização automática diária. Atualiza os últimos 7 dias fechados e a parcial de hoje."
+              : "Sincronização automática aguarda configuração no servidor."}
+          </p>
+        )}
+        {autoSyncError && <p>{autoSyncError.message}</p>}
         {!rangeFits && (
           <p>Para sincronizar, selecione um período de até 31 dias.</p>
         )}
         {!data.accounts.length && <p>Nenhuma conta vinculada.</p>}
-        {data.accounts.map((a) => (
-          <div key={a.account_id} className="paid-row">
-            <div>
-              <strong>{a.name}</strong> ·{" "}
-              <Badge>{a.shared ? "Compartilhada" : "Exclusiva"}</Badge>
-              <p className="muted">
-                {a.account_id} · {a.currency} · {a.timezone}
-              </p>
-              {a.clientIds.map((id) => (
-                <span key={id} className="paid-link">
-                  {data.clients.find((c) => c.id === id)?.name}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={pending}
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          "Remover o vínculo com este cliente? Campanhas atribuídas voltarão à revisão.",
+        {data.accounts.map((a) => {
+          const attempt = attempts.get(a.account_id);
+          return (
+            <div key={a.account_id} className="paid-row">
+              <div>
+                <strong>{a.name}</strong> ·{" "}
+                <Badge>{a.shared ? "Compartilhada" : "Exclusiva"}</Badge>
+                <p className="muted">
+                  {a.account_id} · {a.currency} · {a.timezone}
+                </p>
+                {a.clientIds.length > 0 &&
+                  attempt &&
+                  (autoSync?.configured || attempt.lastAttemptAt) && (
+                    <p className="muted">
+                      {autoSyncLabel[attempt.state]}
+                      {attempt.lastAttemptAt &&
+                        ` · ${readDate(attempt.lastAttemptAt)}`}
+                      {attempt.error && ` · ${attempt.error}`}
+                    </p>
+                  )}
+                {a.clientIds.map((id) => (
+                  <span key={id} className="paid-link">
+                    {data.clients.find((c) => c.id === id)?.name}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={pending}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            "Remover o vínculo com este cliente? Campanhas atribuídas voltarão à revisão.",
+                          )
                         )
-                      )
-                        void run(
-                          {
-                            action: "link",
-                            clientId: id,
-                            accountId: a.account_id,
-                            mode: "remove",
-                          },
-                          "Vínculo removido.",
-                        );
-                    }}
-                  >
-                    Remover vínculo
-                  </Button>
-                </span>
-              ))}
+                          void run(
+                            {
+                              action: "link",
+                              clientId: id,
+                              accountId: a.account_id,
+                              mode: "remove",
+                            },
+                            "Vínculo removido.",
+                          );
+                      }}
+                    >
+                      Remover vínculo
+                    </Button>
+                  </span>
+                ))}
+              </div>
+              <Button
+                size="sm"
+                disabled={
+                  pending ||
+                  !rangeFits ||
+                  !a.clientIds.length ||
+                  !data.metaConfigured
+                }
+                onClick={() =>
+                  run(
+                    { action: "sync", accountId: a.account_id, ...range },
+                    "Sincronização concluída.",
+                  )
+                }
+              >
+                Sincronizar período
+              </Button>
             </div>
-            <Button
-              size="sm"
-              disabled={
-                pending ||
-                !rangeFits ||
-                !a.clientIds.length ||
-                !data.metaConfigured
-              }
-              onClick={() =>
-                run(
-                  { action: "sync", accountId: a.account_id, ...range },
-                  "Sincronização concluída.",
-                )
-              }
-            >
-              Sincronizar período
-            </Button>
-          </div>
-        ))}
+          );
+        })}
       </Card>
     </>
   );

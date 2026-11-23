@@ -84,6 +84,20 @@ test("vincula uma conta, sincroniza e exibe o indicador de Atração", async ({
           },
         ],
       });
+    if (url.searchParams.get("kind") === "syncStatus")
+      return route.fulfill({
+        json: {
+          configured: true,
+          accounts: [
+            {
+              accountId: "act_12",
+              state: "failed",
+              lastAttemptAt: "2026-11-23T08:00Z",
+              error: "Confira a credencial Meta.",
+            },
+          ],
+        },
+      });
     return route.fulfill({
       json: synced
         ? report
@@ -109,14 +123,15 @@ test("vincula uma conta, sincroniza e exibe o indicador de Atração", async ({
     .getByRole("combobox", { name: "Uso da conta" })
     .selectOption("shared");
   await page.getByRole("button", { name: "Vincular conta" }).click();
+  await expect(
+    page.getByText(/Falha na sincronização.*Confira a credencial Meta/),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Sincronizar período" }).click();
   await expect(page.getByRole("status")).toHaveText("Sincronização concluída.");
   await page.getByRole("button", { name: "Funil AIDA" }).click();
-  const attraction = page
-    .locator("section")
-    .filter({
-      has: page.getByRole("heading", { name: "Atração", exact: true }),
-    });
+  const attraction = page.locator("section").filter({
+    has: page.getByRole("heading", { name: "Atração", exact: true }),
+  });
   await expect(attraction).toContainText("Visitas ao perfil");
   await expect(attraction).toContainText("10");
   expect(

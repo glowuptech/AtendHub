@@ -6,7 +6,6 @@ import { sessionOrganizationContext } from "@/lib/supabase/organization-session"
 import { daysBetween, localDay, RangeSchema } from "@/lib/date-range";
 import {
   discoverMetaAccounts,
-  fetchMetaSnapshot,
   getMetaAccount,
   MetaError,
 } from "@/features/paid-media/meta";
@@ -21,6 +20,10 @@ import {
   requireAdmin,
   writePlan,
 } from "@/features/paid-media/server";
+import {
+  importMetaPeriod,
+  readAutoSyncStatus,
+} from "@/features/paid-media/sync";
 
 export const maxDuration = 60;
 const id = z.string().uuid();
@@ -87,6 +90,10 @@ export async function GET(request: Request) {
     if (kind === "metaAccounts") {
       requireAdmin(auth);
       return json(await discoverMetaAccounts(auth.organizationId));
+    }
+    if (kind === "syncStatus") {
+      requireAdmin(auth);
+      return json(await readAutoSyncStatus(auth.organizationId));
     }
     const rawClient = portalClient ?? query.get("clientId");
     const client = rawClient ? id.safeParse(rawClient) : null;
@@ -213,25 +220,13 @@ export async function POST(request: Request) {
           { error: "Vincule a conta a um cliente antes de sincronizar." },
           409,
         );
-      const started = new Date().toISOString();
-      const snapshot = await fetchMetaSnapshot(
+      const result = await importMetaPeriod(
+        admin,
         org,
         value.accountId,
-        value.from,
-        value.to,
+        range.data,
       );
-      const result = await admin.rpc("atendhub_meta_import", {
-        p_org: org,
-        p_account: value.accountId,
-        p_from: value.from,
-        p_to: value.to,
-        p_started: started,
-        p_campaigns: snapshot.campaigns,
-        p_ads: snapshot.ads,
-        p_insights: snapshot.insights,
-      });
-      if (result.error) throw result.error;
-      if (result.data === false)
+      if (!result.imported)
         return json(
           {
             error:
@@ -239,7 +234,7 @@ export async function POST(request: Request) {
           },
           409,
         );
-      return json({ ok: true, rows: snapshot.insights.length });
+      return json({ ok: true, rows: result.rows });
     }
     if (value.action === "classify") {
       if (value.clientId) await clientScope(auth, value.clientId);

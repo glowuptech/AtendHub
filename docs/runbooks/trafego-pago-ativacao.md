@@ -7,8 +7,9 @@ Publique o commit da branch `feature/trafego-pago-aida`. Confirme o projeto Supa
 1. `20261123000000_atendhub_paid_media.sql` cria contas, vínculos, códigos de cliente, catálogo de campanhas/anúncios, métricas diárias, cobertura e planos.
 2. `20261123010000_atendhub_paid_attribution.sql` adiciona atribuição do CRM e a regra da primeira mensagem do WhatsApp.
 3. `20261123020000_atendhub_paid_media_assistant.sql` cria o histórico interno do assistente.
+4. `20261123030000_atendhub_meta_auto_sync.sql` registra as tentativas da sincronização diária nas contas Meta e controla a reserva das tarefas.
 
-Confirme as três versões no histórico remoto e as permissões. Os objetos novos têm RLS e o navegador acessa as rotas autenticadas do app. O token Meta permanece no servidor.
+Confirme as quatro versões no histórico remoto e as permissões. Os objetos novos têm RLS e o navegador acessa as rotas autenticadas do app. O token Meta permanece no servidor.
 
 ## Meta Ads em leitura
 
@@ -25,6 +26,14 @@ Use uma conta exclusiva e uma compartilhada com pelo menos dois clientes. Compar
 O reporte usa os dias do fuso da conta Meta. Os leads atribuídos no CRM usam o dia de captação em America/Sao_Paulo e os resultados operacionais atuais das oportunidades daquele recorte. Formulários Meta, conversas Meta e oportunidades CRM são métricas diferentes. No CRM, cada oportunidade entra uma vez. Se houver atribuição de formulário e WhatsApp, o formulário tem precedência no painel. Agendamentos cancelados não entram no indicador de oportunidades com agendamento. Qualificação usa `qualified_at`, registrado pela confirmação conforme a regra do Atend&Hub.
 
 Foram mapeados códigos explícitos da API para formulário instantâneo, visita ao perfil e ThruPlay. Conversa iniciada entra como WhatsApp quando o catálogo da Meta identifica o conjunto com destino `WHATSAPP`. Sem a métrica ou destino identificável, a célula apresenta um traço. Valide nomes e disponibilidade das métricas com as contas reais. Criativos exibem a miniatura e o texto quando a Meta fornece esses campos. Moedas diferentes ficam separadas. O Dashboard geral ainda usa o lançamento manual e não soma o mesmo gasto importado pelo hub.
+
+### Sincronização diária
+
+Após validar a importação manual, configure um segredo aleatório em `CRON_SECRET` nas variáveis de servidor da Vercel. O `vercel.json` agenda uma execução por dia às 08:00 UTC (05:00 em Brasília), com a precisão do plano da Vercel. No deploy de produção, a Vercel chama `GET /api/cron/meta-sync` com esse segredo. O servidor do Atend&Hub consulta a Meta diretamente com as mesmas credenciais do botão manual. Cada conta vinculada entra uma vez por execução, mesmo quando atende várias clínicas.
+
+No Preview, use uma conta de teste e chame a rota com o cabeçalho `Authorization: Bearer <CRON_SECRET>` apontando para a URL do Preview. É a mesma rota da execução agendada. Confira a última tentativa em **Tráfego pago → Contas vinculadas**. Um segundo disparo no mesmo dia pula as contas que já concluíram uma tentativa. O retorno informa quantas contas foram importadas, falharam ou já estavam atualizadas por outra importação. Se houver falha, o status da conta mostra o motivo. A rotina tenta novamente no dia seguinte e o botão **Sincronizar período** permite tentar manualmente.
+
+A rotina revisa os sete dias anteriores e atualiza a parcial de hoje no fuso de cada conta. Use o botão manual para buscar outro período ou atualizar a parcial durante o dia. As contas são processadas em lotes de quatro. Se o tempo da função terminar antes de processar todas, a resposta informa o limite e o próximo disparo começa pelas contas há mais tempo sem tentativa. Uma importação mais recente prevalece se o mesmo período for atualizado ao mesmo tempo pelo cron e pelo botão manual.
 
 ## Atribuição de formulário e WhatsApp
 

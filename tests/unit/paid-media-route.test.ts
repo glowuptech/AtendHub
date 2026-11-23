@@ -6,6 +6,8 @@ const state = vi.hoisted(() => ({
   scope: vi.fn(),
   rpc: vi.fn(),
   discover: vi.fn(),
+  syncStatus: vi.fn(),
+  requireAdmin: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/organization-session", () => ({
@@ -24,7 +26,10 @@ vi.mock("@/features/paid-media/server", () => ({
   reportFailure: vi.fn(),
   clientScope: state.scope,
   paidMediaAdmin: () => ({ rpc: state.rpc }),
-  requireAdmin: vi.fn(),
+  requireAdmin: state.requireAdmin,
+}));
+vi.mock("@/features/paid-media/sync", () => ({
+  readAutoSyncStatus: state.syncStatus,
 }));
 import { GET, POST } from "@/app/api/paid-media/route";
 
@@ -38,6 +43,27 @@ beforeEach(() => {
   state.report.mockResolvedValue({ canManage: true, metaConfigured: true });
   state.scope.mockResolvedValue([{ id: clientId }]);
   state.rpc.mockResolvedValue({ error: null });
+});
+it("consulta o estado do cron pela organização administrativa e protege o portal", async () => {
+  const path = "/api/paid-media?kind=syncStatus";
+  state.syncStatus.mockResolvedValue({ configured: true, accounts: [] });
+
+  const portal = await GET(
+    new Request("https://clinica.atendehub.app" + path, {
+      headers: { host: "clinica.atendehub.app" },
+    }),
+  );
+  expect(portal?.status).toBe(403);
+  expect(state.syncStatus).not.toHaveBeenCalled();
+
+  const panel = await GET(
+    new Request("https://painel.atendehub.app" + path, {
+      headers: { host: "painel.atendehub.app" },
+    }),
+  );
+  expect(await panel!.json()).toEqual({ configured: true, accounts: [] });
+  expect(state.requireAdmin).toHaveBeenCalledWith(context);
+  expect(state.syncStatus).toHaveBeenCalledWith(context.organizationId);
 });
 it("força o relatório da clínica e desabilita a administração no host do portal", async () => {
   const url =

@@ -60,6 +60,15 @@ export type Account = {
   timezone: string;
   shared: boolean;
 };
+export type MetaAutoSyncStatus = {
+  configured: boolean;
+  accounts: {
+    accountId: string;
+    lastAttemptAt: string | null;
+    state: "pending" | "syncing" | "interrupted" | "succeeded" | "failed";
+    error: string | null;
+  }[];
+};
 export type Client = { id: string; name: string; code: string | null };
 export type Campaign = {
   campaign_id: string;

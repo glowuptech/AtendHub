@@ -35,8 +35,71 @@ beforeAll(async () => {
     "20261123000000_atendhub_paid_media",
     "20261123010000_atendhub_paid_attribution",
     "20261123020000_atendhub_paid_media_assistant",
+    "20261123030000_atendhub_meta_auto_sync",
   ])
     await db.exec(await readFile(`supabase/migrations/${file}.sql`, "utf8"));
+});
+
+it("reserva uma vez por conta e recupera somente tentativas interrompidas", async () => {
+  const account = "act_700";
+  await db.query(
+    "select atendhub_meta_link($1,$2,$3,'shared','Agência','BRL','America/Sao_Paulo')",
+    [otherOrg, account, outsider],
+  );
+  await db.query(
+    "insert into atendhub_meta_accounts values($1,'act_999','Sem vínculo','BRL','UTC',false)",
+    [otherOrg],
+  );
+  const claim = async () =>
+    (
+      await db.query<{ account_id: string; started_at: string }>(
+        "select account_id,started_at::text from atendhub_meta_auto_sync_claim($1,4)",
+        [otherOrg],
+      )
+    ).rows;
+  const finish = async (started: string, error: string | null) =>
+    (
+      await db.query(
+        "select atendhub_meta_auto_sync_finish($1,$2,$3,$4) as done",
+        [otherOrg, account, started, error],
+      )
+    ).rows;
+
+  const [first] = await claim();
+  expect(first?.account_id).toBe(account);
+  expect(await claim()).toEqual([]);
+  await db.query(
+    "update atendhub_meta_accounts set auto_sync_started_at=now()-interval '7 minutes' where organization_id=$1 and account_id=$2",
+    [otherOrg, account],
+  );
+  const [retried] = await claim();
+  expect(retried?.account_id).toBe(account);
+  expect(await finish(first!.started_at, null)).toEqual([{ done: false }]);
+  expect(await finish(retried!.started_at, "Meta indisponível")).toEqual([
+    { done: true },
+  ]);
+  expect(await claim()).toEqual([]);
+  expect(
+    (
+      await db.query(
+        "select auto_sync_error from atendhub_meta_accounts where organization_id=$1 and account_id=$2",
+        [otherOrg, account],
+      )
+    ).rows,
+  ).toEqual([{ auto_sync_error: "Meta indisponível" }]);
+
+  await db.query(
+    "update atendhub_meta_accounts set auto_sync_started_at=now()-interval '1 day' where organization_id=$1 and account_id=$2",
+    [otherOrg, account],
+  );
+  expect(await claim()).toHaveLength(1);
+  expect(
+    (
+      await db.query(
+        `select has_function_privilege('anon','public.atendhub_meta_auto_sync_claim(uuid, integer)','execute') as allowed`,
+      )
+    ).rows,
+  ).toEqual([{ allowed: false }]);
 });
 afterAll(async () => {
   await db?.close();
