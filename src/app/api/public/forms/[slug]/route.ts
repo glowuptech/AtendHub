@@ -14,6 +14,8 @@ const payloadSchema = z.object({
   contacts: z.object({ name: z.string().max(200), phone: z.string().max(200), email: z.string().max(200) }),
   answers: z.record(z.string(), z.unknown()),
   complete: z.boolean(),
+  campaign: z.unknown().optional(),
+  ad: z.unknown().optional(),
   nextIndex: z.number().int().min(0).optional(),
 });
 const eventSchema = z.object({
@@ -120,5 +122,16 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   if (leadError || !lead) return NextResponse.json({ error: "Não foi possível registrar o cadastro." }, { status: 500 });
   const responseRows = steps.filter((step) => answers[step.question.id] !== undefined).map((step) => ({ organization_id: form.organizationId, client_id: form.clientId, lead_id: lead.id, form_id: form.id, form_version_id: version.id, question_id: step.question.id, question_snapshot: step.question, value: answers[step.question.id] }));
   if (responseRows.length) { const { error } = await supabase.from("atendhub_lead_responses").upsert(responseRows, { onConflict: "lead_id,question_id" }); if (error) return NextResponse.json({ error: "Cadastro criado, mas as respostas não foram salvas." }, { status: 500 }); }
+  const campaignId = z.string().regex(/^\d{1,30}$/).safeParse(parsed.data.campaign);
+  const adId = z.string().regex(/^\d{1,30}$/).safeParse(parsed.data.ad);
+  if (campaignId.success) {
+    const { error: attributionError } = await supabase.rpc("atendhub_attribute_form_campaign", {
+      p_org: form.organizationId, p_client: form.clientId, p_lead: lead.id,
+      p_campaign: campaignId.data, p_ad: adId.success ? adId.data : null,
+    });
+    if (attributionError && attributionError.code !== "PGRST202") {
+      console.warn("[form-capture] campaign attribution failed", { code: attributionError.code });
+    }
+  }
   return NextResponse.json({ ok: true, leadId: lead.id, complete: parsed.data.complete }, { status: parsed.data.complete ? 201 : 200 });
 }

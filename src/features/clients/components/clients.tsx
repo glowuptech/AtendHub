@@ -12,6 +12,7 @@ import { ClientInformation } from "./information";
 import { FormsList } from "@/features/forms/components/forms-list";
 import { ClientAccesses } from "./client-accesses";
 import { ExternalScheduling } from "./external-scheduling";
+import { PaidMediaWorkspace } from "@/features/paid-media/workspace";
 import { ClientDomainSettings } from "@/features/client-domains/settings";
 import { KnowledgeBase } from "./knowledge-base";
 export { Clients } from "./directory";
@@ -53,6 +54,7 @@ export function ClientProfile({ id }: { id: string }) {
           "Agendamento externo",
           "Acessos",
           "Domínio público",
+          "Tráfego pago",
         ].map((t) => (
           <Button
             key={t}
@@ -88,6 +90,8 @@ export function ClientProfile({ id }: { id: string }) {
         <ClientAccesses key={id} clientId={id} />
       ) : tab === "Domínio público" ? (
         <ClientDomainSettings key={id} clientId={id} />
+      ) : tab === "Tráfego pago" ? (
+        <PaidMediaWorkspace key={id} clientId={id} embedded />
       ) : tab === "Base de conhecimento" ? (
         <KnowledgeBase key={id} client={c} />
       ) : null}

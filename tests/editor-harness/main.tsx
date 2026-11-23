@@ -1,3 +1,6 @@
+import "@/features/paid-media/workspace.css";
+import { PaidMediaWorkspace } from "@/features/paid-media/workspace";
+import { CampaignPlanning } from "@/features/paid-media/planning";
 // Isolated browser harness: real components, simulated persistence only.
 import { useEffect, useState } from "react";
 import { ExternalScheduling } from "@/features/clients/components/external-scheduling";
@@ -431,6 +434,10 @@ createRoot(document.getElementById("root")!).render(
         <ExternalScheduling clientId={clients[0].id} />
         <ClientAccesses clientId={clients[0].id} />
       </>
+    ) : new URLSearchParams(location.search).has("paid-media") ? (
+      <PaidMediaWorkspace />
+    ) : new URLSearchParams(location.search).has("campaign-planning") ? (
+      <CampaignPlanning />
     ) : new URLSearchParams(location.search).has("confirmations") ? (
       <ConfirmationsList clientId={clients[0].id} />
     ) : new URLSearchParams(location.search).has("inbox") ? (
