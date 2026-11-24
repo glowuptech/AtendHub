@@ -43,7 +43,9 @@ export async function GET(request: Request, { params }: Params) {
     week: url.searchParams.get("week"),
   });
   if (!parsed.success)
-    return badRequest(parsed.error.issues[0]?.message ?? "Parâmetros inválidos.");
+    return badRequest(
+      parsed.error.issues[0]?.message ?? "Parâmetros inválidos.",
+    );
   const { professionalId, week } = parsed.data;
   const { supabase, organizationId } = auth;
   const from = startOfBrazilDay(week);
@@ -56,7 +58,8 @@ export async function GET(request: Request, { params }: Params) {
     .eq("client_id", clientId)
     .eq("organization_id", organizationId)
     .maybeSingle();
-  if (!professional) return badRequest("Profissional não encontrado neste cliente.", 404);
+  if (!professional)
+    return badRequest("Profissional não encontrado neste cliente.", 404);
 
   const [settings, intervals, weekAppointments, bookedLeads, manages] =
     await Promise.all([
@@ -95,10 +98,52 @@ export async function GET(request: Request, { params }: Params) {
       }),
     ]);
   const failure =
-    settings.error ?? intervals.error ?? weekAppointments.error ?? bookedLeads.error;
+    settings.error ??
+    intervals.error ??
+    weekAppointments.error ??
+    bookedLeads.error;
   if (failure) return appointmentError(failure);
 
-  const leadIds = [...new Set((weekAppointments.data ?? []).map((a) => a.lead_id))];
+  const { error: detailsProbeError } = await supabase
+    .from("atendhub_service_values")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("client_id", clientId)
+    .limit(1);
+  const bookingDetailsReady = !detailsProbeError;
+  if (
+    detailsProbeError &&
+    !["42P01", "PGRST205"].includes(detailsProbeError.code ?? "")
+  )
+    return appointmentError(detailsProbeError);
+
+  const appointmentIds = (weekAppointments.data ?? []).map(
+    (a) => a.id as string,
+  );
+  const { data: serviceValues, error: serviceError } =
+    bookingDetailsReady && appointmentIds.length
+      ? await supabase
+          .from("atendhub_service_values")
+          .select("appointment_id,description,amount_cents,currency")
+          .eq("organization_id", organizationId)
+          .eq("client_id", clientId)
+          .in("appointment_id", appointmentIds)
+      : { data: [], error: null };
+  if (serviceError) return appointmentError(serviceError);
+  const serviceByAppointment = new Map(
+    (serviceValues ?? []).map((row) => [
+      row.appointment_id as string,
+      {
+        description: row.description as string,
+        amountCents: row.amount_cents as number | null,
+        currency: row.currency as "BRL",
+      },
+    ]),
+  );
+
+  const leadIds = [
+    ...new Set((weekAppointments.data ?? []).map((a) => a.lead_id)),
+  ];
   const leadNames = new Map<string, string>();
   if (leadIds.length) {
     const { data: leads } = await supabase
@@ -128,8 +173,14 @@ export async function GET(request: Request, { params }: Params) {
       notes: row.notes as string,
       status: row.status as string,
       attendance: row.attendance as string,
+      ...(serviceByAppointment.has(row.id as string)
+        ? { service: serviceByAppointment.get(row.id as string) }
+        : {}),
     })),
-    bookedLeadIds: [...new Set((bookedLeads.data ?? []).map((row) => row.lead_id as string))],
+    capabilities: { bookingDetails: bookingDetailsReady },
+    bookedLeadIds: [
+      ...new Set((bookedLeads.data ?? []).map((row) => row.lead_id as string)),
+    ],
     canManageAvailability: manages.data === true,
   });
 }

@@ -35,7 +35,7 @@ export function useRegistration(leadId: string | null) {
     leadId ? `/api/leads/${leadId}/registration` : null,
     async (url) => {
       const r = await fetch(url, { cache: "no-store" });
-      if (r.status === 404 || r.status === 501)
+      if (r.status === 501)
         return { supported: false, canEdit: false, data: emptyRegistration() };
       const body = await r.json().catch(() => ({}));
       if (!r.ok)
