@@ -3,12 +3,33 @@ vi.mock("server-only", () => ({}));
 import {
   discoverMetaAccounts,
   fetchMetaSnapshot,
+  validateMetaAccess,
 } from "@/features/paid-media/meta";
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 const access = { token: "meta-test-token", version: "v99.0" };
+it("identifica uma versão recusada sem expor a mensagem enviada pelo provedor", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json(
+        {
+          error: {
+            code: 2635,
+            error_subcode: 12,
+            message: `Deprecated version for token ${access.token}`,
+          },
+        },
+        { status: 400 },
+      ),
+    ),
+  );
+  await expect(validateMetaAccess(access)).rejects.toThrow(
+    "A Meta recusou a versão v99.0 usada pelo servidor (código Meta 2635/12).",
+  );
+});
 it("follows cursors on Meta only", async () => {
   const account = {
     id: "act_11",

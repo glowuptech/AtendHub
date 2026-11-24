@@ -14,12 +14,7 @@ import {
   readMetaCredentialStatus,
   saveMetaAccess,
 } from "@/features/paid-media/meta-credentials";
-import {
-  identifiers,
-  metaApiVersion,
-  planInput,
-  stages,
-} from "@/features/paid-media/model";
+import { identifiers, planInput, stages } from "@/features/paid-media/model";
 import {
   clientScope,
   MediaError,
@@ -45,7 +40,6 @@ const command = z.discriminatedUnion("action", [
       .trim()
       .max(4096)
       .regex(/^[\x21-\x7e]+$/, "Informe um token de acesso válido."),
-    version: metaApiVersion,
   }),
   z.object({
     action: z.literal("link"),
@@ -192,12 +186,7 @@ export async function POST(request: Request) {
     if (value.action === "plan") return json(await writePlan(auth, value.plan));
     const admin = paidMediaAdmin();
     if (value.action === "saveMetaCredential")
-      return json(
-        await saveMetaAccess(admin, org, {
-          token: value.token,
-          version: value.version,
-        }),
-      );
+      return json(await saveMetaAccess(admin, org, value.token));
     if (value.action === "link") {
       await clientScope(auth, value.clientId);
       const meta =

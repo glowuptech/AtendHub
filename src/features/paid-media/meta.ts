@@ -47,6 +47,13 @@ export class MetaError extends Error {
     super(message);
   }
 }
+const metaErrorNumber = z.number().int().positive().max(2147483647);
+const metaFailure = z.object({
+  code: metaErrorNumber.optional(),
+  error_subcode: metaErrorNumber.optional(),
+  message: z.string().optional(),
+});
+
 async function graph<T>(
   { token, version }: MetaAccess,
   path: string,
@@ -71,10 +78,15 @@ async function graph<T>(
   }
   const body = await response.json().catch(() => null);
   if (!response.ok || body?.error) {
-    const code = body?.error?.code;
+    const reason = metaFailure.safeParse(body?.error).data;
+    const code = reason?.code ?? 0;
+    const subcode = reason?.error_subcode;
+    const detail = code
+      ? ` (código Meta ${code}${subcode ? `/${subcode}` : ""})`
+      : "";
     if (code === 190)
       throw new MetaError(
-        "A credencial da Meta expirou ou foi revogada. Atualize o token em Tráfego pago → Contas vinculadas.",
+        `A Meta rejeitou a credencial${detail}. Ela pode estar inválida, expirada ou revogada.`,
         503,
       );
     if (response.status === 429 || [4, 17, 32, 613].includes(code))
@@ -82,8 +94,25 @@ async function graph<T>(
         "A Meta limitou as consultas. Aguarde e tente novamente.",
         503,
       );
+    if (
+      code === 12 ||
+      code === 2635 ||
+      /\b(?:unsupported|deprecated)\b.*\bversion\b/i.test(reason?.message ?? "")
+    )
+      throw new MetaError(
+        `A Meta recusou a versão ${version} usada pelo servidor${detail}.`,
+      );
+    if (/appsecret_proof/i.test(reason?.message ?? ""))
+      throw new MetaError(
+        `O aplicativo na Meta exige a configuração de app secret proof${detail}.`,
+      );
+    if (code === 10 || (code >= 200 && code < 300) || response.status === 403)
+      throw new MetaError(
+        `A Meta negou a leitura das contas de anúncio${detail}. Confira o acesso às contas e a permissão ads_read.`,
+        403,
+      );
     throw new MetaError(
-      "A Meta recusou a consulta. Confira a permissão de leitura e o acesso à conta.",
+      `A Meta recusou a consulta de anúncios${detail}. A integração usou a versão ${version}.`,
     );
   }
   const parsed = schema.safeParse(body);

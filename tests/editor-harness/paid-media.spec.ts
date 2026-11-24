@@ -57,7 +57,6 @@ test("vincula uma conta, sincroniza e exibe o indicador de Atração", async ({
     credentialSaved = false;
   const credentialStatus = () => ({
     configured: credentialSaved,
-    version: credentialSaved ? "v99.0" : null,
     updatedAt: credentialSaved ? "2026-11-23T13:00:00Z" : null,
     setupMessage: null,
   });
@@ -66,7 +65,7 @@ test("vincula uma conta, sincroniza e exibe o indicador de Atração", async ({
     if (route.request().method() === "POST") {
       const cmd = route.request().postDataJSON();
       if (cmd.action === "saveMetaCredential") {
-        expect(cmd.version).toBe("v99.0");
+        expect(cmd.version).toBeUndefined();
         if (cmd.token === "test-token-invalid")
           return route.fulfill({
             status: 422,
@@ -136,7 +135,7 @@ test("vincula uma conta, sincroniza e exibe o indicador de Atração", async ({
   await page.getByRole("button", { name: "Contas vinculadas" }).click();
   const tokenField = page.getByLabel("Token de acesso");
   await expect(tokenField).toHaveAttribute("type", "password");
-  await page.getByLabel("Versão da Graph API").fill("v99.0");
+  await expect(page.getByLabel("Versão da Graph API")).toHaveCount(0);
   await tokenField.fill("test-token-invalid");
   await page.getByRole("button", { name: "Salvar token" }).click();
   await expect(page.getByRole("alert")).toHaveText("Token recusado pela Meta.");

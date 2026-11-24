@@ -102,7 +102,6 @@ it("força o relatório da clínica e desabilita a administração no host do po
 it("usa a organização da sessão para salvar o token e bloqueia o portal", async () => {
   const status = {
     configured: true,
-    version: "v99.0",
     updatedAt: "2026-11-23T13:00Z",
     setupMessage: null,
   };
@@ -116,7 +115,6 @@ it("usa a organização da sessão para salvar o token e bloqueia o portal", asy
         action: "saveMetaCredential",
         organizationId: otherId,
         token,
-        version: "v99.0",
       }),
     });
 
@@ -129,7 +127,7 @@ it("usa a organização da sessão para salvar o token e bloqueia o portal", asy
   expect(state.saveMetaAccess).toHaveBeenCalledWith(
     expect.anything(),
     context.organizationId,
-    { token, version: "v99.0" },
+    token,
   );
 });
 it("registra regra de frase com a linha e campanha escolhidas pelo formulário", async () => {
