@@ -97,11 +97,11 @@ export function Inbox() {
         ...new Map([
           ...all.map(
             (c) =>
-              [c.operationCode, c.operationName || c.operationCode] as const,
+              [c.operationCode, c.operationCode === "veredite" ? "Veredit" : c.operationName || c.operationCode] as const,
           ),
           ...assigned.map(
             (l) =>
-              [l.operationCode, l.operationName || l.operationCode] as const,
+              [l.operationCode, l.operationCode === "veredite" ? "Veredit" : l.operationName || l.operationCode] as const,
           ),
         ]),
       ].filter(([code]) => code),
@@ -373,7 +373,7 @@ export function Inbox() {
                     data-operation={c.operationCode}
                   >
                     {c.clientName}
-                    {c.operationName ? ` · ${c.operationName}` : ""}
+                    {c.operationCode === "veredite" ? " · Veredit" : c.operationName ? ` · ${c.operationName}` : ""}
                   </span>
                   {repeatedContacts.has(c.connection.id + ":" + c.phone) && (
                     <small>

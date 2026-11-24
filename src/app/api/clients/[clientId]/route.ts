@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { ClientSchema, type Client } from "@/domain/schemas";
+import { clientCategory, clientOperations, databaseClientStatus } from "@/features/clients/operation";
 import { apiError, organizationContext } from "@/lib/supabase/organization-admin";
 
 const clientInput = ClientSchema.omit({ id: true, organizationId: true });
@@ -23,9 +24,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ cl
   const parsed = clientInput.safeParse(rawBody);
   if (!parsed.success) return apiError(new Error(parsed.error.issues[0]?.message ?? "Dados inválidos."), 400, { requestId, stage: "validation.schema" });
 
-  const client = { ...parsed.data, id: clientId, organizationId: auth.organizationId } as Client;
+  const client: Client = { ...parsed.data, id: clientId, organizationId: auth.organizationId, category: clientCategory(parsed.data) };
   try {
-    const code = client.branding === "prescrita" ? "prescrita" : "veredite";
+    const { code, professionalType } = clientOperations[client.vertical];
     const { data: operation, error: operationError } = await auth.admin
       .from("atendhub_operations")
       .select("id")
@@ -34,7 +35,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ cl
       .single();
     if (operationError || !operation) throw Object.assign(new Error("Operação não encontrada."), { code: operationError?.code ?? "OPERATION_NOT_FOUND" });
 
-    const professionalType = code === "prescrita" ? "health" : "legal";
     const professionals = client.doctors.map((doctor) => ({
       id: doctor.id,
       name: doctor.name,
@@ -49,7 +49,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ cl
       _client_id: clientId,
       _operation_id: operation.id,
       _name: client.name,
-      _status: client.status,
+      _status: databaseClientStatus(client.status),
       _metadata: client,
       _professionals: professionals,
     });
