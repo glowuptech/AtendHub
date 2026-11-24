@@ -6,7 +6,7 @@ import {
   sealPassword,
 } from "@/features/clients/accesses/crypto";
 import { MetaError, validateMetaAccess, type MetaAccess } from "./meta";
-import { metaApiVersion, type MetaCredentialStatus } from "./model";
+import type { MetaCredentialStatus } from "./model";
 import { MediaError, type paidMediaAdmin } from "./server";
 
 type Admin = ReturnType<typeof paidMediaAdmin>;
@@ -18,17 +18,18 @@ const migrationMessage =
   "O cadastro do token aguarda a migration de credenciais Meta.";
 const missingTable = (code?: string) => code === "42P01" || code === "PGRST205";
 
-function environmentVersion() {
-  const parsed = metaApiVersion.safeParse(
-    process.env.ATENDHUB_META_API_VERSION,
-  );
-  return parsed.success ? parsed.data : null;
+const graphMajor = 27;
+function graphVersion() {
+  const override = process.env.ATENDHUB_META_API_VERSION?.trim() ?? "";
+  const major = /^v([1-9][0-9]{0,2})\.(?:0|[1-9][0-9]{0,2})$/.exec(
+    override,
+  )?.[1];
+  return Number(major) >= graphMajor ? override : `v${graphMajor}.0`;
 }
 function environmentAccess(org: string): MetaAccess | null {
   const token = process.env.ATENDHUB_META_ACCESS_TOKEN?.trim();
-  const version = environmentVersion();
-  return token && version && process.env.ATENDHUB_META_ORGANIZATION_ID === org
-    ? { token, version }
+  return token && process.env.ATENDHUB_META_ORGANIZATION_ID === org
+    ? { token, version: graphVersion() }
     : null;
 }
 
@@ -38,14 +39,13 @@ export async function readMetaCredentialStatus(
 ): Promise<MetaCredentialStatus> {
   const { data, error } = await admin
     .from(table)
-    .select("api_version,updated_at")
+    .select("updated_at")
     .eq("organization_id", org)
     .maybeSingle();
   if (error && !missingTable(error.code)) throw error;
   const encryptedStorageReady = accessEncryptionConfigured();
   return {
     configured: data ? encryptedStorageReady : !!environmentAccess(org),
-    version: data?.api_version ?? environmentVersion(),
     updatedAt: data?.updated_at ?? null,
     setupMessage: error
       ? migrationMessage
@@ -61,7 +61,7 @@ export async function getMetaAccess(
 ): Promise<MetaAccess> {
   const { data, error } = await admin
     .from(table)
-    .select("encrypted_token,api_version")
+    .select("encrypted_token")
     .eq("organization_id", org)
     .maybeSingle();
   if (error && !missingTable(error.code)) throw error;
@@ -70,7 +70,7 @@ export async function getMetaAccess(
     try {
       return {
         token: openPassword(data.encrypted_token, context(org)),
-        version: data.api_version,
+        version: graphVersion(),
       };
     } catch {
       throw new MediaError(
@@ -89,7 +89,7 @@ export async function getMetaAccess(
 export async function saveMetaAccess(
   admin: Admin,
   org: string,
-  access: MetaAccess,
+  token: string,
 ): Promise<MetaCredentialStatus> {
   if (!accessEncryptionConfigured()) throw new MediaError(encryptionMessage);
   const current = await admin
@@ -98,11 +98,12 @@ export async function saveMetaAccess(
     .eq("organization_id", org)
     .maybeSingle();
   if (current.error) throw current.error;
-  await validateMetaAccess(access);
+  const version = graphVersion();
+  await validateMetaAccess({ token, version });
 
   const values = {
-    encrypted_token: sealPassword(access.token, context(org)),
-    api_version: access.version,
+    encrypted_token: sealPassword(token, context(org)),
+    api_version: version,
     updated_at: new Date().toISOString(),
   };
   const write = current.data
@@ -121,7 +122,6 @@ export async function saveMetaAccess(
     );
   return {
     configured: true,
-    version: access.version,
     updatedAt: data.updated_at,
     setupMessage: null,
   };

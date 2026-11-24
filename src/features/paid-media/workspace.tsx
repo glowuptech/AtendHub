@@ -880,13 +880,11 @@ function Accounts({
   const [stage, setStage] = useState<Stage>("ATR");
   const [copied, setCopied] = useState("");
   const [token, setToken] = useState("");
-  const [versionInput, setVersionInput] = useState<string | null>(null);
   const [savingCredential, setSavingCredential] = useState(false);
   const [credentialFeedback, setCredentialFeedback] = useState<{
     type: "status" | "alert";
     message: string;
   } | null>(null);
-  const version = versionInput ?? credential.data?.version ?? "";
   const metaConfigured = credential.data?.configured ?? false;
   const code = data.clients.find((c) => c.id === client)?.code;
   const prefix = code ? `[${code}][${stage}]` : "";
@@ -904,10 +902,8 @@ function Accounts({
       const saved = await requestMedia<MetaCredentialStatus>(endpoint, {
         action: "saveMetaCredential",
         token,
-        version,
       });
       setToken("");
-      setVersionInput(null);
       setAccount("");
       setDiscover(false);
       void inventory.mutate(undefined, { revalidate: false });
@@ -949,17 +945,6 @@ function Accounts({
                 autoComplete="new-password"
                 required
                 maxLength={4096}
-                disabled={savingCredential}
-              />
-            </label>
-            <label>
-              Versão da Graph API
-              <input
-                value={version}
-                onChange={(event) => setVersionInput(event.target.value)}
-                placeholder="vNN.N"
-                required
-                maxLength={9}
                 disabled={savingCredential}
               />
             </label>

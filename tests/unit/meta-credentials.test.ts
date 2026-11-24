@@ -11,8 +11,8 @@ vi.mock("server-only", () => ({}));
 
 const org = "df81fff1-62f2-45bc-b3cb-5b5eb5e2d7a5";
 const other = "00000000-0000-4000-8000-000000000001";
-const legacy = { token: "previous-environment-token", version: "v97.0" };
-const renewed = { token: "renewed-test-token", version: "v99.0" };
+const legacy = { token: "previous-environment-token", version: "v27.0" };
+const renewed = { token: "renewed-test-token", version: "v27.0" };
 const now = "2026-11-23T13:00:00Z";
 
 function repository(
@@ -52,28 +52,28 @@ beforeEach(() => {
   vi.stubEnv("ATENDHUB_CLIENT_ACCESS_ENCRYPTION_KEY", "b".repeat(64));
   vi.stubEnv("ATENDHUB_META_ORGANIZATION_ID", org);
   vi.stubEnv("ATENDHUB_META_ACCESS_TOKEN", legacy.token);
-  vi.stubEnv("ATENDHUB_META_API_VERSION", legacy.version);
+  vi.stubEnv("ATENDHUB_META_API_VERSION", "");
 });
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
 
-it("valida na Meta, grava somente o segredo cifrado e usa a nova versão ao consultar", async () => {
+it("ignora a versão obsoleta e valida e grava o token com a versão do servidor", async () => {
+  vi.stubEnv("ATENDHUB_META_API_VERSION", "v01.0");
   const db = repository({ revision: 2 });
   const graph = vi.fn(async () => Response.json({ data: [{ id: "act_123" }] }));
   vi.stubGlobal("fetch", graph);
-  const status = await saveMetaAccess(db.admin, org, renewed);
+  const status = await saveMetaAccess(db.admin, org, renewed.token);
   expect(status).toEqual({
     configured: true,
     updatedAt: now,
-    version: renewed.version,
     setupMessage: null,
   });
   expect(graph).toHaveBeenCalledWith(
     expect.objectContaining({
       origin: "https://graph.facebook.com",
-      pathname: "/v99.0/me/adaccounts",
+      pathname: "/v27.0/me/adaccounts",
     }),
     expect.objectContaining({
       headers: { Authorization: "Bearer " + renewed.token },
@@ -84,12 +84,12 @@ it("valida na Meta, grava somente o segredo cifrado e usa a nova versão ao cons
   expect(JSON.stringify(stored)).not.toContain(renewed.token);
   expect(db.target).toHaveBeenCalledWith("organization_id", org);
   expect(db.revision).toHaveBeenCalledWith("revision", 2);
-  const storedRepo = repository(stored);
+  const storedRepo = repository({ ...stored, api_version: "v01.0" });
   expect(await getMetaAccess(storedRepo.admin, org)).toEqual(renewed);
   expect(await readMetaCredentialStatus(storedRepo.admin, org)).toMatchObject({
     updatedAt: stored.updated_at,
   });
-  expect(storedRepo.select).toHaveBeenLastCalledWith("api_version,updated_at");
+  expect(storedRepo.select).toHaveBeenLastCalledWith("updated_at");
 });
 
 it("preserva o token anterior quando o novo foi revogado ou não possui conta", async () => {
@@ -106,10 +106,10 @@ it("preserva o token anterior quando o novo foi revogado ou não possui conta", 
       )
       .mockResolvedValueOnce(Response.json({ data: [] })),
   );
-  await expect(saveMetaAccess(db.admin, org, renewed)).rejects.toThrow(
-    "expirou ou foi revogada",
+  await expect(saveMetaAccess(db.admin, org, renewed.token)).rejects.toThrow(
+    "A Meta rejeitou a credencial (código Meta 190).",
   );
-  await expect(saveMetaAccess(db.admin, org, renewed)).rejects.toThrow(
+  await expect(saveMetaAccess(db.admin, org, renewed.token)).rejects.toThrow(
     "nenhuma conta de anúncios",
   );
   expect(db.update).not.toHaveBeenCalled();
