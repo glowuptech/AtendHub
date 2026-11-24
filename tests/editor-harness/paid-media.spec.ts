@@ -11,6 +11,7 @@ const empty = {
   campaigns: [],
   ads: [],
   totals: [],
+  daily: [],
   pending: [],
 } satisfies MediaReport;
 const metrics = {
@@ -223,4 +224,99 @@ test("salva um plano AIDA, mantém vínculos e mostra realizado", async ({
   await expect(
     page.getByRole("textbox", { name: "Hipótese", exact: true }).first(),
   ).toHaveValue("Um vídeo melhora a descoberta.");
+});
+
+test("mostra os resultados, os recortes da Meta e o limite por conta no resumo", async ({
+  page,
+}) => {
+  await page.route("**/api/paid-media?**", async (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    if (params.get("kind") === "analytics")
+      return route.fulfill({
+        json: {
+          accounts: [
+            {
+              accountId: "act_12",
+              delivery: {
+                spend: 270,
+                impressions: 4000,
+                reach: 2000,
+                linkClicks: 200,
+                engagement: 400,
+              },
+              billing: { spendLimit: 1000, remainingLimit: 750 },
+              genders: [
+                { key: "female", impressions: 3000, linkClicks: 150 },
+                { key: "male", impressions: 1000, linkClicks: 50 },
+              ],
+              ages: [{ key: "25-34", impressions: 4000, linkClicks: 200 }],
+              placements: [
+                { key: "instagram:feed", impressions: 4000, linkClicks: 200 },
+              ],
+            },
+          ],
+        },
+      });
+    const results = {
+      ...metrics,
+      spend: 270,
+      impressions: 4000,
+      form_leads: 5,
+      whatsapp_conversations: 1,
+      crmLeads: 2,
+      crmForms: 1,
+      crmWhatsApp: 1,
+      qualified: 1,
+      appointments: 1,
+    };
+    const day = params.get("to");
+    return route.fulfill({
+      json: {
+        ...report,
+        totals: [{ currency: "BRL", ...results }],
+        daily: [
+          {
+            currency: "BRL",
+            day,
+            spend: 270,
+            form_leads: 5,
+            whatsapp_conversations: 1,
+          },
+        ],
+        campaigns: [{ ...report.campaigns[0], metrics: results }],
+      },
+    });
+  });
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.goto("/tests/editor-harness/index.html?paid-media");
+  const summary = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Resumo em BRL" }) });
+  await expect(summary.getByText("R$ 45,00")).toBeVisible();
+  await expect(summary.getByText("50%")).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: /Investimento e leads por dia/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Dia no gráfico" }),
+  ).toBeVisible();
+  await expect(page.getByText("Instagram · Feed")).toBeVisible();
+  await expect(page.getByText("Feminino")).toBeVisible();
+  await expect(page.getByText("75%")).toBeVisible();
+  await expect(page.getByText("R$ 750,00")).toBeVisible();
+  await expect(page.getByText("2.000", { exact: true })).toBeVisible();
+  await page
+    .getByRole("combobox", { name: "Comparar por" })
+    .selectOption("linkClicks");
+  await expect(page.getByText("150", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Últimos 7 dias" }).click();
+  const day = page.getByRole("combobox", { name: "Dia no gráfico" });
+  await expect(day.locator("option")).toHaveCount(7);
+  await day.selectOption({ index: 0 });
+  await expect(page.getByText("Dia sem dados importados.")).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
 });

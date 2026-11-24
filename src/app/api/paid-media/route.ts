@@ -1,4 +1,5 @@
 import { tenantSlug } from "@/features/client-domains/model";
+import { readMetaAnalytics } from "@/features/paid-media/analytics-server";
 import { tenantAtHost } from "@/features/client-domains/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -90,7 +91,7 @@ export async function GET(request: Request) {
       return json({ error: "Portal indisponível." }, 404);
     if (
       portalClient &&
-      (kind ||
+      ((kind && kind !== "analytics") ||
         (query.has("clientId") && query.get("clientId") !== portalClient))
     )
       return json(
@@ -157,6 +158,10 @@ export async function GET(request: Request) {
       return json(
         { error: range.error.issues[0]?.message ?? "Período inválido." },
         400,
+      );
+    if (kind === "analytics")
+      return json(
+        await readMetaAnalytics(auth, range.data, client?.data, !!portalClient),
       );
     const report = await readReport(auth, range.data, client?.data);
     return json(portalClient ? { ...report, canManage: false } : report);
