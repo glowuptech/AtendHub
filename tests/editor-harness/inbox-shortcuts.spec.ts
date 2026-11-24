@@ -10,9 +10,87 @@ async function openChat(page: Page, suffix = "") {
     .getByRole("button", { name: "Abrir conversa", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Nenhuma mensagem registrada" }),
+    page.getByRole("region", { name: "Conversa com Adriele", exact: true }),
   ).toBeVisible();
 }
+test("consulta o histórico no horário escolhido sem fechar a ficha", async ({
+  page,
+}) => {
+  await openChat(page, "&booking-history");
+  await page
+    .getByRole("navigation", { name: "Atalhos da conversa" })
+    .getByRole("button", { name: "Agendar", exact: true })
+    .click();
+  await page.getByRole("button", { name: /08:00 Disponível$/ }).click();
+  const booking = page.getByRole("dialog", {
+    name: "Criar agendamento",
+    exact: true,
+  });
+  const notes = booking.getByLabel("Observações");
+  const preview = booking.getByRole("region", { name: "Prévia da conversa" });
+  const history = preview.getByRole("region", { name: "Mensagens da prévia" });
+  await expect(
+    preview.getByRole("heading", { name: "Conversa com Adriele" }),
+  ).toBeVisible();
+  const formBounds = await notes.boundingBox();
+  const previewBounds = await preview.boundingBox();
+  expect(previewBounds!.x).toBeGreaterThan(formBounds!.x + formBounds!.width);
+  await expect
+    .poll(() =>
+      history.evaluate(
+        (node) => node.scrollHeight - node.clientHeight - node.scrollTop,
+      ),
+    )
+    .toBeLessThan(3);
+  await expect(
+    preview.getByText("Pode agendar a consulta de 60 minutos."),
+  ).toBeInViewport();
+  await expect(
+    preview.getByRole("button", { name: "Enviar mensagem" }),
+  ).toHaveCount(0);
+
+  await notes.fill("Conferir que a consulta dura 60 minutos.");
+  const scrollForm = () =>
+    notes.evaluate((node) => node.closest("form")!.scrollTop);
+  const formScroll = await scrollForm();
+  await preview
+    .getByRole("button", { name: "Carregar mensagens anteriores" })
+    .click();
+  await expect(
+    preview.getByText("A preferência é por uma consulta de manhã."),
+  ).toBeVisible();
+  expect(await scrollForm()).toBe(formScroll);
+
+  await booking.getByRole("radio", { name: "Outro lead", exact: true }).check();
+  await expect(
+    booking.getByText(/Selecione o lead desta conversa/),
+  ).toBeVisible();
+  await expect(preview).toHaveCount(0);
+  await booking.getByRole("radio", { name: "Adriele", exact: true }).check();
+  await expect(preview).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(notes).toBeVisible();
+  const mobileSwitch = booking.getByRole("group", {
+    name: "Visualização do agendamento",
+  });
+  await mobileSwitch
+    .getByRole("button", { name: "Conversa", exact: true })
+    .click();
+  await expect(preview).toBeVisible();
+  await expect(
+    preview.getByText("Pode agendar a consulta de 60 minutos."),
+  ).toBeInViewport();
+  await expect(notes).toBeHidden();
+  await mobileSwitch
+    .getByRole("button", { name: "Agendamento", exact: true })
+    .click();
+  await expect(notes).toHaveValue("Conferir que a consulta dura 60 minutos.");
+  await expect(preview).toBeHidden();
+  expect(
+    await booking.evaluate((node) => node.scrollWidth <= node.clientWidth),
+  ).toBe(true);
+});
 test("atalhos abrem ficha e cadastro sem sair do chat, e agenda fixa o cliente/lead", async ({
   page,
 }) => {

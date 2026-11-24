@@ -334,6 +334,30 @@
   padding: 16px 22px;
   overscroll-behavior: contain;
 }
+.booking-conversation-preview {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+}
+.booking-conversation-preview > header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: white;
+  overflow-wrap: anywhere;
+}
+.booking-conversation-preview h3 {
+  font-size: 14px;
+  margin: 0;
+}
+.booking-conversation-history {
+  padding: 12px 16px;
+}
+.booking-conversation-history .inbox-message {
+  margin-bottom: 10px;
+}
+.booking-conversation-history:focus-visible {
+  outline-offset: -3px;
+}
 .inbox-day-separator {
   text-align: center;
   margin: 8px 0 22px;
