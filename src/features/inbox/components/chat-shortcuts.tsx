@@ -18,15 +18,21 @@ import { PersistedLeadDetail } from "@/features/leads/components/persisted-lead-
 import { RegistrationForm } from "@/features/leads/registration/form";
 import { externalUrl } from "@/features/clients/accesses/model";
 import { ConversationValue } from "./conversation-value";
+import {
+  BookingConversationPreview,
+  type InboxMessageHistory,
+} from "./booking-conversation-preview";
 import type { InboxConversation } from "../model";
 export type Shortcut = "schedule" | "lead" | "registration" | "value";
 export function ChatShortcuts({
   conversation,
+  history,
   open,
   onOpen,
   onClose,
 }: {
   conversation: InboxConversation;
+  history: InboxMessageHistory;
   open: Shortcut | null;
   onOpen: (value: Shortcut) => void;
   onClose: () => void;
@@ -145,6 +151,12 @@ export function ChatShortcuts({
                 doctors={client.doctors}
                 initialLeadId={conversation.leadId}
                 conversationId={conversation.id}
+                bookingPreview={
+                  <BookingConversationPreview
+                    contactName={conversation.contactName}
+                    history={history}
+                  />
+                }
               />
             ) : (
               <p role={clientsError ? "alert" : "status"}>
