@@ -5,7 +5,7 @@ test("calendário geral mostra clientes, etapas e hoje sem depender do workspace
 }) => {
   await page.clock.setFixedTime(new Date("2026-11-04T15:00:00Z"));
   await page.setViewportSize({ width: 1600, height: 1000 });
-  await page.goto("/app");
+  await page.goto("/app/visao-geral");
   await page
     .getByLabel("Clínica em contexto")
     .selectOption("00000000-0000-4000-8000-000000000020");
