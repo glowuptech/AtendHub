@@ -8,12 +8,17 @@ Publique o commit da branch `feature/trafego-pago-aida`. Confirme o projeto Supa
 2. `20261123010000_atendhub_paid_attribution.sql` adiciona atribuição do CRM e a regra da primeira mensagem do WhatsApp.
 3. `20261123020000_atendhub_paid_media_assistant.sql` cria o histórico interno do assistente.
 4. `20261123030000_atendhub_meta_auto_sync.sql` registra as tentativas da sincronização diária nas contas Meta e controla a reserva das tarefas.
+5. `20261123040000_atendhub_meta_credentials.sql` adiciona o armazenamento criptografado da credencial Meta por organização. Se as quatro anteriores já foram aplicadas no projeto com timestamps de execução diferentes, aplique somente esta nova migration.
 
-Confirme as quatro versões no histórico remoto e as permissões. Os objetos novos têm RLS e o navegador acessa as rotas autenticadas do app. O token Meta permanece no servidor.
+Confirme no histórico as migrations aplicadas e suas permissões. Os objetos novos têm RLS e o navegador acessa as rotas autenticadas do app. O token salvo permanece no servidor.
 
 ## Meta Ads em leitura
 
-Configure `ATENDHUB_META_ACCESS_TOKEN` no servidor com permissão de leitura de anúncios (como `ads_read`) e acesso às contas desejadas, `ATENDHUB_META_ORGANIZATION_ID` com o UUID da organização dona da credencial e `ATENDHUB_META_API_VERSION` com a versão ativa da Graph API do aplicativo Meta, no formato `vNN.N`. As chamadas iniciais são `me/adaccounts`, informações da conta, catálogo de anúncios com criativo/destino e `insights` por anúncio e dia. A área não escreve na Meta.
+Confirme que `ATENDHUB_CLIENT_ACCESS_ENCRYPTION_KEY` está presente nas variáveis de servidor e mantenha a chave existente. O painel usa o mesmo cofre de acessos do Atend&Hub. Preview e produção precisam usar a mesma chave quando apontam para o mesmo Supabase. Em **Tráfego pago → Contas vinculadas → Credencial da Meta**, entre como superadministrador e informe um token com `ads_read` e acesso às contas. O Atend&Hub verifica o acesso e grava um token criptografado por organização. Um teste que falhar mantém a credencial anterior. Atualize o token nessa tela sempre que renovar a credencial.
+
+O servidor usa a Graph API `v27.0` para validar, listar contas e sincronizar. `ATENDHUB_META_API_VERSION` é opcional para adotar uma versão da Graph API com versão principal 27 ou posterior. Configurações antigas como `v01.0` usam o padrão do servidor. Se a Meta recusar a consulta, o painel exibe o código e o subcódigo disponíveis.
+
+As instalações com `ATENDHUB_META_ACCESS_TOKEN` e `ATENDHUB_META_ORGANIZATION_ID` no ambiente continuam usando esse token até que a organização salve um pelo painel. O token do painel passa a valer para a listagem e para todas as sincronizações, sem redeploy. As chamadas à Meta usam `me/adaccounts`, informações da conta, catálogo de anúncios com criativo/destino e `insights` por anúncio e dia. Teste com as contas reais depois de vincular cada cliente.
 
 Abra **Tráfego pago → Contas vinculadas** como superadministrador. Consulte a Meta, escolha um cliente e vincule a conta como exclusiva ou compartilhada. Para mudar uma conta exclusiva para compartilhada, atualize a modalidade pelo cliente já vinculado e depois adicione o outro cliente. Use **Sincronizar período** para uma conta por vez, em blocos de até 31 dias. O painel de cobertura mostra quantos dias foram importados. Uma falha antes da publicação preserva o recorte anterior.
 
@@ -30,6 +35,8 @@ Foram mapeados códigos explícitos da API para formulário instantâneo, visita
 ### Sincronização diária
 
 Após validar a importação manual, configure um segredo aleatório em `CRON_SECRET` nas variáveis de servidor da Vercel. O `vercel.json` agenda uma execução por dia às 08:00 UTC (05:00 em Brasília), com a precisão do plano da Vercel. No deploy de produção, a Vercel chama `GET /api/cron/meta-sync` com esse segredo. O servidor do Atend&Hub consulta a Meta diretamente com as mesmas credenciais do botão manual. Cada conta vinculada entra uma vez por execução, mesmo quando atende várias clínicas.
+
+Se houver apenas uma organização com token salvo, a rotina usa essa organização automaticamente. Para selecionar uma organização quando houver várias, configure `ATENDHUB_META_ORGANIZATION_ID` uma vez no servidor. A rotina lê a credencial atual a cada execução.
 
 No Preview, use uma conta de teste e chame a rota com o cabeçalho `Authorization: Bearer <CRON_SECRET>` apontando para a URL do Preview. É a mesma rota da execução agendada. Confira a última tentativa em **Tráfego pago → Contas vinculadas**. Um segundo disparo no mesmo dia pula as contas que já concluíram uma tentativa. O retorno informa quantas contas foram importadas, falharam ou já estavam atualizadas por outra importação. Se houver falha, o status da conta mostra o motivo. A rotina tenta novamente no dia seguinte e o botão **Sincronizar período** permite tentar manualmente.
 

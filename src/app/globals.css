@@ -3913,6 +3913,66 @@ tbody tr:hover {
 .schedule-dialog select {
   width: 100%;
 }
+.schedule-dialog.schedule-booking-dialog[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 16px;
+  width: min(1100px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  height: min(820px, calc(100dvh - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+}
+.schedule-booking-dialog > .section-caption {
+  margin-bottom: 0;
+}
+.schedule-booking-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 16px;
+  min-height: 0;
+}
+.schedule-booking-form {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 8px 4px 2px;
+}
+.schedule-booking-reference {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-muted);
+}
+.schedule-booking-reference-empty {
+  padding: 16px;
+}
+.schedule-booking-switch {
+  display: none;
+}
+@media (max-width: 780px) {
+  .schedule-booking-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 12px;
+  }
+  .schedule-booking-switch {
+    display: flex;
+    gap: 8px;
+  }
+  .schedule-booking-switch > button {
+    flex: 1;
+  }
+  .schedule-booking-layout[data-pane="form"] > .schedule-booking-reference,
+  .schedule-booking-layout[data-pane="conversation"] > .schedule-booking-form {
+    display: none;
+  }
+}
 .form-stack {
   display: flex;
   flex-direction: column;

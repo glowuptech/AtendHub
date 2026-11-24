@@ -14,6 +14,7 @@ import {
   stageMetric,
   stages,
   type MediaReport,
+  type MetaCredentialStatus,
   type MetaAutoSyncStatus,
   type Stage,
   type Campaign,
@@ -856,39 +857,118 @@ function Accounts({
   pending: boolean;
 }) {
   const [discover, setDiscover] = useState(false);
+  const credential = useSWR<MetaCredentialStatus>(
+    `${endpoint}?kind=metaCredential`,
+    requestMedia,
+    { shouldRetryOnError: false },
+  );
   const inventory = useSWR<Inventory>(
     discover ? `${endpoint}?kind=metaAccounts` : null,
     requestMedia,
     { revalidateOnFocus: false, shouldRetryOnError: false },
   );
-  const { data: autoSync, error: autoSyncError } = useSWR<MetaAutoSyncStatus>(
-    `${endpoint}?kind=syncStatus`,
-    requestMedia,
-    { shouldRetryOnError: false },
-  );
+  const {
+    data: autoSync,
+    error: autoSyncError,
+    mutate: refreshAutoSync,
+  } = useSWR<MetaAutoSyncStatus>(`${endpoint}?kind=syncStatus`, requestMedia, {
+    shouldRetryOnError: false,
+  });
   const [client, setClient] = useState(filter || data.clients[0]?.id || "");
   const [account, setAccount] = useState("");
   const [mode, setMode] = useState("exclusive");
   const [stage, setStage] = useState<Stage>("ATR");
   const [copied, setCopied] = useState("");
+  const [token, setToken] = useState("");
+  const [savingCredential, setSavingCredential] = useState(false);
+  const [credentialFeedback, setCredentialFeedback] = useState<{
+    type: "status" | "alert";
+    message: string;
+  } | null>(null);
+  const metaConfigured = credential.data?.configured ?? false;
   const code = data.clients.find((c) => c.id === client)?.code;
   const prefix = code ? `[${code}][${stage}]` : "";
   const rangeFits = daysBetween(range.from, range.to) < 31;
   const attempts = new Map(
     autoSync?.accounts.map((item) => [item.accountId, item]),
   );
+  async function saveCredential(event: FormEvent) {
+    event.preventDefault();
+    if (savingCredential || !credential.data || credential.data.setupMessage)
+      return;
+    setSavingCredential(true);
+    setCredentialFeedback(null);
+    try {
+      const saved = await requestMedia<MetaCredentialStatus>(endpoint, {
+        action: "saveMetaCredential",
+        token,
+      });
+      setToken("");
+      setAccount("");
+      setDiscover(false);
+      void inventory.mutate(undefined, { revalidate: false });
+      void credential.mutate(saved, { revalidate: false });
+      void refreshAutoSync().catch(() => undefined);
+      setCredentialFeedback({
+        type: "status",
+        message: "Token validado e salvo.",
+      });
+    } catch (error) {
+      setCredentialFeedback({
+        type: "alert",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Não foi possível salvar o token.",
+      });
+    } finally {
+      setSavingCredential(false);
+    }
+  }
   return (
     <>
+      <Card title="Credencial da Meta">
+        {credential.isLoading && <p>Carregando credencial…</p>}
+        {credential.error && <p role="alert">{credential.error.message}</p>}
+        {credential.data?.updatedAt && (
+          <p>Última atualização em {readDate(credential.data.updatedAt)}.</p>
+        )}
+        {credential.data?.setupMessage && <p>{credential.data.setupMessage}</p>}
+        {credential.data && !credential.data.setupMessage && (
+          <form className="paid-filter" onSubmit={saveCredential}>
+            <label>
+              Token de acesso
+              <input
+                type="password"
+                value={token}
+                onChange={(event) => setToken(event.target.value)}
+                autoComplete="new-password"
+                required
+                maxLength={4096}
+                disabled={savingCredential}
+              />
+            </label>
+            <Button type="submit" disabled={savingCredential || pending}>
+              {savingCredential
+                ? "Validando…"
+                : metaConfigured
+                  ? "Atualizar token"
+                  : "Salvar token"}
+            </Button>
+          </form>
+        )}
+        {credentialFeedback && (
+          <p role={credentialFeedback.type}>{credentialFeedback.message}</p>
+        )}
+      </Card>
       <Card title="Vincular conta de anúncios">
-        {!data.metaConfigured ? (
-          <p>
-            Configure a credencial Meta no servidor para consultar as contas. Os
-            relatórios já importados continuam disponíveis.
-          </p>
+        {!metaConfigured ? (
+          <p>Cadastre o token da Meta para consultar as contas.</p>
         ) : (
           <>
             <Button
               variant="outline"
+              disabled={savingCredential}
               onClick={() => {
                 if (discover) void inventory.mutate();
                 else setDiscover(true);
@@ -1083,7 +1163,8 @@ function Accounts({
                   pending ||
                   !rangeFits ||
                   !a.clientIds.length ||
-                  !data.metaConfigured
+                  !metaConfigured ||
+                  savingCredential
                 }
                 onClick={() =>
                   run(

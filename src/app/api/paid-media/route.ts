@@ -9,6 +9,11 @@ import {
   getMetaAccount,
   MetaError,
 } from "@/features/paid-media/meta";
+import {
+  getMetaAccess,
+  readMetaCredentialStatus,
+  saveMetaAccess,
+} from "@/features/paid-media/meta-credentials";
 import { identifiers, planInput, stages } from "@/features/paid-media/model";
 import {
   clientScope,
@@ -28,6 +33,14 @@ import {
 export const maxDuration = 60;
 const id = z.string().uuid();
 const command = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("saveMetaCredential"),
+    token: z
+      .string()
+      .trim()
+      .max(4096)
+      .regex(/^[\x21-\x7e]+$/, "Informe um token de acesso válido."),
+  }),
   z.object({
     action: z.literal("link"),
     clientId: id,
@@ -89,7 +102,17 @@ export async function GET(request: Request) {
       );
     if (kind === "metaAccounts") {
       requireAdmin(auth);
-      return json(await discoverMetaAccounts(auth.organizationId));
+      return json(
+        await discoverMetaAccounts(
+          await getMetaAccess(paidMediaAdmin(), auth.organizationId),
+        ),
+      );
+    }
+    if (kind === "metaCredential") {
+      requireAdmin(auth);
+      return json(
+        await readMetaCredentialStatus(paidMediaAdmin(), auth.organizationId),
+      );
     }
     if (kind === "syncStatus") {
       requireAdmin(auth);
@@ -136,11 +159,7 @@ export async function GET(request: Request) {
         400,
       );
     const report = await readReport(auth, range.data, client?.data);
-    return json(
-      portalClient
-        ? { ...report, canManage: false, metaConfigured: false }
-        : report,
-    );
+    return json(portalClient ? { ...report, canManage: false } : report);
   } catch (error) {
     return fail(error);
   }
@@ -166,12 +185,17 @@ export async function POST(request: Request) {
     requireAdmin(auth);
     if (value.action === "plan") return json(await writePlan(auth, value.plan));
     const admin = paidMediaAdmin();
+    if (value.action === "saveMetaCredential")
+      return json(await saveMetaAccess(admin, org, value.token));
     if (value.action === "link") {
       await clientScope(auth, value.clientId);
       const meta =
         value.mode === "remove"
           ? null
-          : await getMetaAccount(org, value.accountId);
+          : await getMetaAccount(
+              await getMetaAccess(admin, org),
+              value.accountId,
+            );
       const { error } = await admin.rpc("atendhub_meta_link", {
         p_org: org,
         p_account: value.accountId,
@@ -223,6 +247,7 @@ export async function POST(request: Request) {
       const result = await importMetaPeriod(
         admin,
         org,
+        await getMetaAccess(admin, org),
         value.accountId,
         range.data,
       );

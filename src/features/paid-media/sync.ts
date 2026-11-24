@@ -1,6 +1,10 @@
 import "server-only";
 import { shiftDay } from "@/lib/date-range";
-import { fetchMetaSnapshot, MetaError, metaConfigured } from "./meta";
+import { fetchMetaSnapshot, MetaError, type MetaAccess } from "./meta";
+import {
+  readMetaCredentialStatus,
+  scheduledMetaOrganization,
+} from "./meta-credentials";
 import type { MetaAutoSyncStatus } from "./model";
 import { allRows, MediaError, paidMediaAdmin } from "./server";
 
@@ -10,12 +14,18 @@ type AutoSyncJob = { account_id: string; timezone: string; started_at: string };
 export async function importMetaPeriod(
   admin: Admin,
   org: string,
+  access: MetaAccess,
   account: string,
   range: { from: string; to: string },
   started = new Date().toISOString(),
   signal?: AbortSignal,
 ) {
-  const snapshot = await fetchMetaSnapshot(org, account, range.from, range.to);
+  const snapshot = await fetchMetaSnapshot(
+    access,
+    account,
+    range.from,
+    range.to,
+  );
   const publish = admin.rpc("atendhub_meta_import", {
     p_org: org,
     p_account: account,
@@ -55,8 +65,12 @@ export async function readAutoSyncStatus(
       .range(from, to),
   );
   const cutoff = Date.now() - 6 * 60_000;
+  const configured =
+    !!process.env.CRON_SECRET &&
+    (await scheduledMetaOrganization(admin)) === org &&
+    (await readMetaCredentialStatus(admin, org)).configured;
   return {
-    configured: !!process.env.CRON_SECRET && metaConfigured(org),
+    configured,
     accounts: rows.map((row) => {
       let state: MetaAutoSyncStatus["accounts"][number]["state"] = "pending";
       if (row.auto_sync_finished_at)
@@ -76,7 +90,12 @@ export async function readAutoSyncStatus(
   };
 }
 
-async function syncClaim(admin: Admin, org: string, job: AutoSyncJob) {
+async function syncClaim(
+  admin: Admin,
+  org: string,
+  access: MetaAccess,
+  job: AutoSyncJob,
+) {
   let message: string | null = null;
   let imported = false;
   try {
@@ -89,6 +108,7 @@ async function syncClaim(admin: Admin, org: string, job: AutoSyncJob) {
     ({ imported } = await importMetaPeriod(
       admin,
       org,
+      access,
       job.account_id,
       { from: shiftDay(to, -7), to },
       job.started_at,
@@ -119,8 +139,11 @@ async function syncClaim(admin: Admin, org: string, job: AutoSyncJob) {
   return message ? "failed" : imported ? "imported" : "superseded";
 }
 
-export async function syncLinkedMetaAccounts(org: string) {
-  const admin = paidMediaAdmin();
+export async function syncLinkedMetaAccounts(
+  admin: Admin,
+  org: string,
+  access: MetaAccess,
+) {
   const result = {
     imported: 0,
     failed: 0,
@@ -137,7 +160,7 @@ export async function syncLinkedMetaAccounts(org: string) {
     const jobs = (data ?? []) as AutoSyncJob[];
     if (!jobs.length) return result;
     const outcomes = await Promise.allSettled(
-      jobs.map((job) => syncClaim(admin, org, job)),
+      jobs.map((job) => syncClaim(admin, org, access, job)),
     );
     for (const outcome of outcomes) {
       result[outcome.status === "fulfilled" ? outcome.value : "failed"]++;

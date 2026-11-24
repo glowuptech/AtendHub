@@ -3,20 +3,34 @@ vi.mock("server-only", () => ({}));
 import {
   discoverMetaAccounts,
   fetchMetaSnapshot,
-  metaConfigured,
+  validateMetaAccess,
 } from "@/features/paid-media/meta";
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
 });
-function configure() {
-  vi.stubEnv("ATENDHUB_META_ACCESS_TOKEN", "meta-test-token");
-  vi.stubEnv("ATENDHUB_META_API_VERSION", "v99.0");
-  vi.stubEnv("ATENDHUB_META_ORGANIZATION_ID", "tenant");
-}
-it("keeps the token on the approved organization and follows cursors on Meta only", async () => {
-  configure();
+const access = { token: "meta-test-token", version: "v99.0" };
+it("identifica uma versão recusada sem expor a mensagem enviada pelo provedor", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json(
+        {
+          error: {
+            code: 2635,
+            error_subcode: 12,
+            message: `Deprecated version for token ${access.token}`,
+          },
+        },
+        { status: 400 },
+      ),
+    ),
+  );
+  await expect(validateMetaAccess(access)).rejects.toThrow(
+    "A Meta recusou a versão v99.0 usada pelo servidor (código Meta 2635/12).",
+  );
+});
+it("follows cursors on Meta only", async () => {
   const account = {
     id: "act_11",
     name: "Conta",
@@ -40,18 +54,12 @@ it("keeps the token on the approved organization and follows cursors on Meta onl
     );
   });
   vi.stubGlobal("fetch", graph);
-  expect(metaConfigured("other")).toBe(false);
-  await expect(discoverMetaAccounts("other")).rejects.toThrow(
-    "organização autorizada",
-  );
-  expect(graph).not.toHaveBeenCalled();
-  expect((await discoverMetaAccounts("tenant")).map((a) => a.id)).toEqual([
+  expect((await discoverMetaAccounts(access)).map((a) => a.id)).toEqual([
     "act_11",
     "act_12",
   ]);
 });
 it("counts forms and WhatsApp only from matching provider data, with missing metrics kept null", async () => {
-  configure();
   const base = {
     date_start: "2026-11-20",
     campaign_id: "10",
@@ -93,7 +101,7 @@ it("counts forms and WhatsApp only from matching provider data, with missing met
     ),
   );
   const result = await fetchMetaSnapshot(
-    "tenant",
+    access,
     "act_1",
     "2026-11-20",
     "2026-11-20",

@@ -19,6 +19,7 @@ beforeAll(async () => {
   db = new PGlite();
   await db.exec(`
     create role anon;create role authenticated;create role service_role;create role atendhub_integration;
+    create table public.atendhub_organizations(id uuid primary key);
     create table public.atendhub_clients(id uuid,organization_id uuid,name text,unique(id,organization_id));
     create table public.atendhub_leads(id uuid,organization_id uuid,client_id uuid,form_id uuid,created_at timestamptz default now(),
       unique(id,organization_id,client_id));
@@ -36,8 +37,28 @@ beforeAll(async () => {
     "20261123010000_atendhub_paid_attribution",
     "20261123020000_atendhub_paid_media_assistant",
     "20261123030000_atendhub_meta_auto_sync",
+    "20261123040000_atendhub_meta_credentials",
   ])
     await db.exec(await readFile(`supabase/migrations/${file}.sql`, "utf8"));
+});
+it("restringe os tokens a acesso do servidor", async () => {
+  const permissions = await db.query(
+    `select has_table_privilege('authenticated','public.atendhub_meta_credentials','select') as browser,
+            has_table_privilege('anon','public.atendhub_meta_credentials','select') as guest,
+            has_table_privilege('atendhub_integration','public.atendhub_meta_credentials','select') as integration,
+            has_table_privilege('service_role','public.atendhub_meta_credentials','update') as server,
+            relrowsecurity as rls
+     from pg_catalog.pg_class where oid = 'public.atendhub_meta_credentials'::regclass`,
+  );
+  expect(permissions.rows).toEqual([
+    {
+      browser: false,
+      guest: false,
+      integration: false,
+      server: true,
+      rls: true,
+    },
+  ]);
 });
 
 it("reserva uma vez por conta e recupera somente tentativas interrompidas", async () => {

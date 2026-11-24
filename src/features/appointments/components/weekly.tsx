@@ -13,6 +13,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ReactNode,
 } from "react";
 import {
   ChevronLeft,
@@ -91,12 +92,14 @@ export function WeeklyWorkspace({
   doctors,
   initialLeadId,
   conversationId,
+  bookingPreview,
 }: {
   clientId: string;
   clientName: string;
   doctors: { id: string; name: string }[];
   initialLeadId?: string;
   conversationId?: string;
+  bookingPreview?: ReactNode;
 }) {
   const [doctor, setDoctor] = useState(doctors[0]?.id ?? ""),
     [week, setWeek] = useState(() =>
@@ -107,6 +110,9 @@ export function WeeklyWorkspace({
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const [bookingDetails, setBookingDetails] = useState<BookingDetailsDraft>({});
+  const [bookingPane, setBookingPane] = useState<"form" | "conversation">(
+    "form",
+  );
   const [booking, setBooking] = useState<Booking | null>(null),
     [openedId, setOpenedId] = useState<string | null>(null),
     [reschedule, setReschedule] = useState<{
@@ -171,6 +177,7 @@ export function WeeklyWorkspace({
   function newBooking(day = days[0], time = "08:00") {
     setError("");
     setBookingDetails({});
+    setBookingPane("form");
     setBooking({
       id: crypto.randomUUID(),
       doctorId: doctor,
@@ -503,112 +510,159 @@ export function WeeklyWorkspace({
       {booking && (
         <ScheduleDialog
           title="Criar agendamento"
+          className={bookingPreview ? "schedule-booking-dialog" : undefined}
           onClose={() => {
             setBooking(null);
             setError("");
           }}
         >
-          <form
-            noValidate
-            onSubmit={(e) => {
-              e.preventDefault();
-              void saveBooking();
-            }}
+          <div
+            className={bookingPreview ? "schedule-booking-layout" : undefined}
+            data-pane={bookingPreview ? bookingPane : undefined}
           >
-            <p>
-              Profissional:{" "}
-              <strong>
-                {doctors.find((d) => d.id === booking.doctorId)?.name}
-              </strong>
-            </p>
-            <LeadPicker
-              clientId={clientId}
-              leads={bookingLeads}
-              appointments={bookedRefs}
-              value={booking.leadId}
-              onChange={(leadId) => {
-                setBooking({ ...booking, leadId });
-                setBookingDetails({});
-              }}
-            />
-            <div className="form-columns">
-              <label>
-                Data
-                <input
-                  type="date"
-                  value={booking.day}
-                  onChange={(e) =>
-                    setBooking({ ...booking, day: e.target.value })
-                  }
-                />
-              </label>
-              <label>
-                Horário
-                <input
-                  type="time"
-                  step={60}
-                  value={booking.time}
-                  onChange={(e) =>
-                    setBooking({ ...booking, time: e.target.value })
-                  }
-                />
-              </label>
-            </div>
-            <label>
-              Duração em minutos
-              <input
-                type="number"
-                min={1}
-                max={480}
-                step={1}
-                value={booking.duration}
-                onChange={(e) =>
-                  setBooking({ ...booking, duration: Number(e.target.value) })
-                }
-              />
-            </label>
-            <label>
-              Observações
-              <textarea
-                maxLength={1000}
-                value={booking.notes}
-                onChange={(e) =>
-                  setBooking({ ...booking, notes: e.target.value })
-                }
-              />
-            </label>
-            <BookingDetailsFields
-              key={booking.id + booking.leadId}
-              leadId={booking.leadId}
-              enabled={data?.capabilities?.bookingDetails === true}
-              value={bookingDetails}
-              onChange={setBookingDetails}
-            />
-            <small>
-              O lead pode estar vinculado a outro profissional; este agendamento
-              mantém seu próprio vínculo com o médico selecionado.
-            </small>
-            {error && (
-              <p className="field-error" role="alert">
-                {error}
-              </p>
-            )}
-            <div className="actions">
-              <Button type="submit" disabled={busy}>
-                {busy ? "Salvando…" : "Salvar agendamento"}
-              </Button>
-              <Button
-                variant="outline"
-                type="button"
-                onClick={() => {
-                  setBooking(null);
-                  setError("");
-                }}
+            {bookingPreview && (
+              <div
+                className="schedule-booking-switch"
+                role="group"
+                aria-label="Visualização do agendamento"
               >
-                Cancelar
-              </Button>
-            </div>
-          </form>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={bookingPane === "form" ? "default" : "outline"}
+                  aria-pressed={bookingPane === "form"}
+                  onClick={() => setBookingPane("form")}
+                >
+                  Agendamento
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={
+                    bookingPane === "conversation" ? "default" : "outline"
+                  }
+                  aria-pressed={bookingPane === "conversation"}
+                  onClick={() => setBookingPane("conversation")}
+                >
+                  Conversa
+                </Button>
+              </div>
+            )}
+            <form
+              className={bookingPreview ? "schedule-booking-form" : undefined}
+              noValidate
+              onSubmit={(e) => {
+                e.preventDefault();
+                void saveBooking();
+              }}
+            >
+              <p>
+                Profissional:{" "}
+                <strong>
+                  {doctors.find((d) => d.id === booking.doctorId)?.name}
+                </strong>
+              </p>
+              <LeadPicker
+                clientId={clientId}
+                leads={bookingLeads}
+                appointments={bookedRefs}
+                value={booking.leadId}
+                onChange={(leadId) => {
+                  setBooking({ ...booking, leadId });
+                  setBookingDetails({});
+                }}
+              />
+              <div className="form-columns">
+                <label>
+                  Data
+                  <input
+                    type="date"
+                    value={booking.day}
+                    onChange={(e) =>
+                      setBooking({ ...booking, day: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  Horário
+                  <input
+                    type="time"
+                    step={60}
+                    value={booking.time}
+                    onChange={(e) =>
+                      setBooking({ ...booking, time: e.target.value })
+                    }
+                  />
+                </label>
+              </div>
+              <label>
+                Duração em minutos
+                <input
+                  type="number"
+                  min={1}
+                  max={480}
+                  step={1}
+                  value={booking.duration}
+                  onChange={(e) =>
+                    setBooking({ ...booking, duration: Number(e.target.value) })
+                  }
+                />
+              </label>
+              <label>
+                Observações
+                <textarea
+                  maxLength={1000}
+                  value={booking.notes}
+                  onChange={(e) =>
+                    setBooking({ ...booking, notes: e.target.value })
+                  }
+                />
+              </label>
+              <BookingDetailsFields
+                key={booking.id + booking.leadId}
+                leadId={booking.leadId}
+                enabled={data?.capabilities?.bookingDetails === true}
+                value={bookingDetails}
+                onChange={setBookingDetails}
+              />
+              <small>
+                O lead pode estar vinculado a outro profissional; este
+                agendamento mantém seu próprio vínculo com o médico selecionado.
+              </small>
+              {error && (
+                <p className="field-error" role="alert">
+                  {error}
+                </p>
+              )}
+              <div className="actions">
+                <Button type="submit" disabled={busy}>
+                  {busy ? "Salvando…" : "Salvar agendamento"}
+                </Button>
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => {
+                    setBooking(null);
+                    setError("");
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </form>
+            {bookingPreview && (
+              <div className="schedule-booking-reference">
+                {booking.leadId === initialLeadId ? (
+                  bookingPreview
+                ) : (
+                  <p className="schedule-booking-reference-empty muted">
+                    Selecione o lead desta conversa para consultar o histórico
+                    aqui.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </ScheduleDialog>
       )}
       {opened && (
@@ -896,8 +950,10 @@ export function ScheduleDialog({
   onClose,
   children,
   wide = false,
+  className,
 }: {
   wide?: boolean;
+  className?: string;
   title: string;
   onClose: () => void;
   children: React.ReactNode;
@@ -917,7 +973,9 @@ export function ScheduleDialog({
   return (
     <dialog
       ref={ref}
-      className={`schedule-dialog ${wide ? "schedule-dialog-wide" : ""}`}
+      className={["schedule-dialog", wide && "schedule-dialog-wide", className]
+        .filter(Boolean)
+        .join(" ")}
       aria-label={title}
       onCancel={(e) => {
         if (e.target !== e.currentTarget) return;

@@ -12,7 +12,7 @@ const a = "00000000-0000-4000-8000-000000000010",
   b = "00000000-0000-4000-8000-000000000020",
   f = "00000000-0000-4000-8000-000000000300";
 test("dashboard, contexto e isolamento de navegação", async ({ page }) => {
-  await page.goto("/app");
+  await page.goto("/app/visao-geral");
   await expect(
     page.getByRole("heading", {
       name: "Visão geral",
@@ -135,7 +135,7 @@ test("fila, inbox, portal e mensuração são honestamente demonstrativos", asyn
   ).toHaveCount(0);
 });
 test("estados e acessibilidade desktop/mobile", async ({ page }) => {
-  await page.goto("/app");
+  await page.goto("/app/visao-geral");
   await page.getByLabel("Testar estado").selectOption("error");
   await expect(page.locator("p[role=alert]")).toContainText("Falha");
   await page.getByRole("button", { name: "Tentar novamente" }).click();

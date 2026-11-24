@@ -6,6 +6,7 @@ import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { afterLoginPath } from "./navigation";
 
 function authErrorMessage(error: unknown): string {
   const { code, status } = (error ?? {}) as { code?: string; status?: number };
@@ -14,11 +15,6 @@ function authErrorMessage(error: unknown): string {
     return "Muitas tentativas. Aguarde um momento e tente novamente.";
   if (code === "invalid_credentials") return "E-mail ou senha inválidos.";
   return "Não foi possível concluir o acesso. Tente novamente.";
-}
-
-function getSafeNextPath() {
-  const next = new URLSearchParams(window.location.search).get("next");
-  return next?.startsWith("/") && !next.startsWith("//") && next !== "/login" ? next : "/app";
 }
 
 export function AccessPage() {
@@ -104,7 +100,8 @@ export function AccessPage() {
                 return;
               }
 
-              router.replace(getSafeNextPath());
+              const next = new URLSearchParams(window.location.search).get("next");
+              router.replace(afterLoginPath(next));
               router.refresh();
             } catch (authError) {
               setError(authErrorMessage(authError));

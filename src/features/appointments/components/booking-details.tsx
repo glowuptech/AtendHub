@@ -40,7 +40,19 @@ export function BookingDetailsFields({
           !registration.data.canEdit
         }
       />
-      <fieldset disabled={!enabled}>
+      {registration.data?.supported && !registration.data.canEdit && (
+        <p role="status">
+          Sua conta pode consultar, mas não editar os dados pessoais ou o valor
+          do serviço.
+        </p>
+      )}
+      <fieldset
+        disabled={
+          !enabled ||
+          !registration.data?.supported ||
+          !registration.data.canEdit
+        }
+      >
         <legend>Serviço agendado</legend>
         <label>
           Serviço ou consulta

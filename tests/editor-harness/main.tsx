@@ -66,6 +66,9 @@ const inboxLead = {
 const inboxConversation = () => ({
   ...JSON.parse(localStorage.getItem("test-started-conversation") ?? "null"),
 });
+const bookingHistoryTest = new URLSearchParams(location.search).has(
+  "booking-history",
+);
 const stored = localStorage.getItem("editor-test-draft");
 const original = window.fetch.bind(window);
 window.fetch = async (input, init) => {
@@ -163,7 +166,15 @@ window.fetch = async (input, init) => {
   if (url.includes("/agenda?"))
     return Response.json({
       settings: { defaultDuration: 30, displayStep: 30 },
-      intervals: [],
+      intervals: bookingHistoryTest
+        ? [
+            {
+              day: new URL(url, location.origin).searchParams.get("week"),
+              startMinute: 480,
+              endMinute: 540,
+            },
+          ]
+        : [],
       appointments: [],
       bookedLeadIds: [],
       canManageAvailability: true,
@@ -283,8 +294,40 @@ window.fetch = async (input, init) => {
         : [],
     );
   }
-  if (url.startsWith("/api/inbox/conversations/") && url.includes("/messages"))
-    return Response.json({ messages: [], hasMore: false });
+  if (
+    url.startsWith("/api/inbox/conversations/") &&
+    url.includes("/messages")
+  ) {
+    if (!bookingHistoryTest)
+      return Response.json({ messages: [], hasMore: false });
+    const older = new URL(url, location.origin).searchParams.has("before");
+    const bodies = older
+      ? ["A preferência é por uma consulta de manhã."]
+      : Array.from({ length: 18 }, (_, index) =>
+          index === 17
+            ? "Pode agendar a consulta de 60 minutos."
+            : `Mensagem de atendimento ${index + 1}`,
+        );
+    return Response.json({
+      hasMore: !older,
+      messages: bodies.map((body, index) => ({
+        id: older ? "older" : String(index),
+        conversationId: inboxConversation().id,
+        direction: index % 2 ? "outbound" : "inbound",
+        origin: index % 2 ? "inbox" : "contact",
+        type: "text",
+        body,
+        occurredAt: new Date(
+          Date.UTC(2026, 10, older ? 23 : 24, 13, index),
+        ).toISOString(),
+        media: {},
+        status: index % 2 ? "sent" : "received",
+        failureReason: null,
+        mine: false,
+        requestId: null,
+      })),
+    });
+  }
   if (url.startsWith("/api/inbox/conversations/") && url.endsWith("/read"))
     return Response.json({ ok: true });
   if (url.startsWith("/api/whatsapp/connections")) {
@@ -384,6 +427,15 @@ window.fetch = async (input, init) => {
               phone: inboxLead.phone,
               client_id: inboxLead.clientId,
             },
+            ...(bookingHistoryTest
+              ? [
+                  {
+                    ...queueLead(),
+                    name: "Outro lead",
+                    client_id: inboxLead.clientId,
+                  },
+                ]
+              : []),
           ]
         : [queueLead()],
     );

@@ -2,7 +2,6 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { sessionOrganizationContext } from "@/lib/supabase/organization-session";
 import { addMetrics, emptyMetrics } from "./metrics";
-import { metaConfigured } from "./meta";
 import type {
   Account,
   Ad,
@@ -29,7 +28,7 @@ export class MediaError extends Error {
 export function requireAdmin(auth: Auth) {
   if (auth.role !== "super_admin")
     throw new MediaError(
-      "Somente superadministradores podem alterar as campanhas da agência.",
+      "Esta operação exige acesso de superadministrador.",
       403,
     );
 }
@@ -386,7 +385,6 @@ export async function readReport(
   }
   return {
     canManage,
-    metaConfigured: metaConfigured(org),
     attributionAvailable,
     clients: clients.map((c) => ({
       ...c,

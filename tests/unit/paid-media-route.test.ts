@@ -8,6 +8,8 @@ const state = vi.hoisted(() => ({
   discover: vi.fn(),
   syncStatus: vi.fn(),
   requireAdmin: vi.fn(),
+  credentialStatus: vi.fn(),
+  saveMetaAccess: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/organization-session", () => ({
@@ -19,6 +21,10 @@ vi.mock("@/features/client-domains/server", () => ({
 vi.mock("@/features/paid-media/meta", () => ({
   discoverMetaAccounts: state.discover,
   MetaError: Error,
+}));
+vi.mock("@/features/paid-media/meta-credentials", () => ({
+  readMetaCredentialStatus: state.credentialStatus,
+  saveMetaAccess: state.saveMetaAccess,
 }));
 vi.mock("@/features/paid-media/server", () => ({
   readReport: state.report,
@@ -40,7 +46,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.session.mockResolvedValue(context);
   state.tenant.mockResolvedValue(clientId);
-  state.report.mockResolvedValue({ canManage: true, metaConfigured: true });
+  state.report.mockResolvedValue({ canManage: true });
   state.scope.mockResolvedValue([{ id: clientId }]);
   state.rpc.mockResolvedValue({ error: null });
 });
@@ -78,7 +84,6 @@ it("força o relatório da clínica e desabilita a administração no host do po
   );
   expect(await report!.json()).toEqual({
     canManage: false,
-    metaConfigured: false,
   });
   const switched = await GET(
     new Request(url + "&clientId=" + otherId, {
@@ -93,6 +98,37 @@ it("força o relatório da clínica e desabilita a administração no host do po
   );
   expect(accounts?.status).toBe(403);
   expect(state.discover).not.toHaveBeenCalled();
+});
+it("usa a organização da sessão para salvar o token e bloqueia o portal", async () => {
+  const status = {
+    configured: true,
+    updatedAt: "2026-11-23T13:00Z",
+    setupMessage: null,
+  };
+  const token = "meta-test-secret-token";
+  state.saveMetaAccess.mockResolvedValue(status);
+  const request = (host: string) =>
+    new Request(`https://${host}/api/paid-media`, {
+      method: "POST",
+      headers: { host },
+      body: JSON.stringify({
+        action: "saveMetaCredential",
+        organizationId: otherId,
+        token,
+      }),
+    });
+
+  expect((await POST(request("clinica.atendehub.app")))?.status).toBe(403);
+  expect(state.saveMetaAccess).not.toHaveBeenCalled();
+  const response = await POST(request("painel.atendehub.app"));
+  expect(await response!.json()).toEqual(status);
+  expect(response?.headers.get("cache-control")).toBe("no-store");
+  expect(state.requireAdmin).toHaveBeenCalledWith(context);
+  expect(state.saveMetaAccess).toHaveBeenCalledWith(
+    expect.anything(),
+    context.organizationId,
+    token,
+  );
 });
 it("registra regra de frase com a linha e campanha escolhidas pelo formulário", async () => {
   const response = await POST(
