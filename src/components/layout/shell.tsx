@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import { appHomePath } from "@/features/auth/navigation";
+import { clientOperations } from "@/features/clients/operation";
 import { useDemo } from "./demo-context";
 
 import { DemoNotice } from "./shared";
@@ -86,6 +87,13 @@ export function Shell({
     };
   }, [open]);
   const clinics = remoteClients;
+  const selectedClient = clinics.find((client) => client.id === clientId);
+  const legal = selectedClient?.vertical === "legal";
+  function selectClient(id: string) {
+    setClientId(id);
+    if (pathname.includes("/clientes/")) router.push(`/app/clientes/${id}`);
+    else if (pathname.includes("/leads/")) router.push("/app/leads");
+  }
   const links = portal
     ? ([
         ["/portal", "Visão geral", LayoutDashboard],
@@ -160,7 +168,7 @@ export function Shell({
           <span className="workspace-name">
             GlowUp
             <small>
-              {portal ? "Portal da clínica" : "Gestão de atendimento"}
+              {portal ? (legal ? "Portal do escritório" : "Portal da clínica") : "Gestão de atendimento"}
             </small>
           </span>
         </div>
@@ -250,7 +258,7 @@ export function Shell({
             <span aria-hidden="true">/</span>
             <span>
               {portal
-                ? "Clínica"
+                ? (legal ? "Escritório" : "Clínica")
                 : systemPage
                   ? systemPage[1]
                   : pathname.startsWith("/app/clientes/") &&
@@ -271,20 +279,13 @@ export function Shell({
             ) : (
               <>
                 <label className="sr-only" htmlFor="clinic">
-                  Clínica em contexto
+                  {legal ? "Escritório em contexto" : "Clínica em contexto"}
                 </label>
                 <select
                   id="clinic"
                   value={clientId}
                   disabled={clinics.length === 0}
-                  onChange={(e) => {
-                    const id = e.target.value;
-                    setClientId(id);
-                    if (pathname.includes("/clientes/"))
-                      router.push(`/app/clientes/${id}`);
-                    else if (pathname.includes("/leads/"))
-                      router.push("/app/leads");
-                  }}
+                  onChange={(e) => selectClient(e.target.value)}
                 >
                   {clinics.map((c) => (
                     <option value={c.id} key={c.id}>
@@ -295,9 +296,22 @@ export function Shell({
                 <label className="sr-only" htmlFor="vertical">
                   Vertical
                 </label>
-                <select id="vertical" defaultValue="healthcare">
-                  <option value="healthcare">Saúde · Prescrita</option>
-                  <option disabled>Jurídico · Veredite</option>
+                <select
+                  id="vertical"
+                  value={selectedClient?.vertical ?? ""}
+                  disabled={!selectedClient || portal}
+                  onChange={(e) => {
+                    const client = clinics.find((item) => item.vertical === e.target.value);
+                    if (client) selectClient(client.id);
+                  }}
+                >
+                  {!selectedClient && <option value="">Selecione um cliente</option>}
+                  <option value="healthcare" disabled={!clinics.some((client) => client.vertical === "healthcare")}>
+                    Saúde · {clientOperations.healthcare.name}
+                  </option>
+                  <option value="legal" disabled={!clinics.some((client) => client.vertical === "legal")}>
+                    Jurídico · {clientOperations.legal.name}
+                  </option>
                 </select>
               </>
             )}

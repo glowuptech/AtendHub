@@ -223,7 +223,8 @@
   background: currentColor;
   vertical-align: middle;
 }
-.inbox-operation[data-operation="legal"] {
+.inbox-operation[data-operation="legal"],
+.inbox-operation[data-operation="veredite"] {
   color: var(--veredite);
 }
 .inbox-message-preview {

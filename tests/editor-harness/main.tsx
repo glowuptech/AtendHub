@@ -4,6 +4,7 @@ import { CampaignPlanning } from "@/features/paid-media/planning";
 // Isolated browser harness: real components, simulated persistence only.
 import { useEffect, useState } from "react";
 import { ExternalScheduling } from "@/features/clients/components/external-scheduling";
+import { Clients } from "@/features/clients/components/directory";
 import { ClientAccesses } from "@/features/clients/components/client-accesses";
 import { WhatsappSettings } from "@/features/whatsapp/settings";
 import { Inbox } from "@/features/inbox/components/inbox";
@@ -124,7 +125,7 @@ window.fetch = async (input, init) => {
   }
   if (url.endsWith("/registration")) {
     if (new URLSearchParams(location.search).has("pending-fields"))
-      return Response.json({}, { status: 404 });
+      return Response.json({}, { status: 501 });
     if (init?.method === "PATCH") {
       const data = JSON.parse(String(init.body));
       localStorage.setItem("test-registration", JSON.stringify(data));
@@ -439,6 +440,15 @@ window.fetch = async (input, init) => {
           ]
         : [queueLead()],
     );
+  if (url === "/api/clients" && new URLSearchParams(location.search).has("veredit")) {
+    const existing = JSON.parse(localStorage.getItem("test-veredit-clients") ?? "[]");
+    if (init?.method === "POST") {
+      const office = JSON.parse(String(init.body));
+      localStorage.setItem("test-veredit-clients", JSON.stringify([...existing, office]));
+      return Response.json(office, { status: 201 });
+    }
+    return Response.json([...clients, ...existing]);
+  }
   if (url.startsWith("/api/clients")) return Response.json(clients);
   if (url.startsWith("/api/forms")) {
     const current = JSON.parse(
@@ -486,6 +496,8 @@ createRoot(document.getElementById("root")!).render(
         <ExternalScheduling clientId={clients[0].id} />
         <ClientAccesses clientId={clients[0].id} />
       </>
+    ) : new URLSearchParams(location.search).has("veredit") ? (
+      <Clients />
     ) : new URLSearchParams(location.search).has("paid-media") ? (
       <PaidMediaWorkspace />
     ) : new URLSearchParams(location.search).has("campaign-planning") ? (

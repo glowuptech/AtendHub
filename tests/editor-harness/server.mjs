@@ -19,6 +19,10 @@ const server = await createServer({
         find: "next/link",
         replacement: root + "tests/editor-harness/link.tsx",
       },
+      {
+        find: "next/image",
+        replacement: root + "tests/editor-harness/image.tsx",
+      },
       { find: "@", replacement: root + "src" },
     ],
   },
