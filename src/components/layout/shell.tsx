@@ -21,6 +21,7 @@ import {
   BellRing,
 } from "lucide-react";
 import { useState, useRef, useEffect, type ReactNode } from "react";
+import { appHomePath } from "@/features/auth/navigation";
 import { useDemo } from "./demo-context";
 
 import { DemoNotice } from "./shared";
@@ -91,7 +92,7 @@ export function Shell({
         ["/portal/agendamentos", "Agendamentos", CalendarDays],
       ] as const)
     : ([
-        ["/app", "Visão geral", LayoutDashboard],
+        ["/app/visao-geral", "Visão geral", LayoutDashboard],
         ["/app/leads", "Leads e CRM", Users],
         ["/app/agendamentos", "Agendamentos", CalendarDays],
         ["/app/follow-up", "Follow-up", Repeat2],
@@ -100,7 +101,7 @@ export function Shell({
       ] as const);
   const systemLinks = [
     ["/app/sistema", "Dashboard geral", LayoutDashboard],
-    ["/app/fila", "Fila de atendimento", ListTodo],
+    [appHomePath, "Fila de atendimento", ListTodo],
     ["/app/clientes", "Clientes", Building2],
     ["/app/inbox", "Inbox", MessagesSquare],
     ["/app/calendario", "Calendário", CalendarDays],
@@ -143,7 +144,7 @@ export function Shell({
           <X size={20} />
         </button>
         <Link
-          href={portal ? "/portal" : "/app"}
+          href={portal ? "/portal" : appHomePath}
           className="brand hub-brand"
           aria-label="Atend&Hub — início"
         >
@@ -191,7 +192,7 @@ export function Shell({
                 [...links]
                   .sort((a, b) => b[0].length - a[0].length)
                   .find(([target]) =>
-                    target === "/app" || target === "/portal"
+                    target === "/portal"
                       ? pathname === target
                       : pathname.startsWith(target),
                   )?.[0] === href
@@ -210,7 +211,7 @@ export function Shell({
         <div className="sidebar-bottom">
           <Link
             aria-label={portal ? "Voltar à operação" : "Conhecer portal"}
-            href={portal ? "/app" : "/portal"}
+            href={portal ? appHomePath : "/portal"}
           >
             <span>{portal ? "Voltar à operação" : "Conhecer portal"}</span>
             <ArrowUpRight size={15} />
@@ -256,8 +257,7 @@ export function Shell({
                       !pathname.includes("formularios")
                     ? "Perfil do cliente"
                     : (links.find(
-                        ([href]) =>
-                          href !== "/app" && pathname.startsWith(href),
+                        ([href]) => pathname.startsWith(href),
                       )?.[1] ?? "Visão geral")}
             </span>
           </div>
@@ -310,7 +310,7 @@ export function Shell({
                 <small>GlowUp · Atendimento</small>
                 <Link
                   aria-label={portal ? "Voltar à operação" : "Conhecer portal"}
-                  href={portal ? "/app" : "/portal"}
+                  href={portal ? appHomePath : "/portal"}
                 >
                   {portal ? "Voltar à operação" : "Conhecer portal"}
                 </Link>

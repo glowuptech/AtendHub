@@ -3,7 +3,7 @@ import AxeBuilder from "@axe-core/playwright";
 test("sistema, páginas previstas e inbox pessoal de todos os clientes", async ({
   page,
 }) => {
-  await page.goto("/app");
+  await page.goto("/app/visao-geral");
   await page
     .getByLabel("Clínica em contexto")
     .selectOption("00000000-0000-4000-8000-000000000020");

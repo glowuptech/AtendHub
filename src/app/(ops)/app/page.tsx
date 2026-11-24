@@ -1,1 +1,6 @@
-export { Dashboard as default } from "@/features/analytics/components/dashboard";
+import { redirect } from "next/navigation";
+import { appHomePath } from "@/features/auth/navigation";
+
+export default function AppHome() {
+  redirect(appHomePath);
+}

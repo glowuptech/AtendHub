@@ -5,6 +5,7 @@ test("navegação recolhível, menu mobile e teclado preservam destinos", async 
   page,
 }) => {
   await page.goto("/app");
+  await expect(page).toHaveURL(/\/app\/fila$/);
   await page.getByRole("button", { name: "Recolher navegação" }).click();
   await expect(page.locator(".shell")).toHaveClass(/is-collapsed/);
   expect(
@@ -42,7 +43,7 @@ test("telas principais mantêm contraste e largura em desktop, tablet e celular"
   test.setTimeout(120000);
   const client = "00000000-0000-4000-8000-000000000010";
   const screens = [
-    ["overview", "/app"],
+    ["overview", "/app/visao-geral"],
     ["system", "/app/sistema"],
     ["queue", "/app/fila"],
     ["clients", "/app/clientes"],

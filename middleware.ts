@@ -1,4 +1,5 @@
 import { updateSession } from "@/lib/supabase/proxy";
+import { appHomePath } from "@/features/auth/navigation";
 import {
   panelDomain,
   rootDomain,
@@ -17,7 +18,7 @@ export async function middleware(request: NextRequest) {
     (pathname === "/" || pathname === "/app" || pathname.startsWith("/app/"))
   ) {
     const url = new URL(`https://${panelDomain}`);
-    url.pathname = pathname === "/" ? "/app" : pathname;
+    url.pathname = pathname === "/" ? appHomePath : pathname;
     url.search = request.nextUrl.search;
     return NextResponse.redirect(url);
   }
