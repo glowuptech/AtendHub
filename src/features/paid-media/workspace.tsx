@@ -3,12 +3,23 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { endpoint, requestMedia } from "./transport";
 import { MediaAssistant } from "./assistant";
+import { AnalyticsModules } from "./analytics-summary";
+import { DailyChart } from "./analytics-charts";
+import { displayNumber, money, percent } from "./format";
 import useSWR from "swr";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, Heading, NavButton } from "@/components/layout/shared";
 import { daysBetween, localDay, RangeSchema, shiftDay } from "@/lib/date-range";
-import { addMetrics, cost, cpm, emptyMetrics, primaryResult } from "./metrics";
+import {
+  addMetrics,
+  combinedMetaLeads,
+  cost,
+  cpm,
+  emptyMetrics,
+  percentage,
+  primaryResult,
+} from "./metrics";
 import {
   stageLabels,
   stageMetric,
@@ -21,12 +32,7 @@ import {
   type Metrics,
 } from "./model";
 
-export const displayNumber = (n: number | null) =>
-  n === null ? "—" : new Intl.NumberFormat("pt-BR").format(n);
-export const money = (n: number | null, currency: string) =>
-  n === null
-    ? "—"
-    : new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(n);
+export { displayNumber, money } from "./format";
 const readDate = (value: string) =>
   new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
@@ -230,7 +236,8 @@ export function PaidMediaWorkspace({
           {activeView === "Resumo" && (
             <Summary
               data={data}
-              days={daysBetween(range.from, range.to) + 1}
+              range={range}
+              clientId={filter}
               portal={portal}
             />
           )}
@@ -283,23 +290,22 @@ export function PaidMediaWorkspace({
 
 function Summary({
   data,
-  days,
+  range,
+  clientId,
   portal,
 }: {
   data: MediaReport;
-  days: number;
+  range: { from: string; to: string };
+  clientId: string;
   portal: boolean;
 }) {
+  const days = daysBetween(range.from, range.to) + 1;
   const covered = data.accounts.some((a) => a.coveredDays > 0);
   const complete =
     data.accounts.length > 0 &&
     data.accounts.every((a) => a.coveredDays === days);
-  const coveredCurrencies = [
-    ...new Set(
-      data.accounts.filter((a) => a.coveredDays > 0).map((a) => a.currency),
-    ),
-  ];
-  const totals = coveredCurrencies.map(
+  const currencies = [...new Set(data.accounts.map((a) => a.currency))];
+  const totals = currencies.map(
     (currency) =>
       data.totals.find((row) => row.currency === currency) ?? {
         currency,
@@ -327,39 +333,141 @@ function Summary({
       {!data.attributionAvailable && (
         <p className="muted">A atribuição do CRM aguarda ativação no banco.</p>
       )}
+      {totals.map((m) => {
+        const hasData = data.accounts.some(
+          (a) => a.currency === m.currency && a.coveredDays > 0,
+        );
+        const leads = hasData ? combinedMetaLeads(m) : null;
+        const conversion = data.attributionAvailable
+          ? percentage(m.appointments, m.crmLeads)
+          : null;
+        return (
+          <div className="paid-summary" key={m.currency}>
+            <Card title={`Resumo em ${m.currency}`}>
+              <dl className="paid-values paid-headline-values">
+                <Value title="Investimento">
+                  {money(hasData ? m.spend : null, m.currency)}
+                </Value>
+                <Value title="Leads Meta">{displayNumber(leads)}</Value>
+                <Value title="CPL combinado">
+                  {money(cost(m.spend, leads), m.currency)}
+                </Value>
+                <Value title="Conversão em agendamento">
+                  {percent(conversion)}
+                </Value>
+              </dl>
+              <p className="muted">
+                O CPL divide o investimento pela soma dos formulários Meta e das
+                conversas de WhatsApp reportadas. A conversão usa as
+                oportunidades atribuídas ao CRM no período que têm pelo menos um
+                agendamento não cancelado.
+              </p>
+            </Card>
+            <div className="paid-summary-grid">
+              {hasData && (
+                <DailyChart
+                  rows={data.daily.filter((row) => row.currency === m.currency)}
+                  range={range}
+                  currency={m.currency}
+                />
+              )}
+              <Card title="Resultados e atribuição">
+                <dl className="paid-values">
+                  <Value title="Impressões">
+                    {displayNumber(hasData ? m.impressions : null)}
+                  </Value>
+                  <Value title="CPM">
+                    {money(hasData ? cpm(m) : null, m.currency)}
+                  </Value>
+                  <Value title="Formulários instantâneos da Meta">
+                    {displayNumber(hasData ? m.form_leads : null)}
+                  </Value>
+                  <Value title="Conversas de WhatsApp na Meta">
+                    {displayNumber(hasData ? m.whatsapp_conversations : null)}
+                  </Value>
+                  <Value title="Leads atribuídos no CRM">
+                    {displayNumber(
+                      data.attributionAvailable ? m.crmLeads : null,
+                    )}
+                  </Value>
+                  <Value title="Formulários Atend&Hub atribuídos">
+                    {displayNumber(
+                      data.attributionAvailable ? m.crmForms : null,
+                    )}
+                  </Value>
+                  <Value title="WhatsApp atribuído no CRM">
+                    {displayNumber(
+                      data.attributionAvailable ? m.crmWhatsApp : null,
+                    )}
+                  </Value>
+                  <Value title="Qualificadas no CRM">
+                    {displayNumber(
+                      data.attributionAvailable ? m.qualified : null,
+                    )}
+                  </Value>
+                  <Value title="Oportunidades com agendamento">
+                    {displayNumber(
+                      data.attributionAvailable ? m.appointments : null,
+                    )}
+                  </Value>
+                </dl>
+              </Card>
+            </div>
+          </div>
+        );
+      })}
+      <AnalyticsModules
+        report={data}
+        range={range}
+        clientId={clientId}
+        portal={portal}
+      />
       {covered &&
-        totals.map((m) => (
-          <Card key={m.currency} title={`Resumo em ${m.currency}`}>
-            <dl className="paid-values">
-              <Value title="Investimento">{money(m.spend, m.currency)}</Value>
-              <Value title="Impressões">{displayNumber(m.impressions)}</Value>
-              <Value title="CPM">{money(cpm(m), m.currency)}</Value>
-              <Value title="Formulários instantâneos da Meta">
-                {displayNumber(m.form_leads)}
-              </Value>
-              <Value title="Conversas de WhatsApp na Meta">
-                {displayNumber(m.whatsapp_conversations)}
-              </Value>
-              <Value title="Custo por lead de formulário Meta">
-                {money(cost(m.spend, m.form_leads), m.currency)}
-              </Value>
-              <Value title="Formulários Atend&Hub atribuídos">
-                {data.attributionAvailable ? displayNumber(m.crmForms) : "—"}
-              </Value>
-              <Value title="WhatsApp atribuído no CRM">
-                {data.attributionAvailable ? displayNumber(m.crmWhatsApp) : "—"}
-              </Value>
-              <Value title="Qualificadas no CRM">
-                {data.attributionAvailable ? displayNumber(m.qualified) : "—"}
-              </Value>
-              <Value title="Oportunidades com agendamento">
-                {data.attributionAvailable
-                  ? displayNumber(m.appointments)
-                  : "—"}
-              </Value>
-            </dl>
+        data.campaigns.some(
+          ({ metrics: m }) => m.impressions || m.spend || m.crmLeads,
+        ) && (
+          <Card title="Desempenho por campanha">
+            <Table
+              headers={[
+                "Campanha",
+                "Investimento",
+                "Impressões",
+                "Leads Meta",
+                "CPL combinado",
+                "Conversão",
+                "Agendamentos",
+              ]}
+            >
+              {data.campaigns
+                .filter(
+                  ({ metrics: m }) => m.impressions || m.spend || m.crmLeads,
+                )
+                .map(({ campaign_id, name, metrics: m, currency }) => (
+                  <tr key={campaign_id}>
+                    <td>{name}</td>
+                    <td>{money(m.spend, currency)}</td>
+                    <td>{displayNumber(m.impressions)}</td>
+                    <td>{displayNumber(combinedMetaLeads(m))}</td>
+                    <td>
+                      {money(cost(m.spend, combinedMetaLeads(m)), currency)}
+                    </td>
+                    <td>
+                      {percent(
+                        data.attributionAvailable
+                          ? percentage(m.appointments, m.crmLeads)
+                          : null,
+                      )}
+                    </td>
+                    <td>
+                      {displayNumber(
+                        data.attributionAvailable ? m.appointments : null,
+                      )}
+                    </td>
+                  </tr>
+                ))}
+            </Table>
           </Card>
-        ))}
+        )}
       {data.accounts.length > 0 && (
         <Card title="Cobertura da sincronização">
           <Table
@@ -400,7 +508,7 @@ function Summary({
           ))}
         </Card>
       )}
-      {covered && data.clients.length > 1 && (
+      {covered && data.campaigns.some((c) => c.client_id) && (
         <Card title="Desempenho por cliente">
           <Table
             headers={[
@@ -797,6 +905,13 @@ function Creatives({ data }: { data: MediaReport }) {
                 {displayNumber(ad.metrics.impressions)}
               </Value>
               <Value title="CPM">{money(cpm(ad.metrics), ad.currency)}</Value>
+              <Value title="Conversão em agendamento">
+                {percent(
+                  data.attributionAvailable
+                    ? percentage(ad.metrics.appointments, ad.metrics.crmLeads)
+                    : null,
+                )}
+              </Value>
               {ad.stage === "ATR" ||
               ad.stage === "INT" ||
               ad.stage === "ACA" ? (

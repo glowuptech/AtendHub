@@ -32,6 +32,14 @@ O reporte usa os dias do fuso da conta Meta. Os leads atribuídos no CRM usam o 
 
 Foram mapeados códigos explícitos da API para formulário instantâneo, visita ao perfil e ThruPlay. Conversa iniciada entra como WhatsApp quando o catálogo da Meta identifica o conjunto com destino `WHATSAPP`. Sem a métrica ou destino identificável, a célula apresenta um traço. Valide nomes e disponibilidade das métricas com as contas reais. Criativos exibem a miniatura e o texto quando a Meta fornece esses campos. Moedas diferentes ficam separadas. O Dashboard geral ainda usa o lançamento manual e não soma o mesmo gasto importado pelo hub.
 
+### Indicadores do resumo
+
+O CPL combinado divide o investimento pela soma de formulários instantâneos e conversas de WhatsApp informados pela Meta. A taxa de conversão divide as oportunidades com pelo menos um agendamento não cancelado pelas oportunidades únicas atribuídas no CRM. A visão temporal usa os dados diários já sincronizados.
+
+O resumo consulta alcance, cliques no link, engajamento, gênero, idade e posicionamento diretamente na API da Meta, no período selecionado. CTR usa cliques no link sobre impressões, CPC usa investimento por clique no link e a taxa de engajamento usa engajamentos sobre impressões. Alcance e frequência são exibidos por conta quando há mais de uma conta. Os recortes aplicam o filtro das campanhas do cliente no painel individual e no portal.
+
+O painel administrativo consulta o limite de gastos da conta e calcula o limite restante quando a Meta fornece o limite e o total gasto. Contas compartilhadas exibem valores da conta inteira. O saldo pré-pago está indisponível na integração. Os módulos adicionais usam as migrations de tráfego pago já aplicadas.
+
 ### Sincronização diária
 
 Após validar a importação manual, configure um segredo aleatório em `CRON_SECRET` nas variáveis de servidor da Vercel. O `vercel.json` agenda uma execução por dia às 08:00 UTC (05:00 em Brasília), com a precisão do plano da Vercel. No deploy de produção, a Vercel chama `GET /api/cron/meta-sync` com esse segredo. O servidor do Atend&Hub consulta a Meta diretamente com as mesmas credenciais do botão manual. Cada conta vinculada entra uma vez por execução, mesmo quando atende várias clínicas.

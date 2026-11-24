@@ -3,6 +3,7 @@ const state = vi.hoisted(() => ({
   session: vi.fn(),
   tenant: vi.fn(),
   report: vi.fn(),
+  analytics: vi.fn(),
   scope: vi.fn(),
   rpc: vi.fn(),
   discover: vi.fn(),
@@ -25,6 +26,9 @@ vi.mock("@/features/paid-media/meta", () => ({
 vi.mock("@/features/paid-media/meta-credentials", () => ({
   readMetaCredentialStatus: state.credentialStatus,
   saveMetaAccess: state.saveMetaAccess,
+}));
+vi.mock("@/features/paid-media/analytics-server", () => ({
+  readMetaAnalytics: state.analytics,
 }));
 vi.mock("@/features/paid-media/server", () => ({
   readReport: state.report,
@@ -152,4 +156,26 @@ it("registra regra de frase com a linha e campanha escolhidas pelo formulário",
     p_campaign: "100",
     p_phrase: "Quero saber mais",
   });
+});
+it("limita os indicadores novos ao cliente do portal de origem", async () => {
+  const host = "clinica.atendehub.app";
+  const url = `https://${host}/api/paid-media?kind=analytics&from=2026-11-20&to=2026-11-21`;
+  state.analytics.mockResolvedValue({ accounts: [] });
+  const response = await GET(new Request(url, { headers: { host } }));
+  expect(await response!.json()).toEqual({ accounts: [] });
+  expect(response?.headers.get("cache-control")).toBe("no-store");
+  expect(state.analytics).toHaveBeenCalledWith(
+    context,
+    { from: "2026-11-20", to: "2026-11-21" },
+    clientId,
+    true,
+  );
+  expect(
+    (
+      await GET(
+        new Request(url + "&clientId=" + otherId, { headers: { host } }),
+      )
+    )?.status,
+  ).toBe(403);
+  expect(state.analytics).toHaveBeenCalledTimes(1);
 });
