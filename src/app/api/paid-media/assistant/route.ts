@@ -1,3 +1,4 @@
+import { stageGuide, stageLabels } from "@/features/paid-media/model";
 import { tenantSlug } from "@/features/client-domains/model";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -168,6 +169,7 @@ export async function POST(request: Request) {
           id: exchangeId,
           organizationId: org,
           client: { id: client.id, name: client.name },
+          methodology: { name: "Método VIDA", legacyName: "AIDA", labels: stageLabels, guidance: stageGuide },
           mode: value.mode,
           stage: value.stage,
           period: value.period,

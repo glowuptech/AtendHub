@@ -51,7 +51,7 @@ const report: MediaReport = {
   totals: [{ currency: "BRL", ...metrics }],
 };
 
-test("vincula uma conta, sincroniza e exibe o indicador de Atração", async ({
+test("vincula uma conta, sincroniza e exibe o indicador de Visibilidade", async ({
   page,
 }) => {
   let linked = false,
@@ -162,9 +162,9 @@ test("vincula uma conta, sincroniza e exibe o indicador de Atração", async ({
   await expect(
     page.getByText("Sincronização concluída.", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Funil AIDA" }).click();
+  await page.getByRole("button", { name: "Funil VIDA" }).click();
   const attraction = page.locator("section").filter({
-    has: page.getByRole("heading", { name: "Atração", exact: true }),
+    has: page.getByRole("heading", { name: "Visibilidade", exact: true }),
   });
   await expect(attraction).toContainText("Visitas ao perfil");
   await expect(attraction).toContainText("10");
@@ -175,7 +175,7 @@ test("vincula uma conta, sincroniza e exibe o indicador de Atração", async ({
   ).toBe(true);
 });
 
-test("salva um plano AIDA, mantém vínculos e mostra realizado", async ({
+test("salva um plano VIDA, mantém vínculos e mostra realizado", async ({
   page,
 }) => {
   const plans: Plan[] = [];
