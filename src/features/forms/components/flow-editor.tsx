@@ -6,6 +6,8 @@ import { routingSnapshot } from "../services/path-diagnostics";
 import { Card } from "@/components/layout/shared";
 import {
   addPath,
+  commonQuestion,
+  includedInPath,
   removePath,
   selectRouter,
   pathsFromOptions,
@@ -36,6 +38,26 @@ export function FlowEditor({
         ["single_select", "image_choice"].includes(f.type),
     ),
   );
+  function setMembership(
+    stepId: string,
+    selectedPathsOnly: boolean,
+    pathIds: string[],
+  ) {
+    onChange(
+      {
+        ...version,
+        steps: version.steps.map((step) =>
+          step.id === stepId
+            ? {
+                ...step,
+                question: { ...step.question, selectedPathsOnly, pathIds },
+              }
+            : step,
+        ),
+      },
+      fields,
+    );
+  }
   const pathIds = new Set(paths.map((path) => path.id));
   const orphanedQuestionReferences = version.steps.flatMap((step) =>
     step.question.pathIds
@@ -182,7 +204,7 @@ export function FlowEditor({
                   onClick={() => {
                     if (
                       window.confirm(
-                        `Remover “${path.name}”? Perguntas exclusivas ficarão comuns e destinos precisarão de revisão.`,
+                        `Remover “${path.name}”? Perguntas exclusivas ficarão fora do percurso até você escolher outro destino.`,
                       )
                     )
                       onChange(...removePath(version, fields, path.id));
@@ -218,8 +240,8 @@ export function FlowEditor({
                 const following = version.steps.filter(
                   (s) => s.id !== router.id,
                 );
-                const exclusive = following.filter(
-                  (s) => path && s.question.pathIds.includes(path.id),
+                const included = following.filter(
+                  (s) => path && includedInPath(s.question, path.id),
                 );
                 return (
                   <section
@@ -279,7 +301,7 @@ export function FlowEditor({
                           ↓
                         </div>
                         <ol className="journey-questions">
-                          {exclusive.map((s) => (
+                          {included.map((s) => (
                             <li key={s.id}>
                               {s.question.label}
                               {s.question.pathIds.length > 1 && (
@@ -288,18 +310,15 @@ export function FlowEditor({
                             </li>
                           ))}
                         </ol>
-                        {!exclusive.length && (
+                        {!included.length && (
                           <p className="muted">
-                            Este caminho ainda não tem perguntas específicas.
+                            Nenhuma pergunta selecionada para este caminho.
                           </p>
                         )}
                         <details>
                           <summary>Escolher perguntas de {path.name}</summary>
                           <p className="muted">
-                            Marcar tira a pergunta de “Todos” e a inclui neste
-                            caminho. Você pode marcar a mesma pergunta em outros
-                            caminhos. Desmarcar o último destino volta a
-                            exibi-la para todos.
+                            O paciente verá as perguntas marcadas neste caminho.
                           </p>
                           {following.map((s) => (
                             <label className="check-option" key={s.id}>
@@ -311,18 +330,14 @@ export function FlowEditor({
                                   version.steps.indexOf(s) <
                                   version.steps.indexOf(router)
                                 }
-                                checked={s.question.pathIds.includes(path.id)}
+                                checked={includedInPath(s.question, path.id)}
                                 onChange={(e) => {
+                                  const previous = commonQuestion(s.question)
+                                    ? paths.map((item) => item.id)
+                                    : s.question.pathIds;
                                   const nextPathIds = e.target.checked
-                                    ? [
-                                        ...new Set([
-                                          ...s.question.pathIds,
-                                          path.id,
-                                        ]),
-                                      ]
-                                    : s.question.pathIds.filter(
-                                        (id) => id !== path.id,
-                                      );
+                                    ? [...new Set([...previous, path.id])]
+                                    : previous.filter((id) => id !== path.id);
                                   onDiagnostic?.("E", {
                                     formId: version.formId,
                                     versionId: version.id,
@@ -335,23 +350,7 @@ export function FlowEditor({
                                     previousPathIds: [...s.question.pathIds],
                                     nextPathIds,
                                   });
-                                  onChange(
-                                    {
-                                      ...version,
-                                      steps: version.steps.map((item) =>
-                                        item.id === s.id
-                                          ? {
-                                              ...item,
-                                              question: {
-                                                ...item.question,
-                                                pathIds: nextPathIds,
-                                              },
-                                            }
-                                          : item,
-                                      ),
-                                    },
-                                    fields,
-                                  );
+                                  setMembership(s.id, true, nextPathIds);
                                 }}
                               />
                               {s.question.label}
@@ -371,21 +370,26 @@ export function FlowEditor({
             <div className="journey-common">
               <strong>Perguntas para todos</strong>
               <p className="muted">
-                Aparecem em todos os percursos, na posição definida no bloco
-                Perguntas.
+                Marque uma pergunta aqui para incluí-la em todos os caminhos,
+                inclusive nos que criar depois.
               </p>
-              <ul>
-                {version.steps
-                  .filter(
-                    (s) => s.id !== router.id && !s.question.pathIds.length,
-                  )
-                  .map((s) => (
-                    <li key={s.id}>{s.question.label}</li>
-                  ))}
-              </ul>
-              {!version.steps.some(
-                (s) => s.id !== router.id && !s.question.pathIds.length,
-              ) && <p>Nenhuma pergunta comum.</p>}
+              {version.steps
+                .filter((s) => s.id !== router.id)
+                .map((s) => (
+                  <label className="check-option" key={s.id}>
+                    <input
+                      type="checkbox"
+                      checked={commonQuestion(s.question)}
+                      disabled={
+                        version.steps.indexOf(s) < version.steps.indexOf(router)
+                      }
+                      onChange={(event) =>
+                        setMembership(s.id, !event.target.checked, [])
+                      }
+                    />
+                    {s.question.label}
+                  </label>
+                ))}
             </div>
             <div className="journey-origin">
               <span>↓</span>

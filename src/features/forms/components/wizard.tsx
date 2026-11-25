@@ -14,16 +14,22 @@ import { Button } from "@/components/ui/button";
 import { FieldInput } from "./field-input";
 import { settingsOf } from "../services/settings";
 import { eligibleSteps } from "../services/routing";
-import { useDemo } from "@/components/layout/demo-context";
 import type { CaptureRepository } from "../services/capture";
-export type WizardCapture = Pick<CaptureRepository, "progress" | "view" | "capture" | "action">;
+type Capture = CaptureRepository["capture"];
+export type WizardCapture = Pick<
+  CaptureRepository,
+  "progress" | "view" | "action"
+> & {
+  capture: (
+    input: Parameters<Capture>[0],
+  ) => ReturnType<Capture> | Promise<ReturnType<Capture>>;
+};
 export function FormWizard({
   form,
   version,
   fields,
   clinicName,
   compact = false,
-  live = false,
   onBackgroundImageError,
   onBackgroundImageLoad,
   captureRepository,
@@ -33,17 +39,14 @@ export function FormWizard({
   fields: CustomFieldDefinition[];
   clinicName: string;
   compact?: boolean;
-  live?: boolean;
   onBackgroundImageError?: () => void;
   onBackgroundImageLoad?: () => void;
   captureRepository?: WizardCapture;
 }) {
-  const { repositories, refresh } = useDemo();
-  const capture = captureRepository ?? repositories.capture;
+  const capture = captureRepository;
+  const live = Boolean(capture);
   const settings = settingsOf(version.settings);
-  const progress = live
-    ? capture.progress(form.clientId, form.id, version.id)
-    : null;
+  const progress = capture?.progress(form.clientId, form.id, version.id);
   const [index, setIndex] = useState(progress?.nextIndex ?? 0),
     [answers, setAnswers] = useState<Record<string, FieldValue>>(
       progress?.answers ?? {},
@@ -60,6 +63,7 @@ export function FormWizard({
   const session = useRef(progress?.sessionId ?? "");
   const heading = useRef<HTMLHeadingElement>(null);
   const submitted = useRef(false);
+  const [sending, setSending] = useState(false);
   const hasContacts = Object.values(settings.contacts).some((c) => c.enabled);
   const routedSteps = eligibleSteps(version, fields, answers);
   const sequence = [
@@ -89,7 +93,11 @@ export function FormWizard({
       if (document.visibilityState === "visible")
         elapsed += Math.min(now - last, 500);
       last = now;
-      if (live && !counted && elapsed >= settings.tracking.viewSeconds * 1000) {
+      if (
+        capture &&
+        !counted &&
+        elapsed >= settings.tracking.viewSeconds * 1000
+      ) {
         counted = true;
         try {
           capture.view({
@@ -98,7 +106,6 @@ export function FormWizard({
             versionId: version.id,
             sessionId: session.current,
           });
-          refresh();
         } catch {
           /* Archived forms do not receive views. */
         }
@@ -264,9 +271,11 @@ export function FormWizard({
                 ) : (
                   <form
                     noValidate
-                    onSubmit={(e) => {
+                    onSubmit={async (e) => {
                       e.preventDefault();
                       if (submitted.current) return;
+                      submitted.current = true;
+                      setSending(true);
                       try {
                         if (current === "contacts") validateContacts();
                         else if (step && field)
@@ -290,9 +299,9 @@ export function FormWizard({
                             );
                           }
                         }
-                        if (live) {
+                        if (capture) {
                           if (isLast) {
-                            capture.capture({
+                            await capture.capture({
                               ...base(),
                               contacts,
                               answers: Object.fromEntries(
@@ -305,13 +314,12 @@ export function FormWizard({
                               ),
                               complete: true,
                             });
-                            submitted.current = true;
                           } else if (
                             (current === "contacts" &&
                               settings.contactPosition === "start") ||
                             savedPartial
                           ) {
-                            const id = capture.capture({
+                            const id = await capture.capture({
                               ...base(),
                               contacts,
                               answers,
@@ -320,9 +328,7 @@ export function FormWizard({
                             });
                             setSavedPartial(Boolean(id));
                           }
-                          if (step)
-                            capture.action(base(), step.actionId);
-                          refresh();
+                          if (step) capture.action(base(), step.actionId);
                         }
                         setError("");
                         if (isLast) setDone(true);
@@ -338,136 +344,144 @@ export function FormWizard({
                               ? err.message
                               : "Confira os campos",
                         );
+                      } finally {
+                        submitted.current = false;
+                        setSending(false);
                       }
                     }}
                   >
-                    <h2 ref={heading} tabIndex={-1}>
-                      {current === "contacts"
-                        ? "Como podemos falar com você?"
-                        : step?.question.label}
-                    </h2>
-                    {current === "contacts" ? (
-                      <>
-                        {(["name", "phone", "email"] as const)
-                          .filter((k) => settings.contacts[k].enabled)
-                          .map((k) => (
-                            <label key={k}>
-                              {settings.contacts[k].label}
-                              {settings.contacts[k].required
-                                ? " *"
-                                : " (opcional)"}
-                              <input
-                                autoComplete={
-                                  {
-                                    name: "name",
-                                    phone: "tel",
-                                    email: "email",
-                                  }[k]
-                                }
-                                type={
-                                  {
-                                    name: "text",
-                                    phone: "tel",
-                                    email: "email",
-                                  }[k]
-                                }
-                                maxLength={200}
-                                value={contacts[k]}
-                                aria-invalid={Boolean(error)}
-                                onChange={(e) => {
-                                  setContacts((c) => ({
-                                    ...c,
-                                    [k]: e.target.value,
-                                  }));
-                                  setError("");
-                                }}
-                              />
-                            </label>
-                          ))}
-                        <p className="form-privacy">
-                          Ao avançar, seus contatos e respostas serão
-                          registrados para atendimento, mesmo se você não
-                          concluir as próximas etapas.
-                        </p>
-                      </>
-                    ) : step && field ? (
-                      <>
-                        {step.description && <p>{step.description}</p>}
-                        <label
-                          className="sr-only"
-                          htmlFor={`answer-${step.question.id}`}
-                        >
-                          {step.question.label}
-                        </label>
-                        <FieldInput
-                          choiceCards
-                          id={`answer-${step.question.id}`}
-                          field={{ ...field, label: step.question.label }}
-                          value={answers[step.question.id]}
-                          errorId={error ? "form-error" : undefined}
-                          onChange={(v) => {
-                            setAnswers((a) => {
-                              const next = { ...a, [step.question.id]: v };
-                              const eligible = new Set(
-                                eligibleSteps(version, fields, next).map(
-                                  (item) => item.question.id,
+                    <fieldset
+                      disabled={sending}
+                      style={{ display: "contents" }}
+                    >
+                      <h2 ref={heading} tabIndex={-1}>
+                        {current === "contacts"
+                          ? "Como podemos falar com você?"
+                          : step?.question.label}
+                      </h2>
+                      {current === "contacts" ? (
+                        <>
+                          {(["name", "phone", "email"] as const)
+                            .filter((k) => settings.contacts[k].enabled)
+                            .map((k) => (
+                              <label key={k}>
+                                {settings.contacts[k].label}
+                                {settings.contacts[k].required
+                                  ? " *"
+                                  : " (opcional)"}
+                                <input
+                                  autoComplete={
+                                    {
+                                      name: "name",
+                                      phone: "tel",
+                                      email: "email",
+                                    }[k]
+                                  }
+                                  type={
+                                    {
+                                      name: "text",
+                                      phone: "tel",
+                                      email: "email",
+                                    }[k]
+                                  }
+                                  maxLength={200}
+                                  value={contacts[k]}
+                                  aria-invalid={Boolean(error)}
+                                  onChange={(e) => {
+                                    setContacts((c) => ({
+                                      ...c,
+                                      [k]: e.target.value,
+                                    }));
+                                    setError("");
+                                  }}
+                                />
+                              </label>
+                            ))}
+                          <p className="form-privacy">
+                            Ao avançar, seus contatos e respostas serão
+                            registrados para atendimento, mesmo se você não
+                            concluir as próximas etapas.
+                          </p>
+                        </>
+                      ) : step && field ? (
+                        <>
+                          {step.description && <p>{step.description}</p>}
+                          <label
+                            className="sr-only"
+                            htmlFor={`answer-${step.question.id}`}
+                          >
+                            {step.question.label}
+                          </label>
+                          <FieldInput
+                            choiceCards
+                            id={`answer-${step.question.id}`}
+                            field={{ ...field, label: step.question.label }}
+                            value={answers[step.question.id]}
+                            errorId={error ? "form-error" : undefined}
+                            onChange={(v) => {
+                              setAnswers((a) => {
+                                const next = { ...a, [step.question.id]: v };
+                                const eligible = new Set(
+                                  eligibleSteps(version, fields, next).map(
+                                    (item) => item.question.id,
+                                  ),
+                                );
+                                for (const key of Object.keys(next))
+                                  if (!eligible.has(key)) delete next[key];
+                                return next;
+                              });
+                              setIndex((currentIndex) =>
+                                Math.min(
+                                  currentIndex,
+                                  Math.max(sequence.length - 1, 0),
                                 ),
                               );
-                              for (const key of Object.keys(next))
-                                if (!eligible.has(key)) delete next[key];
-                              return next;
-                            });
-                            setIndex((currentIndex) =>
-                              Math.min(
-                                currentIndex,
-                                Math.max(sequence.length - 1, 0),
-                              ),
-                            );
+                              setError("");
+                            }}
+                          />
+                        </>
+                      ) : null}
+                      {error && (
+                        <p id="form-error" role="alert" className="field-error">
+                          {error}
+                        </p>
+                      )}
+                      <div className="form-navigation">
+                        {settings.introduction.mode === "separate" &&
+                          index > 0 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => setIntroSeen(false)}
+                            >
+                              Apresentação
+                            </Button>
+                          )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          disabled={index === 0}
+                          onClick={() => {
+                            setIndex((i) => i - 1);
                             setError("");
                           }}
-                        />
-                      </>
-                    ) : null}
-                    {error && (
-                      <p id="form-error" role="alert" className="field-error">
-                        {error}
-                      </p>
-                    )}
-                    <div className="form-navigation">
-                      {settings.introduction.mode === "separate" &&
-                        index > 0 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => setIntroSeen(false)}
-                          >
-                            Apresentação
-                          </Button>
-                        )}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        disabled={index === 0}
-                        onClick={() => {
-                          setIndex((i) => i - 1);
-                          setError("");
-                        }}
-                      >
-                        Voltar
-                      </Button>
-                      <Button
-                        type="submit"
-                        data-action-id={
-                          step?.actionId ?? `contacts-${version.id}`
-                        }
-                        data-step-id={current}
-                      >
-                        {isLast
-                          ? "Enviar cadastro"
-                          : step?.buttonLabel || "Continuar"}
-                        <ArrowRight size={16} />
-                      </Button>
-                    </div>
+                        >
+                          Voltar
+                        </Button>
+                        <Button
+                          type="submit"
+                          data-action-id={
+                            step?.actionId ?? `contacts-${version.id}`
+                          }
+                          data-step-id={current}
+                        >
+                          {isLast
+                            ? "Enviar cadastro"
+                            : step?.buttonLabel || "Continuar"}
+                          <ArrowRight size={16} />
+                        </Button>
+                      </div>
+                    </fieldset>
                   </form>
                 )}
               </>

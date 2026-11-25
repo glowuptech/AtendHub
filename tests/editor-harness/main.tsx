@@ -22,6 +22,7 @@ import { Queue } from "@/features/queue/queue";
 import { createRoot } from "react-dom/client";
 import { EditorWorkspace } from "@/features/forms/components/editor";
 import { makePersistedPathForm } from "./path-fixture";
+import { PublicForm } from "@/features/forms/components/views";
 import { FormsList } from "@/features/forms/components/forms-list";
 import { clients } from "@/lib/mocks/fixtures";
 import "@/app/globals.css";
@@ -465,6 +466,12 @@ window.fetch = async (input, init) => {
     }
     if (init?.body) {
       const body = JSON.parse(String(init.body));
+      const version = body.form.versions.find((item: { id: string }) => item.id === body.form.activeVersionId);
+      if (body.publish) {
+        version.state = "snapshot";
+        body.form.status = "demo";
+        body.form.publishedSlug = body.form.slug;
+      }
       localStorage.setItem("editor-test-draft", JSON.stringify(body.form));
       return Response.json(body.form);
     }
@@ -493,7 +500,9 @@ function EditorHarness() {
 
 createRoot(document.getElementById("root")!).render(
   <main style={{ padding: 24 }}>
-    {new URLSearchParams(location.search).has("client-access") ? (
+    {new URLSearchParams(location.search).has("public-form") ? (
+      <PublicForm slug="formulario-publicado" />
+    ) : new URLSearchParams(location.search).has("client-access") ? (
       <>
         <ExternalScheduling clientId={clients[0].id} />
         <ClientAccesses clientId={clients[0].id} />

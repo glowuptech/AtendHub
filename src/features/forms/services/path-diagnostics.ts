@@ -1,3 +1,4 @@
+import { includedInPath } from "./routing";
 import type {
   CustomFieldDefinition,
   FormDefinition,
@@ -32,6 +33,8 @@ export function routingSnapshot(
     questionId: step.question.id,
     fieldDefinitionId: step.question.fieldDefinitionId,
     pathIds: [...step.question.pathIds],
+    selectedPathsOnly: step.question.selectedPathsOnly,
+    definesPath: step.question.definesPath,
   }));
   const optionDestinations = fields.flatMap((field) =>
     field.options.map((option) => ({
@@ -66,12 +69,12 @@ export function routingSnapshot(
     questions,
     availablePathIds: paths.map((path) => path.id),
     optionDestinations,
-    checkboxComparisons: questions.flatMap((question) =>
+    checkboxComparisons: questions.filter((question) => !question.definesPath).flatMap((question) =>
       paths.map((path) => ({
         stepId: question.stepId,
         questionId: question.questionId,
         pathId: path.id,
-        checked: question.pathIds.includes(path.id),
+        checked: includedInPath(question, path.id),
       })),
     ),
     orphanedQuestionReferences: questionReferences,

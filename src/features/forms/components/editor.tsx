@@ -1,5 +1,5 @@
 "use client";
-import { rootDomain } from "@/features/client-domains/model";
+import { PublicFormLink } from "./public-form-link";
 import { useClientOrigin } from "@/features/client-domains/settings";
 import {
   useCallback,
@@ -25,6 +25,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   FieldSchema,
+  VersionSchema,
   FieldTypeSchema,
   type FieldType,
   type FormDefinition,
@@ -36,7 +37,7 @@ import { QuestionOptions } from "./question-options";
 import { SettingsEditor } from "./settings-editor";
 import { EditorAccordion } from "./editor-accordion";
 import { FlowEditor } from "./flow-editor";
-import { validateRouting } from "../services/routing";
+import { commonQuestion, validateRouting } from "../services/routing";
 import {
   createPathDiagnosticReport,
   fieldsForVersion,
@@ -303,6 +304,7 @@ export function EditorWorkspace({
   const [section, setSection] = useState("");
   const [activeStep, setActiveStep] = useState("");
   const [saving, setSaving] = useState(false);
+  const [publishedSlug, setPublishedSlug] = useState(source?.publishedSlug ?? (source?.status === "demo" ? source.slug : null));
   const [persistedId, setPersistedId] = useState(source?.id ?? "");
   const [mode, setMode] = useState("new"),
     [selected, setSelected] = useState(""),
@@ -380,6 +382,7 @@ export function EditorWorkspace({
         );
         return;
       }
+      setPublishedSlug(source.publishedSlug ?? (source.status === "demo" ? source.slug : null));
       const prepared = prepareEditorForm(source, client);
       setInitialEditorState(prepared);
       setDraft(prepared.form);
@@ -448,8 +451,9 @@ export function EditorWorkspace({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             clientId,
-            form: submittedDraft,
+            form: { ...submittedDraft, versions: [VersionSchema.parse(submittedVersion)] },
             publish: snapshot,
+            expectedUpdatedAt: submittedDraft.updatedAt,
           }),
         },
       );
@@ -465,11 +469,13 @@ export function EditorWorkspace({
         id: step.question.id,
         paths: [...step.question.pathIds].sort(),
         router: step.question.definesPath,
+        common: commonQuestion(step.question),
       }));
       const returnedLinks = returnedVersion?.steps.map((step) => ({
         id: step.question.id,
         paths: [...step.question.pathIds].sort(),
         router: step.question.definesPath,
+        common: commonQuestion(step.question),
       }));
       const responseSnapshot = routingSnapshot(
         result.id,
@@ -494,11 +500,13 @@ export function EditorWorkspace({
       }
       setPersistedId(result.id);
       const unchanged = latestDraft.current === submittedDraft;
+      setPublishedSlug(result.publishedSlug ?? (result.status === "demo" ? result.slug : null));
       if (unchanged) setDraft(result);
       else
         setDraft((current) => ({
           ...current,
           id: result.id,
+          updatedAt: result.updatedAt,
           activeVersionId: result.activeVersionId,
           versions: current.versions.map((item) =>
             item.id === current.activeVersionId
@@ -568,15 +576,11 @@ export function EditorWorkspace({
         }
       />
       <div className="actions editor-save-bar">
-        <Button disabled={frozen || saving} onClick={() => save()}>
-          {saving ? "Salvando…" : "Salvar rascunho"}
+        <Button disabled={frozen || saving} onClick={() => save(true)}>
+          {saving ? "Salvando…" : "Salvar e publicar"}
         </Button>
-        <Button
-          variant="outline"
-          disabled={frozen || saving}
-          onClick={() => save(true)}
-        >
-          Publicar formulário
+        <Button variant="outline" disabled={frozen || saving} onClick={() => save()}>
+          Salvar rascunho
         </Button>
         <span className="muted">
           {saved
@@ -587,6 +591,7 @@ export function EditorWorkspace({
       <p role="status" className="notice">
         {notice}
       </p>
+      {publishedSlug && <PublicFormLink key={publishedSlug} origin={origin} slug={publishedSlug} />}
       <PathDiagnostics report={diagnosticReport} />
       <div className={`editor-grid preview-${previewMode}`}>
         <div className="editor-fields">
@@ -734,6 +739,7 @@ export function EditorWorkspace({
                 onDiagnostic={recordFlowDiagnostic}
                 onChange={(next, nextFields) => {
                   markDirty();
+                  setPreviewKey((key) => key + 1);
                   setDraft((current) => ({
                     ...current,
                     fields: nextFields,
@@ -790,7 +796,7 @@ export function EditorWorkspace({
                                       ?.name ?? "Caminho inválido",
                                 )
                                 .join(", ")
-                            : "Comum a todos"}
+                            : commonQuestion(s.question) ? "Comum a todos" : "Fora dos caminhos"}
                       </span>
                     </summary>
                     <fieldset
@@ -1066,6 +1072,7 @@ export function EditorWorkspace({
                           field.label,
                           version.steps.length,
                         );
+                        step.question.selectedPathsOnly = version.steps.some((s) => s.question.definesPath);
                         markDirty();
                         setDraft((current) => ({
                           ...current,
@@ -1121,11 +1128,6 @@ export function EditorWorkspace({
               section="tracking"
             />
           </EditorAccordion>
-          {saved && frozen && (
-            <NavButton href={`${origin ?? `https://${rootDomain}`}/f/${draft.slug}`}>
-              Abrir formulário ativo
-            </NavButton>
-          )}
           {saved && (
             <NavButton
               href={`/app/clientes/${clientId}/formularios/${draft.id}/preview`}

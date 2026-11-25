@@ -2,6 +2,7 @@ import type {
   CustomFieldDefinition,
   FormVersion,
   FieldValue,
+  FormStep,
 } from "@/domain/schemas";
 
 export function validateRouting(
@@ -30,7 +31,7 @@ export function validateRouting(
   if (routers.length !== 1)
     throw new Error("Defina uma pergunta principal de roteamento.");
   const router = routers[0];
-  if (router.question.pathIds.length)
+  if (!commonQuestion(router.question))
     throw new Error("A pergunta de roteamento deve ser comum a todos.");
   if (!router.question.required)
     throw new Error("A pergunta de roteamento deve ser obrigatória.");
@@ -77,16 +78,30 @@ export function pathForAnswer(
   return option?.pathId ?? null;
 }
 
+type PathMembership = Pick<
+  FormStep["question"],
+  "pathIds" | "selectedPathsOnly"
+>;
+
+export function commonQuestion(question: PathMembership) {
+  return !question.selectedPathsOnly && !question.pathIds.length;
+}
+
+export function includedInPath(question: PathMembership, path: string | null) {
+  return (
+    commonQuestion(question) ||
+    (path !== null && question.pathIds.includes(path))
+  );
+}
+
 export function eligibleSteps(
   version: FormVersion,
   fields: CustomFieldDefinition[],
   answers: Record<string, FieldValue>,
 ) {
   const selectedPath = pathForAnswer(version, fields, answers);
-  return version.steps.filter(
-    (step) =>
-      step.question.pathIds.length === 0 ||
-      (!!selectedPath && step.question.pathIds.includes(selectedPath)),
+  return version.steps.filter((step) =>
+    includedInPath(step.question, selectedPath),
   );
 }
 
@@ -120,6 +135,7 @@ export function removePath(
         question: {
           ...s.question,
           pathIds: s.question.pathIds.filter((p) => p !== id),
+          selectedPathsOnly: !commonQuestion(s.question),
         },
       })),
     },
@@ -145,14 +161,21 @@ export function selectRouter(
       !["single_select", "image_choice"].includes(field.type))
   )
     throw new Error("Escolha uma pergunta de seleção única ou por imagens.");
+  const creatingBranches =
+    !!id && !version.steps.some((s) => s.question.definesPath);
+  const routerIndex = version.steps.findIndex((s) => s.id === id);
   return [
     {
       ...version,
       paths: id ? version.paths : [],
-      steps: version.steps.map((s) => ({
+      steps: version.steps.map((s, index) => ({
         ...s,
         question: {
           ...s.question,
+          selectedPathsOnly:
+            !!id &&
+            index > routerIndex &&
+            (creatingBranches || s.question.selectedPathsOnly),
           definesPath: s.id === id,
           pathIds: !id || s.id === id ? [] : s.question.pathIds,
           required: s.id === id ? true : s.question.required,

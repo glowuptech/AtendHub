@@ -203,6 +203,7 @@ export const QuestionSchema = z.object({
   label: z.string().min(2),
   required: z.boolean(),
   pathIds: z.array(z.string().min(1)).default([]),
+  selectedPathsOnly: z.boolean().optional(),
   definesPath: z.boolean().default(false),
 });
 export const StepSchema = z.object({
@@ -388,7 +389,7 @@ export const EventSchema = z
 export type Client = z.infer<typeof ClientSchema>;
 export type CustomFieldDefinition = z.infer<typeof FieldSchema>;
 export type FieldType = z.infer<typeof FieldTypeSchema>;
-export type FormDefinition = z.infer<typeof FormSchema>;
+export type FormDefinition = z.infer<typeof FormSchema> & { publishedSlug?: string | null; updatedAt?: string };
 export type FormVersion = z.infer<typeof VersionSchema>;
 export type FormStep = z.infer<typeof StepSchema>;
 export type FormQuestion = z.infer<typeof QuestionSchema>;
@@ -422,13 +423,13 @@ export function validateAnswer(
         .string()
         .regex(
           /^\+[1-9]\d{7,14}$/,
-          "Use telefone no formato +5511999999999 (apenas fictício)",
+          "Informe o telefone com o código do país, como +5511999999999",
         )
         .parse(value);
     case "email":
       return z
         .string()
-        .email("Informe um e-mail válido de demonstração")
+        .email("Informe um e-mail válido")
         .parse(value);
     case "date":
       return z.string().date("Informe uma data válida").parse(value);
