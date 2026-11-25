@@ -1,5 +1,6 @@
 import "@/features/paid-media/workspace.css";
 import { PaidMediaWorkspace } from "@/features/paid-media/workspace";
+import { ClientProfile } from "@/features/clients/components/clients";
 import { CampaignPlanning } from "@/features/paid-media/planning";
 // Isolated browser harness: real components, simulated persistence only.
 import { useEffect, useState } from "react";
@@ -449,6 +450,7 @@ window.fetch = async (input, init) => {
     }
     return Response.json([...clients, ...existing]);
   }
+  if (url === "/api/clients") return Response.json(clients);
   if (url.startsWith("/api/clients")) return Response.json(clients);
   if (url.startsWith("/api/forms")) {
     const current = JSON.parse(
@@ -498,6 +500,8 @@ createRoot(document.getElementById("root")!).render(
       </>
     ) : new URLSearchParams(location.search).has("veredit") ? (
       <Clients />
+    ) : new URLSearchParams(location.search).has("client-profile") ? (
+      <ClientProfile id={clients[0].id} />
     ) : new URLSearchParams(location.search).has("paid-media") ? (
       <PaidMediaWorkspace />
     ) : new URLSearchParams(location.search).has("campaign-planning") ? (

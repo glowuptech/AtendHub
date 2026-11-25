@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { clients } from "../../src/lib/mocks/fixtures";
 import { emptyMetrics } from "../../src/features/paid-media/metrics";
 import type { MediaReport, Plan } from "../../src/features/paid-media/model";
 
@@ -319,4 +320,96 @@ test("mostra os resultados, os recortes da Meta e o limite por conta no resumo",
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+});
+
+test("perfil do cliente usa a mesma faixa de datas na Visão geral e no dashboard", async ({
+  page,
+}) => {
+  const profileId = clients[0].id;
+  await page.route(`**/api/clients/${profileId}/overview?**`, async (route) => {
+    const search = new URL(route.request().url()).searchParams;
+    const day = search.get("to")!;
+    return route.fulfill({
+      json: {
+        leadCount: 7,
+        appointmentCount: 0,
+        converted: 2,
+        responded: 5,
+        responseAverage: 8,
+        handlingCount: 1,
+        handlingAverage: 10,
+        views: 12,
+        submitted: 3,
+        attendance: { present: 0, known: 0 },
+        daily: [{ day, leads: 7, appointments: 0 }],
+        stages: { new: 7 },
+        forms: [
+          { id: "form", name: "Captação da clínica", views: 12, submitted: 3 },
+        ],
+        awaitingResponse: [],
+        recentAppointments: [],
+      },
+    });
+  });
+  await page.route("**/api/paid-media?**", async (route) => {
+    const search = new URL(route.request().url()).searchParams;
+    expect(search.get("clientId")).toBe(profileId);
+    if (search.get("kind") === "analytics")
+      return route.fulfill({ json: { accounts: [] } });
+    const value = { ...metrics, spend: 180 };
+    return route.fulfill({
+      json: {
+        ...report,
+        clients: [{ id: profileId, name: clients[0].name, code: "C00" }],
+        accounts: report.accounts.map((a) => ({
+          ...a,
+          clientIds: [profileId],
+        })),
+        campaigns: report.campaigns.map((c) => ({
+          ...c,
+          client_id: profileId,
+          metrics: value,
+        })),
+        totals: [{ currency: "BRL", ...value }],
+        daily: [
+          {
+            currency: "BRL",
+            day: search.get("to"),
+            spend: 180,
+            form_leads: 4,
+            whatsapp_conversations: 2,
+          },
+        ],
+      },
+    });
+  });
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.goto("/tests/editor-harness/index.html?client-profile");
+  await expect(page.getByText("Captação da clínica")).toBeVisible();
+  await expect(page.getByText("R$ 180,00", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Últimos 7 dias" }).click();
+  const from = await page.getByLabel("De", { exact: true }).inputValue();
+  await page
+    .getByRole("button", { name: "Ver dashboard de tráfego pago" })
+    .click();
+  const dashboard = page.getByRole("region", {
+    name: "Dashboard de tráfego pago do cliente",
+  });
+  await expect(
+    dashboard.getByRole("heading", { name: "Resumo em BRL" }),
+  ).toBeVisible();
+  await expect(dashboard.getByLabel("De", { exact: true })).toHaveValue(from);
+  await expect(
+    dashboard.getByRole("img", { name: /Investimento e leads por dia/ }),
+  ).toBeVisible();
+  await expect(
+    dashboard.getByRole("combobox", { name: "Cliente", exact: true }),
+  ).toHaveCount(0);
+  await dashboard.getByRole("button", { name: "Últimos 30 dias" }).click();
+  const updatedFrom = await dashboard
+    .getByLabel("De", { exact: true })
+    .inputValue();
+  await page.getByRole("button", { name: "Visão geral" }).click();
+  await expect(page.getByLabel("De", { exact: true })).toHaveValue(updatedFrom);
+  await expect(page.getByText("R$ 180,00", { exact: true })).toBeVisible();
 });

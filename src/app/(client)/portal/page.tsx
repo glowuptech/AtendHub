@@ -8,6 +8,9 @@ export default async function Page() {
       <p>
         <a href="/portal/agendamentos">Consultar agendamentos</a>
       </p>
+      <p>
+        <a href="/portal/trafego-pago">Ver dashboard de tráfego pago</a>
+      </p>
     </section>
   ) : (
     <Portal />
