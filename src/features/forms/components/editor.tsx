@@ -1,4 +1,5 @@
 "use client";
+import { defaultCompletionMessage } from "../services/completion";
 import { PublicFormLink } from "./public-form-link";
 import { useClientOrigin } from "@/features/client-domains/settings";
 import {
@@ -238,7 +239,7 @@ function prepareEditorForm(
           theme: client.branding,
           destination: "demo_success" as const,
           settings: settingsOf(),
-          successMessage: "Cadastro recebido! Em breve entraremos em contato.",
+          successMessage: defaultCompletionMessage,
         },
       ],
     } satisfies FormDefinition,

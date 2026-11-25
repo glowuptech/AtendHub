@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import useSWR from "swr";
 import { useDemo } from "@/components/layout/demo-context";
 import { useClients } from "@/features/clients/hooks";
 import { useForms } from "../hooks";
@@ -12,7 +11,7 @@ import {
 } from "@/components/layout/shared";
 import { fieldsForVersion } from "../services/path-diagnostics";
 import { settingsOf } from "../services/settings";
-import { FormWizard, type WizardCapture } from "./wizard";
+import { FormWizard } from "./wizard";
 
 export function FormPreview({
   clientId: id,
@@ -30,63 +29,6 @@ export function FormPreview({
   const version = form.versions.find((item) => item.id === form.activeVersionId) ?? form.versions.at(-1);
   if (!version) return <Denied />;
   return <><Heading title="Prévia do formulário" description={`${client.name} · persistido no Supabase.`} action={<NavButton href={`/app/clientes/${id}/formularios`}>Voltar</NavButton>} /><div className="preview-center"><FormWizard form={form} version={version} key={version.id} fields={fieldsForVersion(form, version)} clinicName={client.name} /></div></>;
-}
-const publicFetcher = async (url: string) => {
-  const response = await fetch(url);
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? "Formulário indisponível.");
-  return body;
-};
-
-export function PublicForm({ slug }: { slug: string }) {
-  const { data: form, error, isLoading } = useSWR(`/api/public/forms/${encodeURIComponent(slug)}`, publicFetcher, {
-    revalidateOnFocus: false,
-  });
-  const [sessionId] = useState(() => crypto.randomUUID());
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
-  if (isLoading) return <main className="public-page"><p role="status">Carregando formulário…</p></main>;
-  if (error || !form) return <main className="public-page"><p role="alert">Formulário indisponível. Solicite o link atualizado à equipe de atendimento.</p></main>;
-  const version = form.versions.find((item: { id: string }) => item.id === form.activeVersionId);
-  if (!version) return <main className="public-page"><p role="alert">Formulário indisponível. Solicite o link atualizado à equipe de atendimento.</p></main>;
-  const sendEvent = (eventType: "view" | "action", actionId?: string) => {
-    void fetch(`/api/public/forms/${encodeURIComponent(slug)}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ eventType, actionId, sessionId }),
-      keepalive: true,
-    });
-  };
-  const capture: WizardCapture = {
-    progress: () => null,
-    view: () => sendEvent("view"),
-    action: (_input, actionId) => sendEvent("action", actionId),
-    capture: async (input) => {
-      const query = new URLSearchParams(window.location.search);
-      const campaign = query.get("meta_campaign_id");
-      const ad = query.get("meta_ad_id");
-      const response = await fetch(`/api/public/forms/${encodeURIComponent(slug)}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...input, sessionId, idempotencyKey, ...(campaign && { campaign, ad }) }),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        throw new Error(body?.error ?? "Não foi possível salvar suas respostas. Tente novamente.");
-      }
-      return sessionId;
-    },
-  };
-  return (
-    <main className="public-page">
-      <FormWizard
-        form={form}
-        version={version}
-        fields={form.fields ?? []}
-        clinicName={form.clinicName ?? form.name}
-        captureRepository={capture}
-      />
-    </main>
-  );
 }
 export function FormAnalytics({
   clientId: id,

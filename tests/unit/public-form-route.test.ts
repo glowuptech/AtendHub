@@ -6,7 +6,8 @@ const mocks = vi.hoisted(() => ({
   rpc: vi.fn(),
   tenant: vi.fn(),
 }));
-vi.mock("@supabase/supabase-js", () => ({ createClient: () => mocks }));
+vi.mock("server-only", () => ({}));
+vi.mock("@/features/whatsapp/server", () => ({ integrationAdmin: () => mocks }));
 vi.mock("@/features/client-domains/server", () => ({
   tenantAtHost: mocks.tenant,
 }));
@@ -50,8 +51,6 @@ const versions = query({
 });
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubEnv("SUPABASE_URL", "https://example.invalid");
-  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-only");
   mocks.tenant.mockResolvedValue(form.clientId);
   mocks.from.mockImplementation((table) =>
     table === "atendhub_forms"
@@ -71,6 +70,7 @@ const request = (body?: object) =>
 it("abre apenas o snapshot ativo do cliente do domínio sem sessão do painel", async () => {
   const response = await GET(request(), ctx);
   expect(response.status).toBe(200);
+  expect((await response.json()).versions[0].successMessage).toBe("Recebemos seu cadastro.");
   expect(forms.eq).toHaveBeenCalledWith("status", "demo");
   expect(forms.eq).toHaveBeenCalledWith("client_id", form.clientId);
   expect(versions.eq).toHaveBeenCalledWith("id", version.id);

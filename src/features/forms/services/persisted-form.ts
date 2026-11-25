@@ -1,5 +1,7 @@
 import type { FormDefinition } from "@/domain/schemas";
 
+import { completionMessage } from "./completion";
+
 type FormRow = {
   id: string;
   organization_id: string;
@@ -22,7 +24,7 @@ type VersionRow = {
   paths?: unknown;
   choice_assets?: Array<{ id: string; imageUrl?: string; alt?: string }>;
   definition: {
-    version?: { paths?: unknown };
+    version?: { paths?: unknown; successMessage?: string };
     fields?: FormDefinition["fields"];
     details?: Pick<
       FormDefinition,
@@ -57,6 +59,7 @@ export function persistedForm(
     }));
     return {
       ...v.definition.version,
+      successMessage: completionMessage(v.definition.version?.successMessage),
       id: v.id,
       formId: v.form_id,
       organizationId: v.organization_id,

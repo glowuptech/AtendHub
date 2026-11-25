@@ -246,7 +246,7 @@ export function FormWizard({
               <div className="form-success" role="status">
                 <Check size={42} />
                 <h2 ref={heading} tabIndex={-1}>
-                  Cadastro concluído
+                  {live ? "Cadastro concluído" : "Prévia concluída"}
                 </h2>
                 <p>{version.successMessage}</p>
                 <progress

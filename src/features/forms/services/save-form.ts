@@ -4,6 +4,7 @@ import { FormSchema } from "@/domain/schemas";
 import { sessionOrganizationContext } from "@/lib/supabase/organization-session";
 import { apiError } from "@/lib/supabase/organization-admin";
 import { validateRouting } from "./routing";
+import { completionMessage } from "./completion";
 import { persistedForm } from "./persisted-form";
 
 const input = z.object({
@@ -35,8 +36,8 @@ export async function saveForm(request: Request, existingId?: string) {
   if (publish) {
     try {
       validateRouting(version, form.fields);
-      if (version.settings?.enabled === false)
-        throw new Error("Marque “Formulário ativo” antes de publicar.");
+      version.successMessage = completionMessage(version.successMessage);
+      if (version.settings) version.settings.enabled = true;
     } catch (error) {
       return NextResponse.json(
         {

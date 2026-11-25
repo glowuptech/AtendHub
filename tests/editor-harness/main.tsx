@@ -22,7 +22,7 @@ import { Queue } from "@/features/queue/queue";
 import { createRoot } from "react-dom/client";
 import { EditorWorkspace } from "@/features/forms/components/editor";
 import { makePersistedPathForm } from "./path-fixture";
-import { PublicForm } from "@/features/forms/components/views";
+import { PublicForm } from "@/features/forms/components/public-form";
 import { FormsList } from "@/features/forms/components/forms-list";
 import { clients } from "@/lib/mocks/fixtures";
 import "@/app/globals.css";
@@ -501,7 +501,7 @@ function EditorHarness() {
 createRoot(document.getElementById("root")!).render(
   <main style={{ padding: 24 }}>
     {new URLSearchParams(location.search).has("public-form") ? (
-      <PublicForm slug="formulario-publicado" />
+      <PublicForm form={JSON.parse(localStorage.getItem("public-test-form")!)} />
     ) : new URLSearchParams(location.search).has("client-access") ? (
       <>
         <ExternalScheduling clientId={clients[0].id} />

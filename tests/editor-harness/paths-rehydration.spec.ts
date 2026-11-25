@@ -246,21 +246,28 @@ test("formulário público segue a resposta atual e aguarda a gravação antes d
   const field = form.fields.find(
     (f) => f.id === router.question.fieldDefinitionId,
   )!;
+  form.slug = "formulario-publicado";
+  form.versions[0].successMessage = "Recebemos seu cadastro.";
+  await page.addInitScript((fixture) => {
+    localStorage.setItem("public-test-form", JSON.stringify(fixture));
+  }, { ...form, clinicName: "Clínica" });
   let captures = 0;
+  let key: string | undefined;
   await page.route(
     "**/api/public/forms/formulario-publicado",
     async (route) => {
-      if (route.request().method() === "GET")
-        return route.fulfill({ json: form });
+      expect(route.request().method()).toBe("POST");
       const body = route.request().postDataJSON();
       if (body.eventType) return route.fulfill({ json: { ok: true } });
       expect(body.answers[router.question.id]).toBe(field.options[1].id);
       expect(body.answers).not.toHaveProperty(a.question.id);
       expect(body.answers).not.toHaveProperty(common.question.id);
+      key ??= body.idempotencyKey;
+      expect(body.idempotencyKey).toBe(key);
       captures++;
-      return captures === 1
-        ? route.fulfill({ status: 409, json: { error: "Tente novamente." } })
-        : route.fulfill({ json: { ok: true } });
+      if (captures === 1) return route.fulfill({ status: 409, json: { error: "Tente novamente." } });
+      if (captures === 2) return route.fulfill({ json: { ok: true } });
+      return route.fulfill({ status: 201, json: { ok: true, complete: true, leadId: crypto.randomUUID() } });
     },
   );
   await page.goto("/tests/editor-harness/index.html?public-form");
@@ -296,6 +303,9 @@ test("formulário público segue a resposta atual e aguarda a gravação antes d
   await page.getByRole("button", { name: "Enviar cadastro" }).click();
   await expect(page.getByRole("alert")).toHaveText("Tente novamente.");
   await page.getByRole("button", { name: "Enviar cadastro" }).click();
+  await expect(page.getByRole("alert")).toContainText("Não foi possível confirmar o cadastro");
+  await page.getByRole("button", { name: "Enviar cadastro" }).click();
+  await expect(page.getByText("Recebemos seu cadastro.")).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Cadastro concluído" }),
   ).toBeVisible();
