@@ -1,5 +1,6 @@
 import "@/features/paid-media/workspace.css";
 import { PaidMediaWorkspace } from "@/features/paid-media/workspace";
+import { ClientProfile } from "@/features/clients/components/clients";
 import { CampaignPlanning } from "@/features/paid-media/planning";
 // Isolated browser harness: real components, simulated persistence only.
 import { useEffect, useState } from "react";
@@ -439,7 +440,7 @@ window.fetch = async (input, init) => {
           ]
         : [queueLead()],
     );
-  if (url.startsWith("/api/clients")) return Response.json(clients);
+  if (url === "/api/clients") return Response.json(clients);
   if (url.startsWith("/api/forms")) {
     const current = JSON.parse(
       localStorage.getItem("editor-test-draft") ?? "null",
@@ -486,6 +487,8 @@ createRoot(document.getElementById("root")!).render(
         <ExternalScheduling clientId={clients[0].id} />
         <ClientAccesses clientId={clients[0].id} />
       </>
+    ) : new URLSearchParams(location.search).has("client-profile") ? (
+      <ClientProfile id={clients[0].id} />
     ) : new URLSearchParams(location.search).has("paid-media") ? (
       <PaidMediaWorkspace />
     ) : new URLSearchParams(location.search).has("campaign-planning") ? (

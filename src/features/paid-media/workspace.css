@@ -369,3 +369,18 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.client-media-spend .metric-value {
+  display: block;
+}
+.client-media-spend > button {
+  margin-top: 8px;
+}
+.branded-portal {
+  max-width: 850px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+}
+.branded-portal:has(.paid-workspace) {
+  max-width: 1320px;
+}

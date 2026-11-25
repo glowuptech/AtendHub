@@ -15,7 +15,7 @@ export default async function Layout({
   const context = await brandedPortalContext();
   if (context)
     return (
-      <main style={{ maxWidth: 850, margin: "2rem auto", padding: "1.5rem" }}>
+      <main className="branded-portal">
         <BrandedPortalHeader name={context.client.name} />
         {children}
       </main>

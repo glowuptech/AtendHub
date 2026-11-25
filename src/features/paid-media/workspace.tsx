@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent, type ReactNode } from "react";
-import { endpoint, requestMedia } from "./transport";
+import { endpoint, reportPath, requestMedia } from "./transport";
 import { MediaAssistant } from "./assistant";
 import { AnalyticsModules } from "./analytics-summary";
 import { DailyChart } from "./analytics-charts";
@@ -55,13 +55,22 @@ export function PaidMediaWorkspace({
   clientId,
   portal = false,
   embedded = false,
+  period,
+  onPeriodChange,
 }: {
   clientId?: string;
   portal?: boolean;
   embedded?: boolean;
+  period?: { from: string; to: string };
+  onPeriodChange?: (period: { from: string; to: string }) => void;
 }) {
   const [today] = useState(() => localDay(new Date().toISOString()));
-  const [range, setRange] = useState({ from: today, to: today });
+  const [localRange, setLocalRange] = useState(() => ({
+    from: clientId ? shiftDay(today, -29) : today,
+    to: today,
+  }));
+  const range = period ?? localRange;
+  const setRange = onPeriodChange ?? setLocalRange;
   const [draft, setDraft] = useState(range);
   const [filter, setFilter] = useState(clientId ?? "");
   const [view, setView] = useState<View>("Resumo");
@@ -73,10 +82,8 @@ export function PaidMediaWorkspace({
     requestMedia,
     { revalidateOnFocus: false },
   );
-  const query = new URLSearchParams(range);
-  if (filter) query.set("clientId", filter);
   const { data, error, isLoading, mutate } = useSWR<MediaReport>(
-    `${endpoint}?${query}`,
+    reportPath(range, filter),
     requestMedia,
     { keepPreviousData: false, revalidateOnFocus: false },
   );
@@ -300,6 +307,7 @@ function Summary({
   portal: boolean;
 }) {
   const days = daysBetween(range.from, range.to) + 1;
+  const needsCampaigns = !!clientId && data.accounts.length > 0 && !data.campaigns.length;
   const covered = data.accounts.some((a) => a.coveredDays > 0);
   const complete =
     data.accounts.length > 0 &&
@@ -333,7 +341,12 @@ function Summary({
       {!data.attributionAvailable && (
         <p className="muted">A atribuição do CRM aguarda ativação no banco.</p>
       )}
-      {totals.map((m) => {
+      {needsCampaigns && (
+        <Card>
+          <p>Nenhuma campanha vinculada a este cliente.</p>
+        </Card>
+      )}
+      {!needsCampaigns && totals.map((m) => {
         const hasData = data.accounts.some(
           (a) => a.currency === m.currency && a.coveredDays > 0,
         );
