@@ -863,6 +863,7 @@ export function EditorWorkspace({
                         <label>
                           Evento Meta desta etapa (opcional)
                           <input
+                            title="PageView e Lead são configurados em Eventos e integrações."
                             placeholder="Ex.: EtapaCincoConcluida"
                             value={s.metaEvent ?? ""}
                             onChange={(e) =>
