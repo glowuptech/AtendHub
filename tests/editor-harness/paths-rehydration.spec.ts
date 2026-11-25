@@ -54,9 +54,12 @@ test("reidrata vínculos persistidos após carga assíncrona e mantém edição 
       .getByRole("checkbox", { name: "Pergunta com título duplicado" })
       .last(),
   ).toBeChecked();
-  await expect(page.getByText("Pergunta comum", { exact: true })).toHaveCount(
-    1,
-  );
+  await expect(
+    branchA.getByRole("checkbox", { name: "Pergunta comum" }),
+  ).toBeChecked();
+  await expect(
+    branchB.getByRole("checkbox", { name: "Pergunta comum" }),
+  ).toBeChecked();
 
   const reportElement = await openDiagnostic(page);
   const report = JSON.parse((await reportElement.textContent()) ?? "{}");
@@ -190,6 +193,10 @@ test("avisa referências órfãs sem renomear caminho nem associação", async (
 }) => {
   const persisted = makePersistedPathForm();
   persisted.fields[2].options[0].pathId = "path_legacy_generated";
+  // The editor resolves choices from the selected version when it contains its own fields.
+  Object.assign(persisted.versions[0], {
+    fields: structuredClone(persisted.fields),
+  });
   await seedPersistedForm(page, persisted);
   await page.goto("/tests/editor-harness/index.html");
   await openPaths(page);
@@ -206,4 +213,76 @@ test("avisa referências órfãs sem renomear caminho nem associação", async (
     },
   ]);
   expect(persisted.fields[2].options[0].pathId).toBe("path_legacy_generated");
+});
+
+test("salvar e publicar exibe um link que permanece ao reabrir o editor", async ({
+  page,
+}) => {
+  const form = makePersistedPathForm();
+  form.versions[0].steps[0].question.required = true;
+  await page.addInitScript((value) => {
+    if (!localStorage.getItem("editor-test-draft"))
+      localStorage.setItem("editor-test-draft", JSON.stringify(value));
+  }, form);
+  await page.goto("/tests/editor-harness/index.html");
+  await expect(page.getByLabel("Link público")).toHaveCount(0);
+  await page.getByRole("button", { name: "Salvar e publicar" }).click();
+  const url = "https://atendehub.app/f/" + form.slug;
+  await expect(page.getByLabel("Link público")).toHaveValue(url);
+  await page.reload();
+  await expect(
+    page.getByRole("link", { name: "Abrir formulário" }),
+  ).toHaveAttribute("href", url);
+});
+
+test("formulário público segue a resposta atual e aguarda a gravação antes de concluir", async ({
+  page,
+}) => {
+  const form = makePersistedPathForm("snapshot");
+  const [router, a, b, common] = form.versions[0].steps;
+  a.question.label = "Pergunta da manhã";
+  b.question.label = "Pergunta da tarde";
+  common.question.selectedPathsOnly = true;
+  const field = form.fields.find(
+    (f) => f.id === router.question.fieldDefinitionId,
+  )!;
+  let captures = 0;
+  await page.route(
+    "**/api/public/forms/formulario-publicado",
+    async (route) => {
+      if (route.request().method() === "GET")
+        return route.fulfill({ json: form });
+      const body = route.request().postDataJSON();
+      if (body.eventType) return route.fulfill({ json: { ok: true } });
+      expect(body.answers[router.question.id]).toBe(field.options[1].id);
+      expect(body.answers).not.toHaveProperty(a.question.id);
+      expect(body.answers).not.toHaveProperty(common.question.id);
+      captures++;
+      return captures === 1
+        ? route.fulfill({ status: 409, json: { error: "Tente novamente." } })
+        : route.fulfill({ json: { ok: true } });
+    },
+  );
+  await page.goto("/tests/editor-harness/index.html?public-form");
+  await page.getByRole("radio", { name: "Manhã" }).check();
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(
+    page.getByRole("heading", { name: a.question.label }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Voltar" }).click();
+  await page.getByRole("radio", { name: "Tarde" }).check();
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(
+    page.getByRole("heading", { name: b.question.label }),
+  ).toBeVisible();
+  await page.getByLabel(b.question.label, { exact: true }).fill("+5511987654321");
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await page.getByLabel("Nome", { exact: false }).fill("Paciente Teste");
+  await page.getByLabel("WhatsApp", { exact: false }).fill("11999990000");
+  await page.getByRole("button", { name: "Enviar cadastro" }).click();
+  await expect(page.getByRole("alert")).toHaveText("Tente novamente.");
+  await page.getByRole("button", { name: "Enviar cadastro" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Cadastro concluído" }),
+  ).toBeVisible();
 });

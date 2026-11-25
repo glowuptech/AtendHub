@@ -10,6 +10,7 @@ import {
   NavButton,
   Denied,
 } from "@/components/layout/shared";
+import { fieldsForVersion } from "../services/path-diagnostics";
 import { settingsOf } from "../services/settings";
 import { FormWizard, type WizardCapture } from "./wizard";
 
@@ -20,17 +21,15 @@ export function FormPreview({
   clientId: string;
   formId: string;
 }) {
-  const { clientId } = useDemo();
   const { data: clients, isLoading: clientsLoading } = useClients();
   const { data: forms, isLoading: formsLoading } = useForms(id);
   if (clientsLoading || formsLoading) return <p role="status">Carregando prévia…</p>;
-  if (id !== clientId) return <Denied />;
   const form = forms?.find((item) => item.id === formId);
   const client = clients?.find((item) => item.id === id);
   if (!form || !client) return <Denied />;
   const version = form.versions.find((item) => item.id === form.activeVersionId) ?? form.versions.at(-1);
   if (!version) return <Denied />;
-  return <><Heading title="Prévia do formulário" description={`${client.name} · persistido no Supabase.`} action={<NavButton href={`/app/clientes/${id}/formularios`}>Voltar</NavButton>} /><div className="preview-center"><FormWizard form={form} version={version} fields={form.fields ?? []} clinicName={client.name} /></div><div className="preview-center"><p>O formulário público ainda não está conectado ao fluxo persistido.</p></div></>;
+  return <><Heading title="Prévia do formulário" description={`${client.name} · persistido no Supabase.`} action={<NavButton href={`/app/clientes/${id}/formularios`}>Voltar</NavButton>} /><div className="preview-center"><FormWizard form={form} version={version} key={version.id} fields={fieldsForVersion(form, version)} clinicName={client.name} /></div></>;
 }
 const publicFetcher = async (url: string) => {
   const response = await fetch(url);
@@ -46,9 +45,9 @@ export function PublicForm({ slug }: { slug: string }) {
   const [sessionId] = useState(() => crypto.randomUUID());
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   if (isLoading) return <main className="public-page"><p role="status">Carregando formulário…</p></main>;
-  if (error || !form) return <main className="public-page"><Denied /></main>;
+  if (error || !form) return <main className="public-page"><p role="alert">Formulário indisponível. Solicite o link atualizado à equipe de atendimento.</p></main>;
   const version = form.versions.find((item: { id: string }) => item.id === form.activeVersionId);
-  if (!version) return <main className="public-page"><Denied /></main>;
+  if (!version) return <main className="public-page"><p role="alert">Formulário indisponível. Solicite o link atualizado à equipe de atendimento.</p></main>;
   const sendEvent = (eventType: "view" | "action", actionId?: string) => {
     void fetch(`/api/public/forms/${encodeURIComponent(slug)}`, {
       method: "POST",
@@ -59,25 +58,27 @@ export function PublicForm({ slug }: { slug: string }) {
   };
   const capture: WizardCapture = {
     progress: () => null,
-    view: (input) => sendEvent("view", input.sessionId),
+    view: () => sendEvent("view"),
     action: (_input, actionId) => sendEvent("action", actionId),
-    capture: (input) => {
+    capture: async (input) => {
       const query = new URLSearchParams(window.location.search);
       const campaign = query.get("meta_campaign_id");
       const ad = query.get("meta_ad_id");
-      void fetch(`/api/public/forms/${encodeURIComponent(slug)}`, {
+      const response = await fetch(`/api/public/forms/${encodeURIComponent(slug)}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...input, sessionId, idempotencyKey, ...(campaign && { campaign, ad }) }),
-        keepalive: true,
       });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error ?? "Não foi possível salvar suas respostas. Tente novamente.");
+      }
       return sessionId;
     },
   };
   return (
     <main className="public-page">
       <FormWizard
-        live
         form={form}
         version={version}
         fields={form.fields ?? []}

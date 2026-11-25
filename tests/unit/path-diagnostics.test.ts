@@ -31,8 +31,13 @@ describe("diagnóstico de vínculos por ID exato", () => {
     expect(
       snapshot.checkboxComparisons
         .filter((comparison) => comparison.checked)
-        .map((comparison) => comparison.pathId),
-    ).toEqual(["caminho_a", "caminho_b"]);
+        .map(({ questionId, pathId }) => [questionId, pathId]),
+    ).toEqual([
+      [version.steps[1].question.id, "caminho_a"],
+      [version.steps[2].question.id, "caminho_b"],
+      [version.steps[3].question.id, "caminho_a"],
+      [version.steps[3].question.id, "caminho_b"],
+    ]);
     expect(snapshot.orphanedQuestionReferences).toEqual([]);
     expect(snapshot.orphanedOptionReferences).toEqual([]);
     expect(JSON.stringify(snapshot)).not.toContain(
