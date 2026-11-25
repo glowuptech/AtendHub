@@ -1,5 +1,5 @@
 "use client";
-import { rootDomain } from "@/features/client-domains/model";
+import { PublicFormLink } from "./public-form-link";
 import { useClientOrigin } from "@/features/client-domains/settings";
 import { useEffect, useState } from "react";
 import { FileText, Plus, Archive, ArchiveRestore } from "lucide-react";
@@ -207,13 +207,9 @@ export function FormsList({ id }: { id: string }) {
                     >
                       Prévia
                     </NavButton>
-                    {form.status === "demo" && (
-                      <NavButton href={`${origin ?? `https://${rootDomain}`}/f/${form.slug}`}>
-                        Abrir formulário
-                      </NavButton>
-                    )}
                     <NavButton href="/app/leads">Respostas no CRM</NavButton>
                   </div>
+                  {form.status === "demo" && <PublicFormLink origin={origin} slug={form.publishedSlug ?? form.slug} />}
                   <div className="actions separated">
                     {form.status === "archived" ? (
                       <Button
