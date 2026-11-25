@@ -25,7 +25,7 @@ it("publicar ativa a versão e substitui o aviso do antigo modelo", async () => 
     method: "POST",
     body: JSON.stringify({ form, publish: true }),
   });
-  expect((await saveForm(request)).status).toBe(201);
+  expect((await saveForm(request))?.status).toBe(201);
   expect(rpc).toHaveBeenCalledWith(
     "atendhub_save_form_version",
     expect.objectContaining({
