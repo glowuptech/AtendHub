@@ -466,6 +466,7 @@ window.fetch = async (input, init) => {
     }
     if (init?.body) {
       const body = JSON.parse(String(init.body));
+      if (body.action === "duplicate") return original(input, init);
       const version = body.form.versions.find((item: { id: string }) => item.id === body.form.activeVersionId);
       if (body.publish) {
         version.state = "snapshot";

@@ -18,6 +18,7 @@ import { FormPhoneInput } from "./phone-input";
 import { Button } from "@/components/ui/button";
 import { FieldInput } from "./field-input";
 import { settingsOf } from "../services/settings";
+import { questionStage } from "../services/button-events";
 import { eligibleSteps } from "../services/routing";
 import type { CaptureRepository } from "../services/capture";
 type Capture = CaptureRepository["capture"];
@@ -25,6 +26,7 @@ export type WizardCapture = Pick<
   CaptureRepository,
   "progress" | "view" | "action"
 > & {
+  navigate?: (stage: string, action?: string, eventName?: string) => void;
   capture: (
     input: Parameters<Capture>[0],
   ) => ReturnType<Capture> | Promise<ReturnType<Capture>>;
@@ -125,6 +127,28 @@ export function FormWizard({
   }, [index, done]);
   const appearance = settings.appearance;
   const introVisible = settings.introduction.mode === "separate" && !introSeen;
+  const stage = done
+    ? "concluido"
+    : introVisible
+      ? "apresentacao"
+      : step
+        ? questionStage(step)
+        : "contato";
+  const forwardAction = `avancar-${stage}`;
+  const backAction = `voltar-${stage}`;
+  const introAction = `apresentar-${stage}`;
+  const transition = useRef<{ action: string; eventName?: string } | null>(
+    null,
+  );
+  const reportedStage = useRef<string | null>(null);
+  useEffect(() => {
+    if (!capture?.navigate || reportedStage.current === stage) return;
+    reportedStage.current = stage;
+    const click = transition.current;
+    transition.current = null;
+    capture.navigate(stage, click?.action, click?.eventName);
+  }, [capture, stage]);
+
   const style = {
     "--form-primary": appearance.primary,
     "--form-button": appearance.button,
@@ -228,7 +252,14 @@ export function FormWizard({
                 </p>
               ))}
             </div>
-            <Button type="button" onClick={() => setIntroSeen(true)}>
+            <Button
+              type="button"
+              data-action-id="iniciar"
+              onClick={() => {
+                transition.current = { action: "iniciar" };
+                setIntroSeen(true);
+              }}
+            >
               {settings.introduction.buttonLabel}
               <ArrowRight size={16} />
             </Button>
@@ -335,6 +366,10 @@ export function FormWizard({
                           if (step) capture.action(base(), step.actionId);
                         }
                         setError("");
+                        transition.current = {
+                          action: forwardAction,
+                          eventName: step?.metaEvent,
+                        };
                         if (isLast) setDone(true);
                         else setIndex((i) => i + 1);
                       } catch (err) {
@@ -460,7 +495,11 @@ export function FormWizard({
                             <Button
                               type="button"
                               variant="ghost"
-                              onClick={() => setIntroSeen(false)}
+                              data-action-id={introAction}
+                              onClick={() => {
+                                transition.current = { action: introAction };
+                                setIntroSeen(false);
+                              }}
                             >
                               Apresentação
                             </Button>
@@ -468,8 +507,10 @@ export function FormWizard({
                         <Button
                           type="button"
                           variant="ghost"
+                          data-action-id={backAction}
                           disabled={index === 0}
                           onClick={() => {
+                            transition.current = { action: backAction };
                             setIndex((i) => i - 1);
                             setError("");
                           }}
@@ -481,6 +522,7 @@ export function FormWizard({
                           data-action-id={
                             step?.actionId ?? `contacts-${version.id}`
                           }
+                          data-form-action={forwardAction}
                           data-step-id={current}
                         >
                           {isLast

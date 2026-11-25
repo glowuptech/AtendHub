@@ -1,8 +1,8 @@
 "use client";
 import { PublicFormLink } from "./public-form-link";
 import { useClientOrigin } from "@/features/client-domains/settings";
-import { useEffect, useState } from "react";
-import { FileText, Plus, Archive, ArchiveRestore } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { FileText, Copy, Plus, Archive, ArchiveRestore } from "lucide-react";
 import { useDemo } from "@/components/layout/demo-context";
 import { useClients } from "@/features/clients/hooks";
 import { useForms } from "../hooks";
@@ -30,6 +30,8 @@ export function FormsList({ id }: { id: string }) {
   const [notice, setNotice] = useState("");
   const [actionError, setActionError] = useState("");
   const [pending, setPending] = useState("");
+  const copyRequests = useRef(new Map<string, { copyId: string; versionId: string }>());
+  const copying = useRef(false);
   const client = clients?.find((item) => item.id === id);
   useEffect(() => {
     if (client) setClientId(client.id);
@@ -93,6 +95,33 @@ export function FormsList({ id }: { id: string }) {
           : "Não foi possível atualizar o formulário. Tente novamente.",
       );
     } finally {
+      setPending("");
+    }
+  }
+  async function duplicate(formId: string) {
+    if (pending || copying.current) return;
+    copying.current = true;
+    setPending(`copy-${formId}`);
+    setNotice("");
+    setActionError("");
+    try {
+      const ids = copyRequests.current.get(formId) ?? { copyId: crypto.randomUUID(), versionId: crypto.randomUUID() };
+      copyRequests.current.set(formId, ids);
+      const response = await fetch(`/api/forms/${formId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "duplicate", ...ids }),
+      });
+      const result = await response.json();
+      if (!response.ok || result.id !== ids.copyId) {
+        if (response.status === 409) copyRequests.current.delete(formId);
+        throw new Error(result.error ?? "Não foi possível duplicar o formulário.");
+      }
+      window.location.assign(`/app/clientes/${id}/formularios/${ids.copyId}/editar`);
+    } catch (cause) {
+      setActionError(cause instanceof Error && !(cause instanceof TypeError)
+        ? cause.message : "Não foi possível duplicar o formulário. Tente novamente.");
+      copying.current = false;
       setPending("");
     }
   }
@@ -202,6 +231,10 @@ export function FormsList({ id }: { id: string }) {
                         Editar
                       </NavButton>
                     )}
+                    <Button variant="outline" disabled={!!pending} onClick={() => void duplicate(form.id)}>
+                      <Copy size={14} />
+                      {pending === `copy-${form.id}` ? "Duplicando…" : "Duplicar"}
+                    </Button>
                     <NavButton
                       href={`/app/clientes/${id}/formularios/${form.id}/preview`}
                     >

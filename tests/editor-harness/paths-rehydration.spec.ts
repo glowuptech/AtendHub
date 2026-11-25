@@ -251,6 +251,13 @@ test("formulário público segue a resposta atual e aguarda a gravação antes d
   const settings = settingsOf(form.versions[0].settings);
   settings.tracking = { ...settings.tracking, pixelId, viewSeconds: 10, pageView: true, lead: true };
   form.versions[0].settings = settings;
+  settings.introduction.mode = "separate";
+  settings.tracking.buttonEvents = {
+    iniciar: "Contact",
+    [`apresentar-pergunta-${a.id}`]: "ReverInicio",
+    [`voltar-pergunta-${a.id}`]: "VoltouDaManha",
+    "avancar-contato": "CompleteRegistration",
+  };
   router.metaEvent = "EscolheuTurno";
   let scriptLoads = 0;
   await page.route("https://connect.facebook.net/en_US/fbevents.js", async (route) => {
@@ -283,16 +290,22 @@ test("formulário público segue a resposta atual e aguarda a gravação antes d
       return route.fulfill({ status: 201, json: { ok: true, complete: true, leadId: crypto.randomUUID() } });
     },
   );
-  await page.goto("/tests/editor-harness/index.html?public-form");
+  await page.goto("/tests/editor-harness/index.html?public-form&utm_source=meta&etapa=concluido&acao=antiga");
+  await expect(page).toHaveURL(/etapa=apresentacao/);
   await expect.poll(() => scriptLoads).toBe(1);
   await expect.poll(commands).toEqual([["set", "autoConfig", "false", pixelId], ["init", pixelId]]);
   await page.clock.runFor(10_250);
   await expect.poll(commands).toContainEqual(["trackSingle", pixelId, "PageView"]);
+  await page.getByRole("button", { name: settings.introduction.buttonLabel }).click();
+  await expect(page).toHaveURL(new RegExp(`etapa=pergunta-${router.id}&acao=iniciar`));
   await page.getByRole("radio", { name: "Manhã" }).check();
   await page.getByRole("button", { name: "Continuar" }).click();
   await expect(
     page.getByRole("heading", { name: a.question.label }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Apresentação", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`etapa=apresentacao&acao=apresentar-pergunta-${a.id}`));
+  await page.getByRole("button", { name: settings.introduction.buttonLabel }).click();
   await page.getByRole("button", { name: "Voltar" }).click();
   await page.getByRole("radio", { name: "Tarde" }).check();
   await page.getByRole("button", { name: "Continuar" }).click();
@@ -319,6 +332,7 @@ test("formulário público segue a resposta atual e aguarda a gravação antes d
   await expect(phone).toHaveValue("(11) 99999-0000");
   await page.getByRole("button", { name: "Enviar cadastro" }).click();
   await expect(page.getByRole("alert")).toHaveText("Tente novamente.");
+  await expect(page).toHaveURL(/etapa=contato/);
   await page.getByRole("button", { name: "Enviar cadastro" }).click();
   await expect(page.getByRole("alert")).toContainText("Não foi possível confirmar o cadastro");
   await page.getByRole("button", { name: "Enviar cadastro" }).click();
@@ -327,22 +341,30 @@ test("formulário público segue a resposta atual e aguarda a gravação antes d
     ["set", "autoConfig", "false", pixelId],
     ["init", pixelId],
     ["trackSingle", pixelId, "PageView"],
+    ["trackSingle", pixelId, "Contact"],
     ["trackSingleCustom", pixelId, "EscolheuTurno"],
+    ["trackSingleCustom", pixelId, "ReverInicio"],
+    ["trackSingleCustom", pixelId, "VoltouDaManha"],
     ["trackSingle", pixelId, "Lead"],
+    ["trackSingle", pixelId, "CompleteRegistration"],
   ]);
+  await expect(page).toHaveURL(/etapa=concluido&acao=avancar-contato/);
+  expect(new URL(page.url()).searchParams.get("utm_source")).toBe("meta");
   await expect(
     page.getByRole("heading", { name: "Cadastro concluído" }),
   ).toBeVisible();
 });
 
-test("configurações de Pixel desativadas preservam a mensuração interna", async ({ page }) => {
+test("envia apenas o evento de navegação quando PageView e Lead estão desativados", async ({ page }) => {
   const form = makePersistedPathForm("snapshot");
   const version = form.versions[0];
   const settings = settingsOf(version.settings);
   version.settings = settings;
-  settings.tracking = { ...settings.tracking, pixelId: "1234567890", pageView: false, lead: false };
+  settings.tracking = { ...settings.tracking, pixelId: "1234567890", pageView: false, lead: false, trackStageUrls: true };
   version.steps = [version.steps[0]];
-  for (const contact of Object.values(settings.contacts)) contact.enabled = false;
+  for (const key of ["name", "email", "phone"] as const) {
+    settings.contacts[key] = { ...settings.contacts[key], enabled: false };
+  }
   await page.addInitScript((fixture) => {
     localStorage.setItem("public-test-form", JSON.stringify(fixture));
   }, { ...form, clinicName: "Clínica" });
@@ -364,5 +386,56 @@ test("configurações de Pixel desativadas preservam a mensuração interna", as
   expect(internal).toContain("capture");
   expect(await page.evaluate(() => window.fbq?.queue)).toEqual([
     ["set", "autoConfig", "false", settings.tracking.pixelId], ["init", settings.tracking.pixelId],
+    ["trackSingleCustom", settings.tracking.pixelId, "EtapaFormulario"],
   ]);
+});
+
+test("duplicar na lista reabre a mesma cópia após uma resposta perdida", async ({ page }) => {
+  const source = makePersistedPathForm("snapshot");
+  await seedPersistedForm(page, source);
+  let copyId = "";
+  let attempts = 0;
+  await page.route(`**/api/forms/${source.id}`, (route) => {
+    const body = route.request().postDataJSON();
+    expect(body.action).toBe("duplicate");
+    if (++attempts === 1) {
+      copyId = body.copyId;
+      return route.abort();
+    }
+    expect(body.copyId).toBe(copyId);
+    return route.fulfill({json: {id: copyId}});
+  });
+  await page.route("**/formularios/*/editar", (route) => route.fulfill({contentType: "text/html", body: "<main>Editor</main>"}));
+  await page.goto("/tests/editor-harness/index.html?list");
+  await page.getByRole("button", { name: "Duplicar" }).click();
+  await expect(page.getByRole("alert")).toBeVisible();
+  await page.getByRole("button", { name: "Duplicar" }).click();
+  await expect(page).toHaveURL((url) => url.pathname === `/app/clientes/${source.clientId}/formularios/${copyId}/editar`);
+});
+
+test("editor mantém os eventos da apresentação e de retorno ao editar uma publicação", async ({ page }) => {
+  const source = makePersistedPathForm("snapshot");
+  const v = source.versions[0];
+  v.settings = settingsOf(v.settings);
+  v.settings.introduction.mode = "separate";
+  v.settings.contacts = { ...v.settings.contacts, name: { ...v.settings.contacts.name, enabled: true } };
+  await page.addInitScript((value) => {
+    if (!localStorage.getItem("editor-test-draft")) localStorage.setItem("editor-test-draft", JSON.stringify(value));
+  }, source);
+  await page.goto("/tests/editor-harness/index.html");
+  const events = page.getByRole("button", {name: /07 Eventos e integrações/});
+  await events.click();
+  const start = page.getByRole("combobox", {name: v.settings.introduction.buttonLabel, exact:true});
+  await start.fill("Contact");
+  const section = page.getByRole("group", {name:"Dados de contato", exact:true});
+  await section.getByRole("combobox", {name:"Voltar",exact:true}).fill("RetornarPergunta");
+  await page.getByRole("checkbox", {name:/Enviar EtapaFormulario/}).check();
+  await page.getByRole("button", {name:"Salvar rascunho",exact:true}).click();
+  await expect(page.locator(".notice")).toContainText("salvo");
+  await page.reload();
+  await events.click();
+  await expect(start).toHaveValue("Contact");
+  await expect(section.getByRole("combobox", {name:"Voltar",exact:true})).toHaveValue("RetornarPergunta");
+  await expect(page.getByRole("checkbox", {name:/Enviar EtapaFormulario/})).toBeChecked();
+  await expect(page.getByText(`acao=avancar-pergunta-${v.steps[0].id}`, {exact:true})).toBeVisible();
 });

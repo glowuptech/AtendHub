@@ -47,6 +47,8 @@ import {
 } from "../services/path-diagnostics";
 import { PathDiagnostics } from "./path-diagnostics";
 import { settingsOf } from "../services/settings";
+import { copyStep } from "../services/duplicate-form";
+import { ButtonEventsEditor } from "./button-events-editor";
 import { FormWizard } from "./wizard";
 const typeLabels: Record<FieldType, string> = {
   short_text: "Texto curto",
@@ -169,18 +171,9 @@ function prepareEditorForm(
         number: Math.max(...form.versions.map((item) => item.number)) + 1,
         state: "draft",
         steps: receivedVersion.steps.map((step) => {
-          const questionId = crypto.randomUUID();
-          clonedQuestionIds.push({
-            before: step.question.id,
-            after: questionId,
-          });
-          return {
-            ...step,
-            id: crypto.randomUUID(),
-            actionId: crypto.randomUUID(),
-            backActionId: crypto.randomUUID(),
-            question: { ...step.question, id: questionId },
-          };
+          const copy = copyStep(step);
+          clonedQuestionIds.push({ before: step.question.id, after: copy.question.id });
+          return copy;
         }),
       };
       form.versions.push(displayedVersion);
@@ -1128,6 +1121,12 @@ export function EditorWorkspace({
               onChange={(settings) => updateVersion({ settings })}
               disabled={frozen || saving}
               section="tracking"
+            />
+            <ButtonEventsEditor
+              version={version}
+              disabled={frozen || saving}
+              onSettings={(settings) => updateVersion({ settings })}
+              onStepEvent={(id, metaEvent) => updateStep(id, { metaEvent })}
             />
           </EditorAccordion>
           {saved && (

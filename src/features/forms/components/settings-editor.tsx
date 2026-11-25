@@ -587,8 +587,7 @@ export function SettingsEditor({
               Enviar Lead após cadastro aceito
             </label>
             <p className="muted">
-              Publique as alterações para ativar o Pixel no link público. Configure
-              eventos personalizados por botão nas perguntas.
+              Publique as alterações para ativar o Pixel no link público.
             </p>
           </Card>
           <Card title="Cadastros incompletos e notificações">

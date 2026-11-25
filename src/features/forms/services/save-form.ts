@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { FormSchema } from "@/domain/schemas";
+import {
+  FormSchema,
+  type FormDefinition,
+  type FormVersion,
+} from "@/domain/schemas";
 import { sessionOrganizationContext } from "@/lib/supabase/organization-session";
 import { apiError } from "@/lib/supabase/organization-admin";
 import { validateRouting } from "./routing";
@@ -47,20 +51,13 @@ export async function saveForm(request: Request, existingId?: string) {
       );
     }
   }
-  const { id, clientId, name, slug, description, doctorId, fields } = form;
-  const { data, error } = await auth.supabase.rpc(
-    "atendhub_save_form_version",
-    {
-      p_org: auth.organizationId,
-      p_client: clientId,
-      p_form: id,
-      p_create: !existingId,
-      p_details: { name, slug, description, doctorId },
-      p_version: version,
-      p_fields: fields,
-      p_publish: publish,
-      p_expected_update: expectedUpdatedAt ?? null,
-    },
+  const { data, error } = await writeFormVersion(
+    auth.supabase,
+    form,
+    version,
+    !existingId,
+    publish,
+    expectedUpdatedAt,
   );
   if (error) {
     if (error.code === "40001" || error.code === "23505")
@@ -77,5 +74,32 @@ export async function saveForm(request: Request, existingId?: string) {
   }
   return NextResponse.json(persistedForm(data.form, data.versions), {
     status: existingId ? 200 : 201,
+  });
+}
+
+type AuthorizedSession = Exclude<
+  Awaited<ReturnType<typeof sessionOrganizationContext>>,
+  { error: unknown }
+>;
+
+export function writeFormVersion(
+  supabase: AuthorizedSession["supabase"],
+  form: FormDefinition,
+  version: FormVersion,
+  create: boolean,
+  publish: boolean,
+  expectedUpdatedAt?: string | null,
+) {
+  const { id, clientId, name, slug, description, doctorId, fields } = form;
+  return supabase.rpc("atendhub_save_form_version", {
+    p_org: form.organizationId,
+    p_client: clientId,
+    p_form: id,
+    p_create: create,
+    p_details: { name, slug, description, doctorId },
+    p_version: version,
+    p_fields: fields,
+    p_publish: publish,
+    p_expected_update: expectedUpdatedAt ?? null,
   });
 }

@@ -1,6 +1,10 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { Id, type FormDefinition } from "@/domain/schemas";
+import {
+  standardButtonEvents,
+  updateStageUrl,
+} from "../services/button-events";
 import { settingsOf } from "../services/settings";
 import { initializeFormPixel, trackFormPixel } from "../services/meta-pixel";
 import { FormWizard, type WizardCapture } from "./wizard";
@@ -36,20 +40,28 @@ export function PublicForm({
       sendEvent("view", input.sessionId);
       if (tracking.pageView) trackFormPixel(tracking.pixelId, "PageView");
     },
-    action: (input, actionId) => {
-      sendEvent("action", input.sessionId, actionId);
-      const name = version.steps.find(
-        (step) => step.actionId === actionId,
-      )?.metaEvent;
+    action: (input, actionId) => sendEvent("action", input.sessionId, actionId),
+    navigate: (stage, action, stepEvent) => {
+      updateStageUrl(stage, action);
+      if (!action) return;
+      if (tracking.trackStageUrls)
+        trackFormPixel(tracking.pixelId, "EtapaFormulario", true);
+      if (stage === "concluido" && tracking.lead)
+        trackFormPixel(tracking.pixelId, "Lead");
+      const name = stepEvent || tracking.buttonEvents?.[action];
       if (
         !name ||
-        name === "Lead" ||
-        name === "PageView" ||
-        trackedActions.current.has(actionId)
+        ["Lead", "PageView"].includes(name) ||
+        trackedActions.current.has(action)
       )
         return;
-      trackedActions.current.add(actionId);
-      trackFormPixel(tracking.pixelId, name, true);
+      trackedActions.current.add(action);
+      if (tracking.trackStageUrls && name === "EtapaFormulario") return;
+      trackFormPixel(
+        tracking.pixelId,
+        name,
+        !standardButtonEvents.includes(name),
+      );
     },
     capture: async (input) => {
       idempotencyKey.current ??= crypto.randomUUID();
@@ -77,8 +89,6 @@ export function PublicForm({
             "Não foi possível confirmar o cadastro. Tente novamente.",
         );
       }
-      if (input.complete && tracking.lead)
-        trackFormPixel(tracking.pixelId, "Lead");
       return result.leadId;
     },
   };
