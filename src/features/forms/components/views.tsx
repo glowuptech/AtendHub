@@ -96,8 +96,8 @@ export function FormAnalytics({
               </p>
             ))}
         </Card>
-        <Card title="Eventos preparados para Meta">
-          <p>Nenhum envio externo nesta fase.</p>
+        <Card title="Eventos da Meta">
+          <p>Confira o recebimento em Testar eventos no Gerenciador de Eventos da Meta.</p>
           {repositories.capture
             .listMarketing(id)
             .filter((e) => e.formId === formId)

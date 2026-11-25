@@ -1,6 +1,8 @@
 "use client";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Id, type FormDefinition } from "@/domain/schemas";
+import { settingsOf } from "../services/settings";
+import { initializeFormPixel, trackFormPixel } from "../services/meta-pixel";
 import { FormWizard, type WizardCapture } from "./wizard";
 
 export function PublicForm({
@@ -9,6 +11,12 @@ export function PublicForm({
   form: FormDefinition & { clinicName: string };
 }) {
   const idempotencyKey = useRef<string | null>(null);
+  const version = form.versions[0];
+  const { tracking } = settingsOf(version.settings);
+  const trackedActions = useRef(new Set<string>());
+  useEffect(() => {
+    initializeFormPixel(tracking.pixelId);
+  }, [tracking.pixelId]);
   const endpoint = `/api/public/forms/${encodeURIComponent(form.slug)}`;
   const sendEvent = (
     eventType: "view" | "action",
@@ -24,8 +32,25 @@ export function PublicForm({
   };
   const capture: WizardCapture = {
     progress: () => null,
-    view: (input) => sendEvent("view", input.sessionId),
-    action: (input, actionId) => sendEvent("action", input.sessionId, actionId),
+    view: (input) => {
+      sendEvent("view", input.sessionId);
+      if (tracking.pageView) trackFormPixel(tracking.pixelId, "PageView");
+    },
+    action: (input, actionId) => {
+      sendEvent("action", input.sessionId, actionId);
+      const name = version.steps.find(
+        (step) => step.actionId === actionId,
+      )?.metaEvent;
+      if (
+        !name ||
+        name === "Lead" ||
+        name === "PageView" ||
+        trackedActions.current.has(actionId)
+      )
+        return;
+      trackedActions.current.add(actionId);
+      trackFormPixel(tracking.pixelId, name, true);
+    },
     capture: async (input) => {
       idempotencyKey.current ??= crypto.randomUUID();
       const query = new URLSearchParams(window.location.search);
@@ -52,6 +77,8 @@ export function PublicForm({
             "Não foi possível confirmar o cadastro. Tente novamente.",
         );
       }
+      if (input.complete && tracking.lead)
+        trackFormPixel(tracking.pixelId, "Lead");
       return result.leadId;
     },
   };
@@ -59,7 +86,7 @@ export function PublicForm({
     <main className="public-page">
       <FormWizard
         form={form}
-        version={form.versions[0]}
+        version={version}
         fields={form.fields ?? []}
         clinicName={form.clinicName ?? form.name}
         captureRepository={capture}

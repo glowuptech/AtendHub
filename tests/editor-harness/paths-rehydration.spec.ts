@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { settingsOf } from "@/features/forms/services/settings";
 import { makePersistedPathForm } from "./path-fixture";
 
 async function seedPersistedForm(
@@ -246,6 +247,18 @@ test("formulário público segue a resposta atual e aguarda a gravação antes d
   const field = form.fields.find(
     (f) => f.id === router.question.fieldDefinitionId,
   )!;
+  const pixelId = "1234567890";
+  const settings = settingsOf(form.versions[0].settings);
+  settings.tracking = { ...settings.tracking, pixelId, viewSeconds: 10, pageView: true, lead: true };
+  form.versions[0].settings = settings;
+  router.metaEvent = "EscolheuTurno";
+  let scriptLoads = 0;
+  await page.route("https://connect.facebook.net/en_US/fbevents.js", async (route) => {
+    scriptLoads++;
+    await route.fulfill({ contentType: "application/javascript", body: "/* SDK interceptado para o teste */" });
+  });
+  const commands = () => page.evaluate(() => window.fbq?.queue);
+  await page.clock.install();
   form.slug = "formulario-publicado";
   form.versions[0].successMessage = "Recebemos seu cadastro.";
   await page.addInitScript((fixture) => {
@@ -271,6 +284,10 @@ test("formulário público segue a resposta atual e aguarda a gravação antes d
     },
   );
   await page.goto("/tests/editor-harness/index.html?public-form");
+  await expect.poll(() => scriptLoads).toBe(1);
+  await expect.poll(commands).toEqual([["set", "autoConfig", "false", pixelId], ["init", pixelId]]);
+  await page.clock.runFor(10_250);
+  await expect.poll(commands).toContainEqual(["trackSingle", pixelId, "PageView"]);
   await page.getByRole("radio", { name: "Manhã" }).check();
   await page.getByRole("button", { name: "Continuar" }).click();
   await expect(
@@ -306,7 +323,46 @@ test("formulário público segue a resposta atual e aguarda a gravação antes d
   await expect(page.getByRole("alert")).toContainText("Não foi possível confirmar o cadastro");
   await page.getByRole("button", { name: "Enviar cadastro" }).click();
   await expect(page.getByText("Recebemos seu cadastro.")).toBeVisible();
+  expect(await commands()).toEqual([
+    ["set", "autoConfig", "false", pixelId],
+    ["init", pixelId],
+    ["trackSingle", pixelId, "PageView"],
+    ["trackSingleCustom", pixelId, "EscolheuTurno"],
+    ["trackSingle", pixelId, "Lead"],
+  ]);
   await expect(
     page.getByRole("heading", { name: "Cadastro concluído" }),
   ).toBeVisible();
+});
+
+test("configurações de Pixel desativadas preservam a mensuração interna", async ({ page }) => {
+  const form = makePersistedPathForm("snapshot");
+  const version = form.versions[0];
+  const settings = settingsOf(version.settings);
+  version.settings = settings;
+  settings.tracking = { ...settings.tracking, pixelId: "1234567890", pageView: false, lead: false };
+  version.steps = [version.steps[0]];
+  for (const contact of Object.values(settings.contacts)) contact.enabled = false;
+  await page.addInitScript((fixture) => {
+    localStorage.setItem("public-test-form", JSON.stringify(fixture));
+  }, { ...form, clinicName: "Clínica" });
+  await page.route("https://connect.facebook.net/en_US/fbevents.js", (route) => route.abort());
+  const internal: string[] = [];
+  await page.route("**/api/public/forms/*", (route) => {
+    const body = route.request().postDataJSON();
+    internal.push(body.eventType ?? "capture");
+    return route.fulfill({ json: { ok: true, complete: true, leadId: crypto.randomUUID() } });
+  });
+  await page.clock.install();
+  await page.goto("/tests/editor-harness/index.html?public-form");
+  await expect(page.getByRole("radio", { name: "Manhã" })).toBeVisible();
+  await page.clock.runFor(10_250);
+  await page.getByRole("radio", { name: "Manhã" }).check();
+  await page.getByRole("button", { name: "Enviar cadastro" }).click();
+  await expect(page.getByRole("heading", { name: "Cadastro concluído" })).toBeVisible();
+  expect(internal).toContain("view");
+  expect(internal).toContain("capture");
+  expect(await page.evaluate(() => window.fbq?.queue)).toEqual([
+    ["set", "autoConfig", "false", settings.tracking.pixelId], ["init", settings.tracking.pixelId],
+  ]);
 });

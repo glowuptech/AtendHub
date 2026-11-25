@@ -557,7 +557,7 @@ export function SettingsEditor({
                   })
                 }
               />{" "}
-              Preparar PageView após tempo mínimo
+              Enviar PageView após tempo mínimo
             </label>
             <label>
               Tempo de página visível
@@ -584,12 +584,11 @@ export function SettingsEditor({
                   patch({ tracking: { ...s.tracking, lead: e.target.checked } })
                 }
               />{" "}
-              Preparar Lead após cadastro aceito
+              Enviar Lead após cadastro aceito
             </label>
             <p className="muted">
-              Eventos por botão são configurados nas perguntas. Configuração
-              preparada; nenhum evento é enviado à Meta nesta fase. Cadastro
-              concluído não significa lead qualificado.
+              Publique as alterações para ativar o Pixel no link público. Configure
+              eventos personalizados por botão nas perguntas.
             </p>
           </Card>
           <Card title="Cadastros incompletos e notificações">
