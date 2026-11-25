@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { BillingSchema } from "./billing";
-import { FormSettingsSchema } from "@/features/forms/services/settings";
+import { buttonEventName, FormSettingsSchema } from "@/features/forms/services/settings";
 z.config(z.locales.pt());
 export const Id = z.string().uuid();
 export const scoped = { id: Id, organizationId: Id, clientId: Id };
@@ -207,10 +207,8 @@ export const QuestionSchema = z.object({
   definesPath: z.boolean().default(false),
 });
 export const StepSchema = z.object({
-  metaEvent: z
-    .string()
-    .regex(/^[A-Za-z][A-Za-z0-9_]{0,39}$|^$/)
-    .optional(),
+  trackingId: Id.optional(),
+  metaEvent: buttonEventName.optional(),
   id: Id,
   order: z.number().int().nonnegative(),
   title: z.string().min(2),

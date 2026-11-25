@@ -9,6 +9,13 @@ export function validateRouting(
   version: FormVersion,
   fields: CustomFieldDefinition[],
 ) {
+  const buttonNames = [
+    ...version.steps.map((step) => step.metaEvent),
+    ...Object.values(version.settings?.tracking.buttonEvents ?? {}),
+  ];
+  if (buttonNames.some((name) => name === "PageView" || name === "Lead")) {
+    throw new Error("Configure PageView e Lead nas opções de conversão. Escolha outro evento para o botão.");
+  }
   const paths = version.paths ?? [];
   const ids = new Set(paths.map((path) => path.id));
   if (

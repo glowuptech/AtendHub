@@ -3,7 +3,12 @@ import { z } from "zod";
 import { apiError } from "@/lib/supabase/organization-admin";
 import { sessionOrganizationContext } from "@/lib/supabase/organization-session";
 import { persistedForm } from "@/features/forms/services/persisted-form";
-import { saveForm } from "@/features/forms/services/save-form";
+import { FormSchema } from "@/domain/schemas";
+import { duplicateForm } from "@/features/forms/services/duplicate-form";
+import {
+  saveForm,
+  writeFormVersion,
+} from "@/features/forms/services/save-form";
 
 async function load(
   auth: Exclude<
@@ -43,6 +48,73 @@ export async function GET(
     return NextResponse.json(persistedForm(data.row, data.versions));
   } catch (error) {
     return apiError(error, 404);
+  }
+}
+
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ formId: string }> },
+) {
+  const auth = await sessionOrganizationContext();
+  if ("error" in auth) return auth.error;
+  const { formId } = await context.params;
+  const input = z
+    .object({
+      action: z.literal("duplicate"),
+      copyId: z.uuid(),
+      versionId: z.uuid(),
+    })
+    .safeParse(await request.json().catch(() => null));
+  if (
+    !input.success ||
+    !z.uuid().safeParse(formId).success ||
+    input.data.copyId === formId
+  ) {
+    return NextResponse.json(
+      { error: "Solicitação de cópia inválida." },
+      { status: 400 },
+    );
+  }
+  try {
+    const { row, versions } = await load(auth, formId);
+    const source = persistedForm(row, versions);
+    const selected = source.versions.find(
+      (v) => v.id === source.activeVersionId,
+    );
+    const parsed = FormSchema.safeParse({ ...source, versions: [selected] });
+    if (!parsed.success)
+      return NextResponse.json(
+        { error: "Não foi possível ler a versão do formulário." },
+        { status: 422 },
+      );
+    const copy = duplicateForm(
+      parsed.data,
+      input.data.copyId,
+      input.data.versionId,
+    );
+    const { error } = await writeFormVersion(
+      auth.supabase,
+      copy,
+      copy.versions[0],
+      true,
+      false,
+    );
+    if (error?.code === "23505") {
+      // A response can be lost after the transaction commits. Reopen that same copy on retry.
+      const previous = await auth.supabase
+        .from("atendhub_form_versions")
+        .select("id")
+        .eq("organization_id", auth.organizationId)
+        .eq("client_id", copy.clientId)
+        .eq("form_id", copy.id)
+        .eq("id", copy.activeVersionId)
+        .maybeSingle();
+      if (previous.data) return NextResponse.json({ id: copy.id });
+    }
+    if (error) return apiError(error, 409);
+    return NextResponse.json({ id: copy.id }, { status: 201 });
+  } catch (cause) {
+    return apiError(cause, 400);
   }
 }
 
