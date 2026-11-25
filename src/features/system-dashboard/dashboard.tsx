@@ -106,7 +106,7 @@ export function SystemDashboard() {
         cells([
           r.client.name,
           r.client.vertical === "healthcare"
-            ? "Prescrita"
+            ? "Glow Up"
             : r.client.vertical === "legal"
               ? "Veredit"
               : "Não classificada",
@@ -203,8 +203,8 @@ export function SystemDashboard() {
               }}
             >
               <option value="all">Todas as frentes</option>
-              <option value="healthcare">Prescrita · Saúde</option>
-              <option value="legal">Veredit · Jurídico</option>
+              <option value="healthcare">Glow Up</option>
+              <option value="legal">Veredit</option>
             </select>
           </label>
           <label>
@@ -293,7 +293,7 @@ export function SystemDashboard() {
                 <header>
                   <div>
                     <small>{v === "healthcare" ? "SAÚDE" : "JURÍDICO"}</small>
-                    <h2>{v === "healthcare" ? "Prescrita" : "Veredit"}</h2>
+                    <h2>{v === "healthcare" ? "Glow Up" : "Veredit"}</h2>
                   </div>
                   <Badge>{s.clients} clientes</Badge>
                 </header>
@@ -340,7 +340,7 @@ export function SystemDashboard() {
             <p>Séries diárias por frente, com escalas independentes</p>
           </div>
           <div className="series-legend">
-            <span className="healthcare">● Prescrita</span>
+            <span className="healthcare">● Glow Up</span>
             <span className="legal">● Veredit</span>
           </div>
         </div>
@@ -388,7 +388,7 @@ export function SystemDashboard() {
                                     ? "3px"
                                     : `${Math.max(2, (s[metric as "spent" | "leads"] / max) * 130)}px`,
                                 }}
-                                title={`${dayLabel(d.day)} · ${v === "healthcare" ? "Prescrita" : "Veredit"} · ${metric === "spent" ? (unknown ? "Investimento não informado" : money(s.spent)) : `${s.leads} leads`}`}
+                                title={`${dayLabel(d.day)} · ${v === "healthcare" ? "Glow Up" : "Veredit"} · ${metric === "spent" ? (unknown ? "Investimento não informado" : money(s.spent)) : `${s.leads} leads`}`}
                               />
                             );
                           })}
@@ -414,8 +414,8 @@ export function SystemDashboard() {
               <thead>
                 <tr>
                   <th>Data</th>
-                  <th>Prescrita · gasto</th>
-                  <th>Prescrita · leads</th>
+                  <th>Glow Up · gasto</th>
+                  <th>Glow Up · leads</th>
                   <th>Veredit · gasto</th>
                   <th>Veredit · leads</th>
                 </tr>
@@ -549,7 +549,7 @@ export function SystemDashboard() {
                   <td>
                     <span className={row.client.vertical}>
                       {row.client.vertical === "healthcare"
-                        ? "Prescrita"
+                        ? "Glow Up"
                         : row.client.vertical === "legal"
                           ? "Veredit"
                           : "Não classificada"}

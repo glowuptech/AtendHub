@@ -20,7 +20,11 @@ import { Heading, Card, Badge, Empty } from "@/components/layout/shared";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ClientSchema, DoctorSchema, type Client } from "@/domain/schemas";
 import { z } from "zod";
-import { clientCategories as categories, clientOperations } from "../operation";
+import {
+  clientCategories as categories,
+  clientCategory,
+  clientOperations,
+} from "../operation";
 const normalize = (s: string) =>
   s
     .normalize("NFD")
@@ -268,7 +272,11 @@ export function Clients() {
               />
             </div>
             <div className="clinic-specialties">
-              <span className="eyebrow">ESPECIALIDADES</span>
+              <span className="eyebrow">
+                {c.category === "organization" || c.vertical === "legal"
+                  ? "ÁREAS DE ATUAÇÃO"
+                  : "ESPECIALIDADES"}
+              </span>
               <div className="actions">
                 {[
                   ...new Set([
@@ -289,7 +297,11 @@ export function Clients() {
             <div className="clinic-doctors">
               <div className="section-caption">
                 <h3>
-                  {c.vertical === "legal" ? "Equipe jurídica" : "Corpo clínico"}{" "}
+                  {c.category === "organization"
+                    ? "Equipe"
+                    : c.vertical === "legal"
+                      ? "Equipe jurídica"
+                      : "Corpo clínico"}{" "}
                   <small>{c.doctors.length} profissional(is)</small>
                 </h3>
                 <CopyButton
@@ -315,15 +327,23 @@ export function Clients() {
                       {d.specialties.join(" · ") ||
                         "Especialidade não informada"}
                     </small>
-                    <div className="doctor-crm">
-                      <span>
-                        {d.crm ? `${c.vertical === "legal" ? "OAB" : "CRM"}/${d.uf} ${d.crm}` : "Registro não informado"}
-                      </span>
-                      <CopyButton
-                        value={d.crm ? `${c.vertical === "legal" ? "OAB" : "CRM"}/${d.uf} ${d.crm}` : null}
-                        label={`${c.vertical === "legal" ? "OAB" : "CRM"} de ${d.name}`}
-                      />
-                    </div>
+                    {(c.category !== "organization" || d.crm) && (
+                      <div className="doctor-crm">
+                        <span>
+                          {d.crm
+                            ? `${c.vertical === "legal" ? "OAB" : "CRM"}/${d.uf} ${d.crm}`
+                            : "Registro não informado"}
+                        </span>
+                        <CopyButton
+                          value={
+                            d.crm
+                              ? `${c.vertical === "legal" ? "OAB" : "CRM"}/${d.uf} ${d.crm}`
+                              : null
+                          }
+                          label={`${c.vertical === "legal" ? "OAB" : "CRM"} de ${d.name}`}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -395,6 +415,8 @@ function CreateClinic({
       { name: string; crm: string; uf: string; specialties: string }[]
     >([]),
     [error, setError] = useState("");
+  const internal = category === "organization";
+  const practice = internal || legal ? "Áreas de atuação" : "Especialidades";
   const [billing, setBilling] = useState(() => BillingSchema.parse({}));
   const [billingKey, setBillingKey] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -449,7 +471,7 @@ function CreateClinic({
             doctors: doctors.map((d) => ({
               id: crypto.randomUUID(),
               name: d.name,
-              crm: d.crm.trim() || null,
+              crm: internal ? null : d.crm.trim() || null,
               uf: d.uf,
               specialties: parseList(d.specialties),
             })),
@@ -487,14 +509,17 @@ function CreateClinic({
       </header>
 
       <label>
-        Tipo de cliente
-        <select value={vertical} onChange={(e) => {
-          const next = e.target.value as Client["vertical"];
-          setVertical(next);
-          setCategory(clientOperations[next].categories[0]);
-        }}>
-          <option value="healthcare">Médico / Clínica · Prescrita</option>
-          <option value="legal">Advogado / Escritório · Veredit</option>
+        Operação
+        <select
+          value={vertical}
+          onChange={(e) => {
+            const next = e.target.value as Client["vertical"];
+            setVertical(next);
+            setCategory(clientCategory({ vertical: next, category }));
+          }}
+        >
+          <option value="healthcare">{clientOperations.healthcare.name}</option>
+          <option value="legal">{clientOperations.legal.name}</option>
         </select>
       </label>
       <div className="clinic-upload">
@@ -551,7 +576,11 @@ function CreateClinic({
         )}
       </div>
       <label>
-        {legal ? "Nome do escritório ou profissional *" : "Nome da clínica ou profissional *"}
+        {internal
+          ? "Nome da organização *"
+          : legal
+            ? "Nome do escritório ou profissional *"
+            : "Nome da clínica ou profissional *"}
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -601,11 +630,17 @@ function CreateClinic({
         />
       </label>
       <label>
-        {legal ? "Áreas de atuação (separadas por vírgula)" : "Especialidades (separadas por vírgula)"}
+        {practice} (separadas por vírgula)
         <input
           value={specialties}
           onChange={(e) => setSpecialties(e.target.value)}
-          placeholder={legal ? "Família, Trabalho" : "Ginecologia, Obstetrícia"}
+          placeholder={
+            internal
+              ? "Marketing, Comercial"
+              : legal
+                ? "Família, Trabalho"
+                : "Ginecologia, Obstetrícia"
+          }
         />
       </label>
       <div className="section-caption">
@@ -623,7 +658,11 @@ function CreateClinic({
           }
         >
           <Plus size={15} />
-          {legal ? "Adicionar advogado(a)" : "Adicionar médico"}
+          {internal
+            ? "Adicionar profissional"
+            : legal
+              ? "Adicionar advogado(a)"
+              : "Adicionar médico"}
         </Button>
       </div>
       {doctors.map((d, i) => (
@@ -631,42 +670,61 @@ function CreateClinic({
           <legend>Profissional {i + 1}</legend>
           {(
             [
-              ["name", legal ? "Nome do advogado(a) *" : "Nome do médico *"],
-              ["crm", legal ? "Número da OAB (opcional)" : "Número do CRM (opcional)"],
-              ["specialties", legal ? "Áreas de atuação" : "Especialidades do médico"],
+              [
+                "name",
+                internal
+                  ? "Nome do profissional *"
+                  : legal
+                    ? "Nome do advogado(a) *"
+                    : "Nome do médico *",
+              ],
+              [
+                "crm",
+                legal ? "Número da OAB (opcional)" : "Número do CRM (opcional)",
+              ],
+              [
+                "specialties",
+                internal || legal
+                  ? "Áreas de atuação"
+                  : "Especialidades do médico",
+              ],
             ] as const
-          ).map(([key, label]) => (
-            <label key={key}>
-              {label}
-              <input
-                value={d[key]}
+          )
+            .filter(([key]) => !internal || key !== "crm")
+            .map(([key, label]) => (
+              <label key={key}>
+                {label}
+                <input
+                  value={d[key]}
+                  onChange={(e) =>
+                    setDoctors(
+                      doctors.map((v, j) =>
+                        j === i ? { ...v, [key]: e.target.value } : v,
+                      ),
+                    )
+                  }
+                />
+              </label>
+            ))}
+          {!internal && (
+            <label>
+              {legal ? "UF da OAB" : "UF do CRM"}
+              <select
+                value={d.uf}
                 onChange={(e) =>
                   setDoctors(
                     doctors.map((v, j) =>
-                      j === i ? { ...v, [key]: e.target.value } : v,
+                      j === i ? { ...v, uf: e.target.value } : v,
                     ),
                   )
                 }
-              />
+              >
+                {DoctorSchema.shape.uf.options.map((uf) => (
+                  <option key={uf}>{uf}</option>
+                ))}
+              </select>
             </label>
-          ))}
-          <label>
-            {legal ? "UF da OAB" : "UF do CRM"}
-            <select
-              value={d.uf}
-              onChange={(e) =>
-                setDoctors(
-                  doctors.map((v, j) =>
-                    j === i ? { ...v, uf: e.target.value } : v,
-                  ),
-                )
-              }
-            >
-              {DoctorSchema.shape.uf.options.map((uf) => (
-                <option key={uf}>{uf}</option>
-              ))}
-            </select>
-          </label>
+          )}
           <Button
             type="button"
             variant="ghost"

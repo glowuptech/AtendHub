@@ -117,7 +117,7 @@ export function SystemCalendar() {
             onChange={(e) => setOperation(e.target.value)}
           >
             <option value="all">Todas</option>
-            <option value="healthcare">Prescrita</option>
+            <option value="healthcare">Glow Up</option>
             <option value="legal">Veredit</option>
           </select>
         </label>
@@ -145,7 +145,7 @@ export function SystemCalendar() {
         </label>
       </div>
       <div className="system-calendar-legend">
-        <span data-operation="healthcare">● Prescrita</span>
+        <span data-operation="healthcare">● Glow Up</span>
         <span data-operation="legal">● Veredit</span>
         <span>Dia atual destacado em roxo</span>
       </div>
@@ -209,7 +209,7 @@ export function SystemCalendar() {
                         </small>
                         <span className="system-appointment-operation">
                           {client.vertical === "healthcare"
-                            ? "Prescrita"
+                            ? "Glow Up"
                             : "Veredit"}
                         </span>
                         <Badge tone={tag.tone}>{tag.label}</Badge>
@@ -241,7 +241,7 @@ export function SystemCalendar() {
           <h3>{a.name}</h3>
           <p>
             {client.name} ·{" "}
-            {client.vertical === "healthcare" ? "Prescrita" : "Veredit"}
+            {client.vertical === "healthcare" ? "Glow Up" : "Veredit"}
           </p>
           <p>{doctor?.name ?? "Sem profissional vinculado"}</p>
           <p>

@@ -26,19 +26,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ cl
 
   const client: Client = { ...parsed.data, id: clientId, organizationId: auth.organizationId, category: clientCategory(parsed.data) };
   try {
-    const { code, professionalType } = clientOperations[client.vertical];
+    const operationType = clientOperations[client.vertical];
     const { data: operation, error: operationError } = await auth.admin
       .from("atendhub_operations")
       .select("id")
       .eq("organization_id", auth.organizationId)
-      .eq("code", code)
+      .eq("code", operationType.code)
       .single();
     if (operationError || !operation) throw Object.assign(new Error("Operação não encontrada."), { code: operationError?.code ?? "OPERATION_NOT_FOUND" });
 
     const professionals = client.doctors.map((doctor) => ({
       id: doctor.id,
       name: doctor.name,
-      professional_type: professionalType,
+      professional_type:
+        client.category === "organization"
+          ? "other"
+          : operationType.professionalType,
       crm: doctor.crm,
       specialties: doctor.specialties,
       status: "active",

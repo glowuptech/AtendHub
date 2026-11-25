@@ -114,7 +114,7 @@ export const ClientSchema = z.object({
   }, "Informe uma URL HTTPS válida, sem credenciais no endereço."),
   description: z.string(),
   category: z
-    .enum(["clinic", "doctor_male", "doctor_female", "law_firm", "lawyer"])
+    .enum(["clinic", "doctor_male", "doctor_female", "law_firm", "lawyer", "organization"])
     .default("clinic"),
   cnpj: z
     .string()
