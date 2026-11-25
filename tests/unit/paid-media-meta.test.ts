@@ -3,6 +3,7 @@ vi.mock("server-only", () => ({}));
 import {
   discoverMetaAccounts,
   fetchMetaSnapshot,
+  fetchMetaAnalytics,
   validateMetaAccess,
 } from "@/features/paid-media/meta";
 
@@ -120,4 +121,108 @@ it("counts forms and WhatsApp only from matching provider data, with missing met
       profile_visits: null,
     },
   ]);
+});
+
+const account = {
+  account_id: "act_12",
+  name: "Conta",
+  currency: "BRL",
+  timezone: "America/Sao_Paulo",
+  shared: true,
+};
+const range = { from: "2026-11-20", to: "2026-11-21" };
+
+it("busca os recortes da Meta com o mesmo filtro de campanhas e calcula o limite em BRL", async () => {
+  const graph = vi.fn(async (url: URL) => {
+    if (!url.pathname.endsWith("/insights")) {
+      expect(url.searchParams.get("fields")).toBe("spend_cap,amount_spent");
+      return Response.json({ spend_cap: "100000", amount_spent: "25000" });
+    }
+    expect(url.searchParams.get("time_range")).toBe(
+      JSON.stringify({ since: range.from, until: range.to }),
+    );
+    expect(JSON.parse(url.searchParams.get("filtering")!)).toEqual([
+      { field: "campaign.id", operator: "IN", value: ["10"] },
+    ]);
+    switch (url.searchParams.get("breakdowns")) {
+      case "age,gender":
+        return Response.json({
+          data: [
+            { age: "25-34", gender: "female", impressions: "30" },
+            { age: "25-34", gender: "male", impressions: "20" },
+            { age: "35-44", gender: "female", impressions: "50" },
+          ],
+        });
+      case "publisher_platform,platform_position":
+        if (url.searchParams.get("fields")?.includes("actions"))
+          return Response.json({ error: { code: 100 } }, { status: 400 });
+        return Response.json({
+          data: [
+            {
+              publisher_platform: "facebook",
+              platform_position: "feed",
+              impressions: "100",
+            },
+          ],
+        });
+      default:
+        return Response.json({
+          data: [
+            {
+              spend: "40",
+              impressions: "100",
+              reach: "60",
+              inline_link_clicks: "20",
+              actions: [{ action_type: "post_engagement", value: "15" }],
+            },
+          ],
+        });
+    }
+  });
+  vi.stubGlobal("fetch", graph);
+  const result = await fetchMetaAnalytics(
+    access,
+    account,
+    range,
+    ["10"],
+    true,
+    AbortSignal.timeout(1_000),
+  );
+  expect(result.delivery).toEqual({
+    spend: 40,
+    impressions: 100,
+    reach: 60,
+    linkClicks: 20,
+    engagement: 15,
+  });
+  expect(result.ages).toMatchObject([
+    { key: "25-34", impressions: 50 },
+    { key: "35-44", impressions: 50 },
+  ]);
+  expect(result.genders).toMatchObject([
+    { key: "female", impressions: 80 },
+    { key: "male", impressions: 20 },
+  ]);
+  expect(result.placements).toMatchObject([
+    { key: "facebook:feed", impressions: 100, formLeads: null },
+  ]);
+  expect(result.billing).toEqual({ spendLimit: 1000, remainingLimit: 750 });
+  graph.mockClear();
+  const noCampaigns = await fetchMetaAnalytics(
+    access,
+    account,
+    range,
+    [],
+    false,
+    AbortSignal.timeout(1_000),
+  );
+  expect(graph).not.toHaveBeenCalled();
+  expect(noCampaigns).toEqual({
+    accountId: "act_12",
+    delivery: null,
+    ages: null,
+    genders: null,
+    placements: null,
+    billing: null,
+  });
 });

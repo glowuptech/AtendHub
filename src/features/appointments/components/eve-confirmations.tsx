@@ -114,9 +114,9 @@ export function ConfirmationsList({
             )}
             <Badge>
               {r.declined_at
-                ? "Paciente não vai comparecer"
+                ? "Contato informou que não vai comparecer"
                 : r.confirmed_at
-                  ? "Paciente confirmou · lead qualificado"
+                  ? "Contato confirmou · lead qualificado"
                   : r.sent_at
                     ? r.purpose === "reminder"
                       ? "Lembrete enviado"
@@ -162,7 +162,7 @@ export function ConfirmationsList({
                       disabled={busy}
                       onClick={() => register(r.id, "confirmed")}
                     >
-                      Registrar que o paciente confirmou por telefone
+                      Registrar confirmação por telefone
                     </Button>
                   )}
                 </div>
@@ -303,7 +303,7 @@ function ReminderPreferences({ clientId }: { clientId: string }) {
             </>
           )}
           <p>
-            O pedido coleta a confirmação do paciente. O lembrete informa a data
+            O pedido coleta a confirmação do contato. O lembrete informa a data
             e a hora da consulta e também é enviado a quem já confirmou.
           </p>
           <Button type="submit">Salvar configuração</Button>

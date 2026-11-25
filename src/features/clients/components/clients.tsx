@@ -2,10 +2,10 @@
 import { useState } from "react";
 import { useClients } from "../hooks";
 
-import { useDemo } from "@/components/layout/demo-context";
-
 import { Heading, Card, Denied } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
+import { useLeads } from "@/features/leads/hooks";
+import { localDay, shiftDay } from "@/lib/date-range";
 import { LeadTable } from "@/features/leads/components/lead-table";
 import { ClientOverview } from "./overview";
 import { ClientInformation } from "./information";
@@ -17,10 +17,13 @@ import { ClientDomainSettings } from "@/features/client-domains/settings";
 import { KnowledgeBase } from "./knowledge-base";
 export { Clients } from "./directory";
 export function ClientProfile({ id }: { id: string }) {
-  const { repositories, scope, clientId } = useDemo();
   const { data: clients, error, isLoading } = useClients();
   const [tab, setTab] = useState("Visão geral");
-  if (id !== clientId) return <Denied />;
+  const [today] = useState(() => localDay(new Date().toISOString()));
+  const [range, setRange] = useState(() => ({
+    from: shiftDay(today, -29),
+    to: today,
+  }));
   if (isLoading)
     return (
       <Card>
@@ -70,18 +73,16 @@ export function ClientProfile({ id }: { id: string }) {
         <ClientOverview
           key={id}
           client={c}
+          today={today}
+          range={range}
+          onPeriodChange={setRange}
+          onPaidMedia={() => setTab("Tráfego pago")}
           onEdit={() => setTab("Informações")}
         />
       ) : tab === "Informações" ? (
         <ClientInformation key={id} client={c} />
       ) : tab === "Leads" ? (
-        <Card>
-          <LeadTable
-            leads={
-              scope.clientIds.includes(id) ? repositories.leads.list(id) : []
-            }
-          />
-        </Card>
+        <ClientLeads clientId={id} />
       ) : tab === "Formulários" ? (
         <FormsList id={id} />
       ) : tab === "Agendamento externo" ? (
@@ -91,10 +92,36 @@ export function ClientProfile({ id }: { id: string }) {
       ) : tab === "Domínio público" ? (
         <ClientDomainSettings key={id} clientId={id} />
       ) : tab === "Tráfego pago" ? (
-        <PaidMediaWorkspace key={id} clientId={id} embedded />
+        <section aria-label="Dashboard de tráfego pago do cliente">
+          <PaidMediaWorkspace
+            key={id}
+            clientId={id}
+            period={range}
+            onPeriodChange={setRange}
+            embedded
+          />
+        </section>
       ) : tab === "Base de conhecimento" ? (
         <KnowledgeBase key={id} client={c} />
       ) : null}
     </>
+  );
+}
+
+function ClientLeads({ clientId }: { clientId: string }) {
+  const { data, error, isLoading, mutate } = useLeads({ clientId });
+  return (
+    <Card>
+      {isLoading && <p role="status">Carregando leads…</p>}
+      {error && (
+        <>
+          <p role="alert">{error.message}</p>
+          <Button variant="outline" onClick={() => mutate()}>
+            Tentar novamente
+          </Button>
+        </>
+      )}
+      {data && !error && <LeadTable leads={data} />}
+    </Card>
   );
 }

@@ -108,6 +108,36 @@ export type Metrics = Omit<Insight, "day" | "ad_id"> & {
   qualified: number;
   appointments: number;
 };
+export type MediaDay = {
+  currency: string;
+  day: string;
+  spend: number;
+  form_leads: number | null;
+  whatsapp_conversations: number | null;
+};
+export type MetaDelivery = {
+  spend: number | null;
+  impressions: number | null;
+  reach: number | null;
+  linkClicks: number | null;
+  engagement: number | null;
+};
+export type MetaSegment = {
+  key: string;
+  spend: number | null;
+  impressions: number | null;
+  linkClicks: number | null;
+  formLeads: number | null;
+};
+export type MetaAccountAnalytics = {
+  accountId: string;
+  delivery: MetaDelivery | null;
+  placements: MetaSegment[] | null;
+  ages: MetaSegment[] | null;
+  genders: MetaSegment[] | null;
+  billing: { spendLimit: number | null; remainingLimit: number | null } | null;
+};
+export type MediaAnalytics = { accounts: MetaAccountAnalytics[] };
 export type MediaReport = {
   canManage: boolean;
   attributionAvailable: boolean;
@@ -122,6 +152,7 @@ export type MediaReport = {
   campaigns: Array<Campaign & { metrics: Metrics; currency: string }>;
   ads: Array<Ad & { metrics: Metrics; currency: string; stage: Stage | null }>;
   totals: Array<Metrics & { currency: string }>;
+  daily: MediaDay[];
   pending: Array<{ currency: string; spend: number; campaigns: number }>;
 };
 export function emptyPlan(clientId: string, day: string): Plan {

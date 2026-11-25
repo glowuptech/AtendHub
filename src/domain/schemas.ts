@@ -10,7 +10,7 @@ export const DoctorSchema = z.object({
   name: z.string().trim().min(2).max(120),
   crm: z
     .string()
-    .regex(/^\d{1,8}$/, "CRM deve conter de 1 a 8 dígitos")
+    .regex(/^\d{1,8}(?:-?[A-Za-z])?$/, "Informe o número do registro profissional")
     .nullable(),
   uf: z.enum([
     "AC",
@@ -114,7 +114,7 @@ export const ClientSchema = z.object({
   }, "Informe uma URL HTTPS válida, sem credenciais no endereço."),
   description: z.string(),
   category: z
-    .enum(["clinic", "doctor_male", "doctor_female"])
+    .enum(["clinic", "doctor_male", "doctor_female", "law_firm", "lawyer", "organization"])
     .default("clinic"),
   cnpj: z
     .string()

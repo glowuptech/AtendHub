@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import useSWR from "swr";
 import {
   CalendarDays,
   Clock3,
@@ -10,7 +11,6 @@ import {
   ClipboardCheck,
 } from "lucide-react";
 import type { Client } from "@/domain/schemas";
-import { useDemo } from "@/components/layout/demo-context";
 import {
   Card,
   Badge,
@@ -21,24 +21,28 @@ import {
 } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
 import {
-  DEMO_TODAY,
   shiftDay,
   partnershipSummary,
   ratio,
   RangeSchema,
-  getClientOverview,
+  type ClientOverviewData,
+  type OverviewRange,
 } from "../services/overview";
+import { ClientMediaSpend } from "./client-media-spend";
+
 export const dateLabel = (date: string | null) =>
   date ? date.split("-").reverse().join("/") : "Não informado";
 export function Partnership({
   client,
   onEdit,
+  today,
 }: {
   client: Client;
   onEdit: () => void;
+  today: string;
 }) {
   const p = client.partnership,
-    s = partnershipSummary(p);
+    s = partnershipSummary(p, today);
   return (
     <Card className="partnership-card">
       <div className="section-caption">
@@ -114,90 +118,58 @@ export function Partnership({
           </Badge>
         )}
         <small>
-          Responsável: {p.manager || "Não informado"} · Referência fixa:{" "}
-          {dateLabel(DEMO_TODAY)}. Contrato não acompanha o filtro de métricas.
+          Responsável: {p.manager || "Não informado"} · Prazos em{" "}
+          {dateLabel(today)}
         </small>
       </div>
     </Card>
   );
 }
+async function requestOverview(url: string): Promise<ClientOverviewData> {
+  const response = await fetch(url, { cache: "no-store" });
+  const body = await response.json().catch(() => null);
+  if (!response.ok || !body)
+    throw new Error(
+      body?.error ?? "Não foi possível carregar os indicadores deste cliente.",
+    );
+  return body;
+}
+
 export function ClientOverview({
   client,
+  today,
+  range,
+  onPeriodChange,
+  onPaidMedia,
   onEdit,
 }: {
   client: Client;
+  today: string;
+  range: OverviewRange;
+  onPeriodChange: (range: OverviewRange) => void;
+  onPaidMedia: () => void;
   onEdit: () => void;
 }) {
-  const { repositories } = useDemo();
-  const [range, setRange] = useState({
-      from: shiftDay(DEMO_TODAY, -29),
-      to: DEMO_TODAY,
-    }),
-    [draftRange, setDraftRange] = useState(range),
-    [doctor, setDoctor] = useState("all"),
-    [error, setError] = useState("");
-  const data = getClientOverview(repositories, client.id, range, doctor, client);
-  const known = data.appointments.filter(
-      (a) => a.attendance !== "unknown",
-    ).length,
-    present = data.appointments.filter(
-      (a) => a.attendance === "present",
-    ).length;
-  const max = Math.max(
-    1,
-    ...data.daily.map((d) => Math.max(d.leads, d.appointments)),
+  const [draftRange, setDraftRange] = useState(range);
+  const [doctor, setDoctor] = useState("all");
+  const [error, setError] = useState("");
+  const {
+    data,
+    error: loadError,
+    isLoading,
+    mutate,
+  } = useSWR(
+    `/api/clients/${client.id}/overview?${new URLSearchParams({ ...range, professional: doctor })}`,
+    requestOverview,
+    { revalidateOnFocus: false },
   );
-  const metrics = [
-    {
-      title: "Leads recebidos",
-      value: String(data.leads.length),
-      detail: "Criados no período selecionado",
-      icon: Users,
-    },
-    {
-      title: "Conversão em agendamento",
-      value: ratio(data.converted, data.leads.length),
-      detail: `${data.converted} leads com espelho / ${data.leads.length} recebidos`,
-      icon: TrendingUp,
-    },
-    {
-      title: "Conversão dos formulários",
-      value: ratio(data.submitted, data.views),
-      detail: `${data.submitted} envios / ${data.views} sessões `,
-      icon: ClipboardCheck,
-    },
-    {
-      title: "Agendamentos no período",
-      value: String(data.appointments.length),
-      detail: "Data da consulta no período · espelhos",
-      icon: CalendarDays,
-    },
-    {
-      title: "Primeira resposta humana",
-      value:
-        data.responseAverage === null
-          ? "N/D"
-          : `${data.responseAverage.toFixed(1).replace(".", ",")} min`,
-      detail: `Média corrida · ${data.responded}/${data.leads.length} leads com registro`,
-      icon: Clock3,
-    },
-    {
-      title: "Tempo de atendimento",
-      value:
-        data.handlingAverage === null
-          ? "N/D"
-          : `${data.handlingAverage.toFixed(1).replace(".", ",")} min`,
-      detail: `Média de duração registrada · ${data.handlingCount} amostras`,
-      icon: Timer,
-    },
-  ];
   return (
     <>
       <div className="section-caption">
         <div>
-          <h2>Desempenho da clínica</h2>
+          <h2>Desempenho do cliente</h2>
           <p className="muted">
-            Aquisição, atendimento e agendamento no mesmo recorte.
+            Aquisição, atendimento e agendamentos no período selecionado.
           </p>
         </div>
       </div>
@@ -211,7 +183,7 @@ export function ClientOverview({
             return;
           }
           setError("");
-          setRange(parsed.data);
+          onPeriodChange(parsed.data);
         }}
       >
         <div className="actions">
@@ -220,18 +192,17 @@ export function ClientOverview({
               key={days}
               type="button"
               variant={
-                range.from === shiftDay(DEMO_TODAY, 1 - days) &&
-                range.to === DEMO_TODAY
+                range.from === shiftDay(today, 1 - days) && range.to === today
                   ? "default"
                   : "outline"
               }
               size="sm"
               onClick={() => {
                 const next = {
-                  from: shiftDay(DEMO_TODAY, 1 - days),
-                  to: DEMO_TODAY,
+                  from: shiftDay(today, 1 - days),
+                  to: today,
                 };
-                setRange(next);
+                onPeriodChange(next);
                 setDraftRange(next);
                 setError("");
               }}
@@ -267,7 +238,7 @@ export function ClientOverview({
           <label>
             Profissional
             <select value={doctor} onChange={(e) => setDoctor(e.target.value)}>
-              <option value="all">Todos da clínica</option>
+              <option value="all">Todos os profissionais</option>
               {client.doctors.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
@@ -284,24 +255,107 @@ export function ClientOverview({
         )}
         <small>
           Período aplicado: {dateLabel(range.from)} a {dateLabel(range.to)} ·
-          America/Sao_Paulo · Referência dos atalhos: {dateLabel(DEMO_TODAY)}.
+          America/Sao_Paulo.
         </small>
       </form>
       <div className="client-summary-bento">
         <div className="client-metrics">
-          {metrics.map((m) => (
-            <Card key={m.title}>
-              <div className="metric-top">
-                <span>{m.title}</span>
-                <m.icon size={18} />
-              </div>
-              <strong className="metric-value">{m.value}</strong>
-              <small>{m.detail}</small>
+          <ClientMediaSpend
+            clientId={client.id}
+            range={range}
+            onDashboard={onPaidMedia}
+          />
+          {isLoading && <p role="status">Carregando indicadores do cliente…</p>}
+          {loadError && (
+            <Card>
+              <p role="alert">{loadError.message}</p>
+              <Button variant="outline" onClick={() => mutate()}>
+                Tentar novamente
+              </Button>
             </Card>
-          ))}
+          )}
+          {data && !loadError && <OverviewMetrics data={data} />}
         </div>
-        <Partnership client={client} onEdit={onEdit} />
+        <Partnership client={client} today={today} onEdit={onEdit} />
       </div>
+      {data && !loadError && (
+        <OverviewDetails clientId={client.id} data={data} />
+      )}
+    </>
+  );
+}
+
+function OverviewMetrics({ data }: { data: ClientOverviewData }) {
+  const metrics = [
+    {
+      title: "Leads recebidos",
+      value: String(data.leadCount),
+      detail: "Criados no período selecionado",
+      icon: Users,
+    },
+    {
+      title: "Conversão em agendamento",
+      value: ratio(data.converted, data.leadCount),
+      detail: `${data.converted} leads com agendamento / ${data.leadCount} recebidos`,
+      icon: TrendingUp,
+    },
+    {
+      title: "Envios por sessão de formulário",
+      value: ratio(data.submitted, data.views ?? 0),
+      detail: `${data.submitted} envios / ${data.views ?? "—"} sessões no período`,
+      icon: ClipboardCheck,
+    },
+    {
+      title: "Agendamentos no período",
+      value: String(data.appointmentCount),
+      detail: "Pela data marcada",
+      icon: CalendarDays,
+    },
+    {
+      title: "Primeira resposta humana",
+      value:
+        data.responseAverage === null
+          ? "N/D"
+          : `${data.responseAverage.toFixed(1).replace(".", ",")} min`,
+      detail: `Média corrida · ${data.responded}/${data.leadCount} leads com registro`,
+      icon: Clock3,
+    },
+    {
+      title: "Tempo de atendimento",
+      value:
+        data.handlingAverage === null
+          ? "N/D"
+          : `${data.handlingAverage.toFixed(1).replace(".", ",")} min`,
+      detail: `Abertura ao encerramento no Inbox · ${data.handlingCount} amostras`,
+      icon: Timer,
+    },
+  ];
+  return metrics.map((metric) => (
+    <Card key={metric.title}>
+      <div className="metric-top">
+        <span>{metric.title}</span>
+        <metric.icon size={18} aria-hidden="true" />
+      </div>
+      <strong className="metric-value">{metric.value}</strong>
+      <small>{metric.detail}</small>
+    </Card>
+  ));
+}
+
+function OverviewDetails({
+  clientId,
+  data,
+}: {
+  clientId: string;
+  data: ClientOverviewData;
+}) {
+  const { present, known } = data.attendance;
+  const max = Math.max(
+    1,
+    ...data.daily.map((day) => Math.max(day.leads, day.appointments)),
+  );
+  return (
+    <>
       <div className="profile-dashboard-grid">
         <Card title="Movimento no período">
           <div className="chart-legend">
@@ -314,17 +368,17 @@ export function ClientOverview({
               Consultas marcadas para a data
             </span>
           </div>
-          {!data.leads.length && !data.appointments.length ? (
+          {!data.leadCount && !data.appointmentCount ? (
             <Empty
               title="Sem movimento neste período"
-              description="Ajuste as datas ou o profissional para explorar os exemplos."
+              description="Ajuste as datas ou selecione outro profissional."
             />
           ) : (
             <div
               className="daily-chart"
               tabIndex={0}
               role="img"
-              aria-label={`Evolução diária: ${data.leads.length} leads recebidos e ${data.appointments.length} agendamentos no período. Detalhes por data na tabela abaixo.`}
+              aria-label={`Evolução diária: ${data.leadCount} leads recebidos e ${data.appointmentCount} agendamentos no período. Detalhes por data na tabela abaixo.`}
             >
               {data.daily.map((d) => (
                 <div
@@ -381,21 +435,21 @@ export function ClientOverview({
         </Card>
         <Card title="Funil de atendimento">
           {[
-            ["Leads recebidos", data.leads.length],
+            ["Leads recebidos", data.leadCount],
             ["Com resposta humana", data.responded],
-            ["Com agendamento espelhado", data.converted],
+            ["Com agendamento", data.converted],
           ].map(([label, n], i) => (
             <div className="funnel-row" data-series={i} key={label}>
               <div>
                 <span>{label}</span>
                 <strong>
-                  {n}/{data.leads.length}
+                  {n}/{data.leadCount}
                 </strong>
               </div>
               <div className="bar-track">
                 <span
                   style={{
-                    width: `${data.leads.length ? (Number(n) / data.leads.length) * 100 : 0}%`,
+                    width: `${data.leadCount ? (Number(n) / data.leadCount) * 100 : 0}%`,
                   }}
                 />
               </div>
@@ -407,14 +461,21 @@ export function ClientOverview({
               {present} presentes / {known} presenças ou faltas informadas.
             </small>
             <small>
-              Cobertura: {known}/{data.appointments.length} consultas do
-              período. Ausência de informação não conta como falta.
+              Cobertura: {known}/{data.appointmentCount} consultas do período.
+              Ausência de informação não conta como falta.
             </small>
           </div>
         </Card>
       </div>
-      <Card title="Conversão por formulário">
-        <div className="actions"><NavButton href={`/app/clientes/${client.id}/formularios`}>Gerenciar formulários</NavButton><NavButton href={`/app/clientes/${client.id}/formularios/novo`}>Novo formulário</NavButton></div>
+      <Card title="Resultados por formulário">
+        <div className="actions">
+          <NavButton href={`/app/clientes/${clientId}/formularios`}>
+            Gerenciar formulários
+          </NavButton>
+          <NavButton href={`/app/clientes/${clientId}/formularios/novo`}>
+            Novo formulário
+          </NavButton>
+        </div>
         <div
           className="table-scroll"
           tabIndex={0}
@@ -426,24 +487,16 @@ export function ClientOverview({
                 <th>Formulário</th>
                 <th>Sessões</th>
                 <th>Envios</th>
-                <th>Conversão</th>
-                <th>Referência</th>
+                <th>Envios por sessão</th>
               </tr>
             </thead>
             <tbody>
               {data.forms.map((f) => (
                 <tr key={f.id}>
-                  <td>
-                    <NavButton
-                      href={`/app/clientes/${client.id}/formularios/${f.id}/analytics`}
-                    >
-                      {f.name}
-                    </NavButton>
-                  </td>
-                  <td>{f.views}</td>
+                  <td>{f.name}</td>
+                  <td>{f.views ?? "—"}</td>
                   <td>{f.submitted}</td>
-                  <td>{ratio(f.submitted, f.views)}</td>
-                  <td>{f.version}</td>
+                  <td>{ratio(f.submitted, f.views ?? 0)}</td>
                 </tr>
               ))}
             </tbody>
@@ -458,30 +511,26 @@ export function ClientOverview({
           {Object.entries(stageLabels).map(([key, label]) => (
             <div className="profile-stat-row" key={key}>
               <span>{label}</span>
-              <strong>
-                {data.leads.filter((l) => l.stage === key).length}
-              </strong>
+              <strong>{data.stages[key] ?? 0}</strong>
             </div>
           ))}
           <NavButton href="/app/leads">Abrir CRM da clínica</NavButton>
         </Card>
-        <Card title="Próximos passos e agendamentos">
-          {data.leads
-            .filter((l) => !l.firstResponseAt)
-            .map((l) => (
-              <div className="profile-stat-row" key={l.id}>
-                <span>
-                  {l.name}
-                  <small>Primeira resposta humana não registrada</small>
-                </span>
-                <NavButton href={`/app/leads/${l.id}`}>Atender</NavButton>
-              </div>
-            ))}
-          {data.appointments.map((a) => (
+        <Card title="Pendências e agendamentos">
+          {data.awaitingResponse.map((l) => (
+            <div className="profile-stat-row" key={l.id}>
+              <span>
+                {l.name}
+                <small>Primeira resposta humana não registrada</small>
+              </span>
+              <NavButton href={`/app/leads/${l.id}`}>Atender</NavButton>
+            </div>
+          ))}
+          {data.recentAppointments.map((a) => (
             <div className="profile-stat-row" key={a.id}>
               <span>
-                {a.name}
-                <small>{dateTime(a.scheduledAt)} · espelho</small>
+                {a.lead?.name ?? "Lead"}
+                <small>{dateTime(a.starts_at)}</small>
               </span>
               <Badge>
                 {a.attendance === "unknown"
@@ -492,18 +541,16 @@ export function ClientOverview({
               </Badge>
             </div>
           ))}
-          {!data.appointments.length &&
-            !data.leads.some((l) => !l.firstResponseAt) && (
-              <p className="muted">Nenhuma pendência neste recorte.</p>
-            )}
+          {!data.appointmentCount && !data.awaitingResponse.length && (
+            <p className="muted">Nenhuma pendência neste recorte.</p>
+          )}
           <NavButton href="/app/agendamentos">Ver agendamentos</NavButton>
         </Card>
       </div>
       <p className="muted profile-metric-note">
-        Tempo até a primeira resposta é corrido, não SLA em horário útil. Tempo
-        de atendimento usa duração registrada, não tempo desde o último contato.
-        Médicos são filtrados por vínculo explícito do lead/formulário; dados
-        sem vínculo ficam em “Sem profissional vinculado”.
+        O filtro de profissional usa o vínculo de cada lead, formulário ou
+        agendamento. O investimento da Meta se refere ao cliente inteiro. O
+        tempo de primeira resposta é corrido.
       </p>
     </>
   );

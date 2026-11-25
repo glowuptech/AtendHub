@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useClients } from "@/features/clients/hooks";
+import { clientCategories, clientOperations } from "@/features/clients/operation";
 import { useLeads } from "@/features/leads/hooks";
 import { Heading, Badge, stageLabels } from "@/components/layout/shared";
 import { Button } from "@/components/ui/button";
@@ -163,13 +164,9 @@ export function Queue() {
                 return (
                   <article className="queue-card" key={l.id}>
                     <small className="queue-client">{l.client.name}</small>
-                    <Badge>
-                      {l.client.category === "clinic"
-                        ? "Clínica · Saúde"
-                        : l.client.category === "doctor_female"
-                          ? "Médica · Saúde"
-                          : "Médico · Saúde"}
-                    </Badge>
+                    <span className="client-operation-badge" data-vertical={l.client.vertical}>
+                      {clientCategories[l.client.category]} · {clientOperations[l.client.vertical].name}
+                    </span>
                     <h3>{l.name}</h3>
                     <p>{l.phone || "Telefone não informado"}</p>
                     <small>Origem: {l.source}</small>

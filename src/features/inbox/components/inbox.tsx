@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, SlidersHorizontal, MessagesSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge, stageLabels } from "@/components/layout/shared";
+import { operationName } from "@/features/clients/operation";
 import type { Shortcut } from "./chat-shortcuts";
 import { RoutingReview } from "./episode-actions";
 import { StartConversation } from "./start-conversation";
@@ -97,11 +98,17 @@ export function Inbox() {
         ...new Map([
           ...all.map(
             (c) =>
-              [c.operationCode, c.operationName || c.operationCode] as const,
+              [
+                c.operationCode,
+                operationName(c.operationCode, c.operationName),
+              ] as const,
           ),
           ...assigned.map(
             (l) =>
-              [l.operationCode, l.operationName || l.operationCode] as const,
+              [
+                l.operationCode,
+                operationName(l.operationCode, l.operationName),
+              ] as const,
           ),
         ]),
       ].filter(([code]) => code),
@@ -373,7 +380,8 @@ export function Inbox() {
                     data-operation={c.operationCode}
                   >
                     {c.clientName}
-                    {c.operationName ? ` · ${c.operationName}` : ""}
+                    {(c.operationCode || c.operationName) &&
+                      ` · ${operationName(c.operationCode, c.operationName)}`}
                   </span>
                   {repeatedContacts.has(c.connection.id + ":" + c.phone) && (
                     <small>

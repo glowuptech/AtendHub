@@ -64,7 +64,7 @@ export function AccessPage() {
           <p>Clientes, equipe e operação conectados em um só lugar.</p>
           <ul><li><ShieldCheck size={20} />Acesso autorizado pelo administrador</li></ul>
         </div>
-        <small>Prescrita · Veredite</small>
+        <small>Glow Up · Veredit</small>
       </section>
       <section className="access-form-panel" aria-label="Login">
         <div className="access-form-card">

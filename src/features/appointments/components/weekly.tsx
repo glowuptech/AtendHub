@@ -627,7 +627,7 @@ export function WeeklyWorkspace({
               />
               <small>
                 O lead pode estar vinculado a outro profissional; este
-                agendamento mantém seu próprio vínculo com o médico selecionado.
+                agendamento mantém seu próprio vínculo com o profissional selecionado.
               </small>
               {error && (
                 <p className="field-error" role="alert">

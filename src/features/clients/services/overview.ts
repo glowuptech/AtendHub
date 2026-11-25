@@ -1,40 +1,10 @@
-import { z } from "zod";
 import type { Client } from "@/domain/schemas";
-import type { RepositoryRegistry } from "@/domain/contracts";
-import { uid } from "@/lib/mocks/fixtures";
-export const DEMO_TODAY = "2026-11-03";
-const dayMs = 86400000;
-export const daysBetween = (start: string, end: string) =>
-  Math.round(
-    (Date.parse(end + "T12:00:00Z") - Date.parse(start + "T12:00:00Z")) / dayMs,
-  );
-export function shiftDay(day: string, offset: number) {
-  return new Date(Date.parse(day + "T12:00:00Z") + offset * dayMs)
-    .toISOString()
-    .slice(0, 10);
-}
-export const RangeSchema = z
-  .object({ from: z.string().date(), to: z.string().date() })
-  .refine(
-    (v) => v.from <= v.to,
-    "A data inicial deve ser anterior ou igual à final.",
-  )
-  .refine(
-    (v) => daysBetween(v.from, v.to) < 366,
-    "Selecione um período de até 366 dias.",
-  );
-export function localDay(timestamp: string) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(timestamp));
-}
-export function partnershipSummary(
-  p: Client["partnership"],
-  today = DEMO_TODAY,
-) {
+import { daysBetween, localDay, shiftDay } from "@/lib/date-range";
+
+export { daysBetween, localDay, RangeSchema, shiftDay } from "@/lib/date-range";
+export type OverviewRange = { from: string; to: string };
+
+export function partnershipSummary(p: Client["partnership"], today: string) {
   return {
     projectDays: p.projectStartedOn
       ? daysBetween(p.projectStartedOn, today)
@@ -47,115 +17,128 @@ export function partnershipSummary(
     renewalDays: p.renewsOn ? daysBetween(today, p.renewsOn) : null,
   };
 }
+
 export const ratio = (n: number, d: number) =>
   d ? `${Math.round((n / d) * 100)}%` : "N/D";
-function scopedList<T>(list: () => T[]): T[] {
-  try {
-    return list();
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("fora do escopo")) return [];
-    throw error;
-  }
+
+export type OverviewLead = {
+  id: string;
+  name: string;
+  stage: string;
+  created_at: string;
+  first_response_at: string | null;
+};
+export type OverviewAppointment = {
+  id: string;
+  lead_id: string;
+  starts_at: string;
+  attendance: "unknown" | "present" | "absent";
+  lead?: { name: string } | null;
+};
+export type FormPerformance = {
+  id: string;
+  name: string;
+  views: number | null;
+  submitted: number;
+};
+export type EpisodeEvent = {
+  conversation_id: string;
+  status: "open" | "closed";
+  occurred_at: string;
+  conversation: { created_at: string };
+};
+
+function responseMinutes(start: string, end: string | null) {
+  if (!end) return null;
+  const duration = (Date.parse(end) - Date.parse(start)) / 60000;
+  return duration >= 0 ? duration : null;
 }
 
-export function getClientOverview(
-  repositories: RepositoryRegistry,
-  clientId: string,
-  range: { from: string; to: string },
-  doctorId = "all",
-  clientOverride?: Client,
-) {
-  RangeSchema.parse(range);
-  let client = clientOverride;
-  if (!client) client = repositories.clients.get(clientId);
-  if (!client) throw new Error("Cliente não encontrado.");
-  if (
-    doctorId !== "all" &&
-    doctorId !== "unassigned" &&
-    !client.doctors.some((d) => d.id === doctorId)
-  )
-    throw Error("Profissional fora desta clínica");
-  const doctorMatch = (id: string | null) =>
-    doctorId === "all" || (doctorId === "unassigned" ? !id : id === doctorId);
-  const inRange = (day: string) => day >= range.from && day <= range.to;
-  const allLeads = scopedList(() => repositories.leads.list(clientId)),
-    leads = allLeads.filter(
-      (l) => doctorMatch(l.doctorId) && inRange(localDay(l.createdAt)),
-    );
-  const mirrors = scopedList(() => repositories.appointments.list(clientId));
-  const allIds = new Set(
-    allLeads.filter((l) => doctorMatch(l.doctorId)).map((l) => l.id),
-  );
-  const appointments = mirrors.filter(
-    (a) => allIds.has(a.leadId) && inRange(localDay(a.scheduledAt)),
-  );
-  const converted = leads.filter((l) =>
-    mirrors.some((a) => a.leadId === l.id),
-  ).length;
-  const responseSamples = leads
-    .filter(
-      (l) =>
-        l.firstResponseAt &&
-        Date.parse(l.firstResponseAt) >= Date.parse(l.createdAt),
-    )
-    .map(
-      (l) => (Date.parse(l.firstResponseAt!) - Date.parse(l.createdAt)) / 60000,
-    );
-  const handlingSamples = leads.flatMap((l) =>
-    l.handlingMinutes === null ? [] : [l.handlingMinutes],
-  );
-  // Fixed anonymous demo aggregates, not generated leads or a production analytics API.
-  const formRows = scopedList(() => repositories.forms.list(clientId))
-    .filter((f) => doctorMatch(f.doctorId))
-    .map((f) => {
-      const seeded = [uid(300), uid(400), uid(500)].includes(f.id);
-      const daily = ["2026-11-01", "2026-11-02", "2026-11-03"]
-        .filter(inRange)
-        .map((day) => {
-          const i = Number(day.slice(-2)) - 1;
-          return {
-            day,
-            views: seeded ? [25, 35, 40][i] : 0,
-            submitted: seeded ? [8, 13, 17][i] : 0,
-          };
-        });
-      return {
-        id: f.id,
-        name: f.name,
-        version: "v1",
-        views: daily.reduce((s, d) => s + d.views, 0),
-        submitted: daily.reduce((s, d) => s + d.submitted, 0),
-        daily,
-      };
-    });
-  const daily = Array.from(
-    { length: daysBetween(range.from, range.to) + 1 },
-    (_, i) => {
+export function episodeDurations(events: EpisodeEvent[]) {
+  const starts = new Map<string, string | null>();
+  const durations: number[] = [];
+  for (const event of events) {
+    const { conversation_id: id, status, occurred_at: time } = event;
+    if (status === "open") {
+      starts.set(id, time);
+      continue;
+    }
+    const start = starts.has(id)
+      ? starts.get(id)
+      : event.conversation.created_at;
+    const minutes = start ? responseMinutes(start, time) : null;
+    if (minutes !== null) durations.push(minutes);
+    starts.set(id, null);
+  }
+  return durations;
+}
+
+const average = (samples: number[]) =>
+  samples.length
+    ? samples.reduce((sum, n) => sum + n, 0) / samples.length
+    : null;
+
+export function summarizeClientOverview({
+  leads,
+  appointments,
+  bookedLeadIds,
+  forms,
+  handling,
+  range,
+}: {
+  leads: OverviewLead[];
+  appointments: OverviewAppointment[];
+  bookedLeadIds: Set<string>;
+  forms: FormPerformance[];
+  handling: number[];
+  range: OverviewRange;
+}) {
+  const dayCounts = new Map(
+    Array.from({ length: daysBetween(range.from, range.to) + 1 }, (_, i) => {
       const day = shiftDay(range.from, i);
-      return {
-        day,
-        leads: leads.filter((l) => localDay(l.createdAt) === day).length,
-        appointments: appointments.filter(
-          (a) => localDay(a.scheduledAt) === day,
-        ).length,
-      };
-    },
+      return [day, { day, leads: 0, appointments: 0 }];
+    }),
   );
+  const stages: Record<string, number> = {};
+  const responses: number[] = [];
+  for (const lead of leads) {
+    const day = dayCounts.get(localDay(lead.created_at));
+    if (day) day.leads++;
+    stages[lead.stage] = (stages[lead.stage] ?? 0) + 1;
+    const minutes = responseMinutes(lead.created_at, lead.first_response_at);
+    if (minutes !== null) responses.push(minutes);
+  }
+  for (const appointment of appointments) {
+    const day = dayCounts.get(localDay(appointment.starts_at));
+    if (day) day.appointments++;
+  }
   return {
-    leads,
-    appointments,
-    converted,
-    views: formRows.reduce((s, f) => s + f.views, 0),
-    submitted: formRows.reduce((s, f) => s + f.submitted, 0),
-    forms: formRows,
-    daily,
-    responded: responseSamples.length,
-    responseAverage: responseSamples.length
-      ? responseSamples.reduce((s, n) => s + n, 0) / responseSamples.length
-      : null,
-    handlingCount: handlingSamples.length,
-    handlingAverage: handlingSamples.length
-      ? handlingSamples.reduce((s, n) => s + n, 0) / handlingSamples.length
-      : null,
+    leadCount: leads.length,
+    appointmentCount: appointments.length,
+    converted: leads.filter((lead) => bookedLeadIds.has(lead.id)).length,
+    responded: responses.length,
+    responseAverage: average(responses),
+    handlingCount: handling.length,
+    handlingAverage: average(handling),
+    forms,
+    views: forms.some((form) => form.views === null)
+      ? null
+      : forms.reduce((sum, form) => sum + (form.views ?? 0), 0),
+    submitted: forms.reduce((sum, form) => sum + form.submitted, 0),
+    attendance: {
+      present: appointments.filter((a) => a.attendance === "present").length,
+      known: appointments.filter(
+        (a) => a.attendance === "present" || a.attendance === "absent",
+      ).length,
+    },
+    stages,
+    daily: [...dayCounts.values()],
+    awaitingResponse: leads
+      .filter((lead) => !lead.first_response_at)
+      .slice(0, 10)
+      .map(({ id, name }) => ({ id, name })),
+    recentAppointments: appointments.slice(0, 10),
   };
 }
+
+export type ClientOverviewData = ReturnType<typeof summarizeClientOverview>;

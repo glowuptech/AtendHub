@@ -1,6 +1,13 @@
 import "server-only";
 import { z } from "zod";
-import { identifiers, type Ad, type Insight } from "./model";
+import {
+  identifiers,
+  type Ad,
+  type Insight,
+  type Account,
+  type MetaAccountAnalytics,
+  type MetaSegment,
+} from "./model";
 
 const accountSchema = z.object({
   id: identifiers.account,
@@ -202,6 +209,190 @@ function count(actions: z.infer<typeof actionSchema>, types: string[]) {
     return Number.isSafeInteger(value) && value >= 0 ? value : null;
   }
   return null;
+}
+
+const numberField = z.union([z.string(), z.number()]).nullish();
+const deliverySchema = z.object({
+  spend: numberField,
+  impressions: numberField,
+  reach: numberField,
+  inline_link_clicks: numberField,
+  actions: actionSchema,
+});
+const breakdownSchema = deliverySchema.extend({
+  publisher_platform: z.string().optional(),
+  platform_position: z.string().optional(),
+  age: z.string().optional(),
+  gender: z.string().optional(),
+});
+function metaNumber(value: z.infer<typeof numberField>) {
+  if (value == null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function groupSegments(
+  rows: z.infer<typeof breakdownSchema>[],
+  keyFor: (row: z.infer<typeof breakdownSchema>) => string,
+) {
+  const sums = new Map<string, MetaSegment>();
+  for (const row of rows) {
+    const key = keyFor(row);
+    const raw = {
+      spend: metaNumber(row.spend),
+      impressions: metaNumber(row.impressions),
+      linkClicks: metaNumber(row.inline_link_clicks),
+      formLeads: count(row.actions, ["onsite_conversion.lead_grouped"]),
+    };
+    const sum = sums.get(key) ?? {
+      key,
+      spend: null,
+      impressions: null,
+      linkClicks: null,
+      formLeads: null,
+    };
+    for (const metric of [
+      "spend",
+      "impressions",
+      "linkClicks",
+      "formLeads",
+    ] as const) {
+      const value = raw[metric];
+      if (value !== null) sum[metric] = (sum[metric] ?? 0) + value;
+    }
+    sums.set(key, sum);
+  }
+  return [...sums.values()];
+}
+
+async function readMetaBilling(
+  access: MetaAccess,
+  account: Account,
+  signal: AbortSignal,
+) {
+  const row = await graph(
+    access,
+    account.account_id,
+    { fields: "spend_cap,amount_spent" },
+    z.object({ spend_cap: numberField, amount_spent: numberField }),
+    signal,
+  );
+  const cap = metaNumber(row.spend_cap);
+  const charged = metaNumber(row.amount_spent);
+  // Ad account amounts are in minor currency units, unlike Insights spend.
+  const decimals =
+    new Intl.NumberFormat("en", {
+      style: "currency",
+      currency: account.currency,
+    }).resolvedOptions().maximumFractionDigits ?? 2;
+  const unit = 10 ** decimals;
+  return {
+    spendLimit: cap ? cap / unit : null,
+    remainingLimit:
+      cap && charged !== null ? Math.max(0, cap - charged) / unit : null,
+  };
+}
+
+export async function fetchMetaAnalytics(
+  access: MetaAccess,
+  account: Account,
+  range: { from: string; to: string },
+  campaignIds: string[] | null,
+  billing: boolean,
+  signal: AbortSignal,
+): Promise<MetaAccountAnalytics> {
+  const query = {
+    time_range: JSON.stringify({ since: range.from, until: range.to }),
+    level: "account",
+    ...(campaignIds
+      ? {
+          filtering: JSON.stringify([
+            { field: "campaign.id", operator: "IN", value: campaignIds },
+          ]),
+        }
+      : {}),
+  };
+  const path = `${account.account_id}/insights`;
+  const segments = async (breakdowns: string) => {
+    const fields = "spend,impressions,inline_link_clicks";
+    try {
+      return await pages(
+        access,
+        path,
+        { ...query, breakdowns, fields: fields + ",actions" },
+        breakdownSchema,
+        signal,
+      );
+    } catch (error) {
+      if (
+        signal.aborted ||
+        !(error instanceof MetaError) ||
+        error.status !== 502
+      )
+        throw error;
+      // Some accounts allow delivery breakdowns while withholding action breakdowns.
+      return pages(
+        access,
+        path,
+        { ...query, breakdowns, fields },
+        breakdownSchema,
+        signal,
+      );
+    }
+  };
+  const hasCampaigns = campaignIds === null || campaignIds.length > 0;
+  const [deliveryRows, placementRows, demographicRows, limit] =
+    await Promise.allSettled([
+      hasCampaigns
+        ? graph(
+            access,
+            path,
+            {
+              ...query,
+              fields: "spend,impressions,reach,inline_link_clicks,actions",
+            },
+            z.object({ data: z.array(deliverySchema) }),
+            signal,
+          )
+        : null,
+      hasCampaigns ? segments("publisher_platform,platform_position") : null,
+      hasCampaigns ? segments("age,gender") : null,
+      billing ? readMetaBilling(access, account, signal) : null,
+    ]);
+  const row =
+    deliveryRows.status === "fulfilled" ? deliveryRows.value?.data[0] : null;
+  const placement =
+    placementRows.status === "fulfilled" ? placementRows.value : null;
+  const demographics =
+    demographicRows.status === "fulfilled" ? demographicRows.value : null;
+  return {
+    accountId: account.account_id,
+    delivery: row
+      ? {
+          spend: metaNumber(row.spend),
+          impressions: metaNumber(row.impressions),
+          reach: metaNumber(row.reach),
+          linkClicks: metaNumber(row.inline_link_clicks),
+          engagement: count(row.actions, ["post_engagement"]),
+        }
+      : null,
+    placements:
+      placement &&
+      groupSegments(
+        placement,
+        (value) =>
+          [value.publisher_platform, value.platform_position]
+            .filter(Boolean)
+            .join(":") || "unknown",
+      ),
+    ages:
+      demographics &&
+      groupSegments(demographics, (value) => value.age ?? "unknown"),
+    genders:
+      demographics &&
+      groupSegments(demographics, (value) => value.gender ?? "unknown"),
+    billing: limit.status === "fulfilled" ? limit.value : null,
+  };
 }
 function safeThumbnail(value: string | undefined) {
   if (!value) return null;
