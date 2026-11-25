@@ -166,9 +166,15 @@ export function Shell({
         <div className="workspace-pill">
           <span className="avatar">G</span>
           <span className="workspace-name">
-            GlowUp
+            Glow Up
             <small>
-              {portal ? (legal ? "Portal do escritório" : "Portal da clínica") : "Gestão de atendimento"}
+              {portal
+                ? selectedClient?.category === "organization"
+                  ? "Portal da organização"
+                  : legal
+                    ? "Portal do escritório"
+                    : "Portal da clínica"
+                : "Gestão de atendimento"}
             </small>
           </span>
         </div>
@@ -294,7 +300,7 @@ export function Shell({
                   ))}
                 </select>
                 <label className="sr-only" htmlFor="vertical">
-                  Vertical
+                  Operação
                 </label>
                 <select
                   id="vertical"
@@ -305,12 +311,26 @@ export function Shell({
                     if (client) selectClient(client.id);
                   }}
                 >
-                  {!selectedClient && <option value="">Selecione um cliente</option>}
-                  <option value="healthcare" disabled={!clinics.some((client) => client.vertical === "healthcare")}>
-                    Saúde · {clientOperations.healthcare.name}
+                  {!selectedClient && (
+                    <option value="">Selecione um cliente</option>
+                  )}
+                  <option
+                    value="healthcare"
+                    disabled={
+                      !clinics.some(
+                        (client) => client.vertical === "healthcare",
+                      )
+                    }
+                  >
+                    {clientOperations.healthcare.name}
                   </option>
-                  <option value="legal" disabled={!clinics.some((client) => client.vertical === "legal")}>
-                    Jurídico · {clientOperations.legal.name}
+                  <option
+                    value="legal"
+                    disabled={
+                      !clinics.some((client) => client.vertical === "legal")
+                    }
+                  >
+                    {clientOperations.legal.name}
                   </option>
                 </select>
               </>
@@ -321,7 +341,7 @@ export function Shell({
               </summary>
               <div className="account-popover">
                 <strong>Operadora</strong>
-                <small>GlowUp · Atendimento</small>
+                <small>Glow Up · Atendimento</small>
                 <Link
                   aria-label={portal ? "Voltar à operação" : "Conhecer portal"}
                   href={portal ? appHomePath : "/portal"}

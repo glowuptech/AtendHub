@@ -1,6 +1,7 @@
 import type { Client } from "@/domain/schemas";
 
 export const clientCategories = {
+  organization: "Organização",
   clinic: "Clínica",
   doctor_male: "Médico",
   doctor_female: "Médica",
@@ -11,15 +12,15 @@ export const clientCategories = {
 export const clientOperations = {
   healthcare: {
     code: "prescrita",
-    name: "Prescrita",
+    name: "Glow Up",
     professionalType: "health",
-    categories: ["clinic", "doctor_male", "doctor_female"],
+    categories: ["clinic", "doctor_male", "doctor_female", "organization"],
   },
   legal: {
     code: "veredite",
     name: "Veredit",
     professionalType: "legal",
-    categories: ["law_firm", "lawyer"],
+    categories: ["law_firm", "lawyer", "organization"],
   },
 } as const satisfies Record<
   Client["vertical"],
@@ -41,3 +42,10 @@ export function clientCategory(client: Pick<Client, "vertical" | "category">) {
 
 export const databaseClientStatus = (status: Client["status"]) =>
   status === "paused" ? "inactive" : "active";
+
+export function operationName(code: string, storedName: string) {
+  const operation = Object.values(clientOperations).find(
+    (item) => item.code === code,
+  );
+  return operation?.name ?? (storedName || code);
+}

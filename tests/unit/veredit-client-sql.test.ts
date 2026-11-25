@@ -41,6 +41,12 @@ beforeAll(async () => {
       "utf8",
     ),
   );
+  await db.exec(
+    await readFile(
+      "supabase/migrations/20261125000000_atendhub_internal_organizations.sql",
+      "utf8",
+    ),
+  );
 });
 
 afterAll(async () => db?.close());
@@ -49,8 +55,9 @@ async function createClient(
   target: string,
   id: string,
   vertical: string,
-  document: string,
+  document: string | null,
   duplicate = false,
+  category?: string,
 ) {
   const member = {
     id,
@@ -66,7 +73,12 @@ async function createClient(
       [
         target,
         id,
-        JSON.stringify({ vertical, branding: "sage", doctors: [member] }),
+        JSON.stringify({
+          vertical,
+          category,
+          branding: "sage",
+          doctors: [member],
+        }),
         JSON.stringify(duplicate ? [member, member] : [member]),
       ],
     );
@@ -83,6 +95,7 @@ it("cria o escritório e o profissional legal na operação do cadastro", async 
     select op.code, p.professional_type, p.crm, c.metadata#>>'{doctors,0,uf}' as uf
     from atendhub_clients c join atendhub_operations op on op.id=c.operation_id
     join atendhub_professionals p on p.client_id=c.id
+    where c.id = '${uuid(11)}'
   `);
   expect(result.rows).toEqual([
     { code: "veredite", professional_type: "legal", crm: "123456-A", uf: "MG" },
@@ -115,4 +128,36 @@ it("recusa outra organização e reverte o cadastro se um profissional falhar", 
     [[uuid(20), uuid(21)]],
   );
   expect(result.rows).toEqual([]);
+});
+
+it("mantém as operações conhecidas e cadastra equipes internas nas duas", async () => {
+  for (const [id, vertical] of [
+    [31, "healthcare"],
+    [32, "legal"],
+  ] as const)
+    await createClient(org, uuid(id), vertical, null, false, "organization");
+
+  const { rows } = await db.query(
+    `select op.code, op.name, p.professional_type, p.crm, c.metadata->>'category' as category
+     from atendhub_clients c join atendhub_operations op on op.id = c.operation_id
+     join atendhub_professionals p on p.client_id = c.id
+     where c.id = any($1::uuid[]) order by c.id`,
+    [[uuid(31), uuid(32)]],
+  );
+  expect(rows).toEqual([
+    {
+      code: "prescrita",
+      name: "Glow Up",
+      professional_type: "other",
+      crm: null,
+      category: "organization",
+    },
+    {
+      code: "veredite",
+      name: "Veredit",
+      professional_type: "other",
+      crm: null,
+      category: "organization",
+    },
+  ]);
 });
