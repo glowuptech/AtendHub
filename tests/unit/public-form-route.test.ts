@@ -6,7 +6,8 @@ const mocks = vi.hoisted(() => ({
   rpc: vi.fn(),
   tenant: vi.fn(),
 }));
-vi.mock("@supabase/supabase-js", () => ({ createClient: () => mocks }));
+vi.mock("server-only", () => ({}));
+vi.mock("@/features/whatsapp/server", () => ({ integrationAdmin: () => mocks }));
 vi.mock("@/features/client-domains/server", () => ({
   tenantAtHost: mocks.tenant,
 }));
@@ -50,8 +51,6 @@ const versions = query({
 });
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubEnv("SUPABASE_URL", "https://example.invalid");
-  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-only");
   mocks.tenant.mockResolvedValue(form.clientId);
   mocks.from.mockImplementation((table) =>
     table === "atendhub_forms"
@@ -71,6 +70,7 @@ const request = (body?: object) =>
 it("abre apenas o snapshot ativo do cliente do domínio sem sessão do painel", async () => {
   const response = await GET(request(), ctx);
   expect(response.status).toBe(200);
+  expect((await response.json()).versions[0].successMessage).toBe("Recebemos seu cadastro.");
   expect(forms.eq).toHaveBeenCalledWith("status", "demo");
   expect(forms.eq).toHaveBeenCalledWith("client_id", form.clientId);
   expect(versions.eq).toHaveBeenCalledWith("id", version.id);
@@ -104,4 +104,54 @@ it("remove respostas fora do caminho antes de gravar o cadastro público", async
       .status,
   ).toBe(409);
   expect(mocks.rpc).toHaveBeenCalledTimes(1);
+});
+
+it.each([
+  ["(16) 3456-7890", "+551634567890"],
+  ["(55) 98765-4321", "+5555987654321"],
+  ["+55 (11) 98765-4321", "+5511987654321"],
+])(
+  "normaliza o WhatsApp e a pergunta de telefone %s antes de gravar",
+  async (phone, expected) => {
+    const [router, , question] = version.steps;
+    const body = {
+      sessionId: "visit",
+      idempotencyKey: crypto.randomUUID(),
+      complete: false,
+      contacts: { name: "Teste", phone, email: "" },
+      answers: {
+        [router.question.id]: "afternoon",
+        [question.question.id]: phone,
+      },
+    };
+    mocks.rpc.mockResolvedValue({ data: crypto.randomUUID() });
+    expect((await POST(request(body), ctx)).status).toBe(200);
+    expect(mocks.rpc.mock.calls[0][1]).toMatchObject({
+      p_contacts: { phone: expected },
+      p_responses: expect.arrayContaining([
+        expect.objectContaining({
+          question_id: question.question.id,
+          value: expected,
+        }),
+      ]),
+    });
+  },
+);
+
+it.each([
+  "98765-4321",
+  "(00) 98765-4321",
+  "(11) 987654-3210",
+  "+1 212 555 0123",
+  "11abc987654321",
+])("rejeita o WhatsApp inválido %s também no envio parcial", async (phone) => {
+  const body = {
+    sessionId: "visit",
+    idempotencyKey: crypto.randomUUID(),
+    complete: false,
+    contacts: { name: "Teste", phone, email: "" },
+    answers: {},
+  };
+  expect((await POST(request(body), ctx)).status).toBe(422);
+  expect(mocks.rpc).not.toHaveBeenCalled();
 });

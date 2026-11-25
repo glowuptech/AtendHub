@@ -1,13 +1,11 @@
-import { tenantSlug } from "@/features/client-domains/model";
-import { tenantAtHost } from "@/features/client-domains/server";
+import { loadPublicForm } from "@/features/forms/services/public-form-server";
+import { integrationAdmin } from "@/features/whatsapp/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createClient } from "@supabase/supabase-js";
-import { persistedForm } from "@/features/forms/services/persisted-form";
-import { FormSchema, type FieldValue } from "@/domain/schemas";
+import type { FieldValue } from "@/domain/schemas";
 import { eligibleSteps } from "@/features/forms/services/routing";
 import { settingsOf } from "@/features/forms/services/settings";
-import { validateAnswer } from "@/domain/schemas";
+import { normalizeFormPhone, phoneHint, validateFormAnswer } from "@/features/forms/services/phone";
 
 const payloadSchema = z.object({
   sessionId: z.string().min(1).max(100),
@@ -26,44 +24,21 @@ const eventSchema = z.object({
   actionId: z.string().max(120).optional(),
 });
 
-function admin() {
-  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Supabase não configurado");
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
-}
-
-async function load(slug: string, host: string | null) {
-  const tenant = tenantSlug(host) ? await tenantAtHost(host) : undefined;
-  if (tenant === null) return null;
-  const supabase = admin();
-  let query = supabase.from("atendhub_forms").select("id,organization_id,client_id,doctor_id,name,description,slug,status,active_version_id").eq("slug", slug).eq("status", "demo");
-  if (tenant) query = query.eq("client_id", tenant);
-  const { data: row, error } = await query.maybeSingle();
-  if (error || !row) return null;
-  const { data: versions, error: versionError } = await supabase.from("atendhub_form_versions").select("id,form_id,organization_id,client_id,number,state,definition,paths,choice_assets").eq("form_id", row.id).eq("id", row.active_version_id).eq("state", "snapshot").limit(1);
-  if (versionError || !versions?.[0]) return null;
-  const { data: client } = await supabase.from("atendhub_clients").select("name").eq("id", row.client_id).maybeSingle();
-  const parsed = FormSchema.safeParse(persistedForm(row, versions, false));
-  if (!parsed.success || parsed.data.versions[0].settings?.enabled === false) return null;
-  return { ...parsed.data, clinicName: client?.name ?? row.name };
-}
-
 export async function GET(request: Request, context: { params: Promise<{ slug: string }> }) {
-  const form = await load((await context.params).slug, request.headers.get("host"));
+  const form = await loadPublicForm((await context.params).slug, request.headers.get("host"));
   if (!form) return NextResponse.json({ error: "Formulário não encontrado." }, { status: 404 });
   return NextResponse.json(form, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request, context: { params: Promise<{ slug: string }> }) {
   const body = await request.json().catch(() => null);
-  const form = await load((await context.params).slug, request.headers.get("host"));
+  const form = await loadPublicForm((await context.params).slug, request.headers.get("host"));
   if (!form) return NextResponse.json({ error: "Formulário não encontrado." }, { status: 404 });
   const version = form.versions.find((item) => item.id === form.activeVersionId);
   if (!version) return NextResponse.json({ error: "Versão publicada indisponível." }, { status: 409 });
   const event = eventSchema.safeParse(body);
   if (event.success) {
-    const { error } = await admin().from("atendhub_public_form_events").upsert({
+    const { error } = await integrationAdmin().from("atendhub_public_form_events").upsert({
       form_id: form.id,
       form_version_id: version.id,
       session_id: event.data.sessionId,
@@ -84,7 +59,11 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
     contacts[key] = value;
     if (config.enabled && config.required && !value) return NextResponse.json({ error: `Preencha ${config.label}` }, { status: 422 });
     if (config.enabled && key === "email" && value && !/^\S+@\S+\.\S+$/.test(value)) return NextResponse.json({ error: "Informe um e-mail válido." }, { status: 422 });
-    if (config.enabled && key === "phone" && value && !/^\+?[\d ()-]{8,25}$/.test(value)) return NextResponse.json({ error: "Informe um telefone válido." }, { status: 422 });
+    if (key === "phone" && value) {
+      const phone = normalizeFormPhone(value);
+      if (!phone) return NextResponse.json({ error: phoneHint }, { status: 422 });
+      contacts.phone = phone;
+    }
   }
   const fields = form.fields ?? [];
   const submittedAnswers = parsed.data.answers as Record<string, FieldValue>;
@@ -95,9 +74,14 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
       if (!parsed.data.complete && answers[step.question.id] === undefined) continue;
       const field = fields.find((item) => item.id === step.question.fieldDefinitionId);
       if (!field) return NextResponse.json({ error: "Campo publicado indisponível." }, { status: 409 });
-      try { validateAnswer(field, step.question.required, answers[step.question.id]); } catch { return NextResponse.json({ error: "Confira as respostas antes de continuar." }, { status: 422 }); }
+      try {
+        const answer = validateFormAnswer(field, step.question.required, answers[step.question.id]);
+        if (answer !== undefined) answers[step.question.id] = answer;
+      } catch {
+        return NextResponse.json({ error: field.type === "phone" ? phoneHint : "Confira as respostas antes de continuar." }, { status: 422 });
+      }
   }
-  const supabase = admin();
+  const supabase = integrationAdmin();
   const responses = steps.filter((step) => answers[step.question.id] !== undefined).map((step) => ({
     question_id: step.question.id, question_snapshot: step.question, value: answers[step.question.id],
   }));

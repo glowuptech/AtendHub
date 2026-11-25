@@ -208,14 +208,6 @@ export function SettingsEditor({
                 onChange={(e) => patch({ description: e.target.value })}
               />
             </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={s.enabled}
-                onChange={(e) => patch({ enabled: e.target.checked })}
-              />{" "}
-              Formulário ativo
-            </label>
           </Card>
         </div>
       )}

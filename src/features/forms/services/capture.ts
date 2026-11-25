@@ -5,10 +5,10 @@ import type {
 } from "@/domain/contracts";
 import {
   LeadSchema,
-  validateAnswer,
   type Lead,
   type FieldValue,
 } from "@/domain/schemas";
+import { normalizeFormPhone, phoneHint, validateFormAnswer } from "./phone";
 import { settingsOf } from "./settings";
 import { eligibleSteps, pathForAnswer } from "./routing";
 export interface CaptureInput {
@@ -155,6 +155,7 @@ export class MemoryCaptureRepository {
     if (previous && previous.input.versionId !== input.versionId)
       throw Error("A versão desta sessão mudou");
     if (previous?.completed) return previous.leadId;
+    const contact = { ...input.contacts };
     for (const [key, config] of Object.entries(settings.contacts)) {
       const value =
         input.contacts[key as keyof typeof input.contacts]?.trim() ?? "";
@@ -167,16 +168,13 @@ export class MemoryCaptureRepository {
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
       )
         throw Error("E-mail inválido");
-      if (
-        config.enabled &&
-        value &&
-        key === "phone" &&
-        !/^\+?[\d ()-]{8,25}$/.test(value)
-      )
-        throw Error("Telefone inválido");
+      if (config.enabled && key === "phone" && value) {
+        const phone = normalizeFormPhone(value);
+        if (!phone) throw Error(phoneHint);
+        contact.phone = phone;
+      }
       if (value.length > 200) throw Error("Contato muito longo");
     }
-    const contact = { ...input.contacts };
     for (const k of ["name", "phone", "email"] as const)
       if (!settings.contacts[k].enabled) contact[k] = "";
     if (
@@ -192,10 +190,10 @@ export class MemoryCaptureRepository {
     const selectedPathId = pathForAnswer(v, this.fields.list(f.clientId), sanitizedAnswers);
     const selectedPath = v.paths?.find((path) => path.id === selectedPathId) ?? null;
     const values = routedSteps.flatMap((s) => {
-      const answer = sanitizedAnswers[s.question.id];
+      let answer: FieldValue | undefined = sanitizedAnswers[s.question.id];
       const field = this.fields.get(f.clientId, s.question.fieldDefinitionId);
       if (input.complete || answer !== undefined)
-        validateAnswer(field, s.question.required, answer);
+        answer = validateFormAnswer(field, s.question.required, answer);
       return answer === undefined
         ? []
         : [

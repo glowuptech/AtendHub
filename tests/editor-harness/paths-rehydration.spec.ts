@@ -246,21 +246,28 @@ test("formulário público segue a resposta atual e aguarda a gravação antes d
   const field = form.fields.find(
     (f) => f.id === router.question.fieldDefinitionId,
   )!;
+  form.slug = "formulario-publicado";
+  form.versions[0].successMessage = "Recebemos seu cadastro.";
+  await page.addInitScript((fixture) => {
+    localStorage.setItem("public-test-form", JSON.stringify(fixture));
+  }, { ...form, clinicName: "Clínica" });
   let captures = 0;
+  let key: string | undefined;
   await page.route(
     "**/api/public/forms/formulario-publicado",
     async (route) => {
-      if (route.request().method() === "GET")
-        return route.fulfill({ json: form });
+      expect(route.request().method()).toBe("POST");
       const body = route.request().postDataJSON();
       if (body.eventType) return route.fulfill({ json: { ok: true } });
       expect(body.answers[router.question.id]).toBe(field.options[1].id);
       expect(body.answers).not.toHaveProperty(a.question.id);
       expect(body.answers).not.toHaveProperty(common.question.id);
+      key ??= body.idempotencyKey;
+      expect(body.idempotencyKey).toBe(key);
       captures++;
-      return captures === 1
-        ? route.fulfill({ status: 409, json: { error: "Tente novamente." } })
-        : route.fulfill({ json: { ok: true } });
+      if (captures === 1) return route.fulfill({ status: 409, json: { error: "Tente novamente." } });
+      if (captures === 2) return route.fulfill({ json: { ok: true } });
+      return route.fulfill({ status: 201, json: { ok: true, complete: true, leadId: crypto.randomUUID() } });
     },
   );
   await page.goto("/tests/editor-harness/index.html?public-form");
@@ -276,12 +283,29 @@ test("formulário público segue a resposta atual e aguarda a gravação antes d
     page.getByRole("heading", { name: b.question.label }),
   ).toBeVisible();
   await page.getByLabel(b.question.label, { exact: true }).fill("+5511987654321");
+  await expect(page.getByLabel(b.question.label, { exact: true })).toHaveValue("(11) 98765-4321");
   await page.getByRole("button", { name: "Continuar" }).click();
   await page.getByLabel("Nome", { exact: false }).fill("Paciente Teste");
-  await page.getByLabel("WhatsApp", { exact: false }).fill("11999990000");
+  const phone = page.getByLabel("WhatsApp", { exact: false });
+  await phone.pressSequentially("163456");
+  await expect(phone).toHaveValue("(16) 3456");
+  await page.getByRole("button", { name: "Enviar cadastro" }).click();
+  await expect(page.getByRole("alert")).toContainText("Informe o DDD");
+  await phone.press("End");
+  await phone.pressSequentially("7890");
+  await expect(phone).toHaveValue("(16) 3456-7890");
+  await phone.pressSequentially("1");
+  await expect(phone).toHaveValue("(16) 34567-8901");
+  await phone.pressSequentially("2A");
+  await expect(phone).toHaveValue("(16) 34567-8901");
+  await phone.fill("+55 (11) 99999-0000");
+  await expect(phone).toHaveValue("(11) 99999-0000");
   await page.getByRole("button", { name: "Enviar cadastro" }).click();
   await expect(page.getByRole("alert")).toHaveText("Tente novamente.");
   await page.getByRole("button", { name: "Enviar cadastro" }).click();
+  await expect(page.getByRole("alert")).toContainText("Não foi possível confirmar o cadastro");
+  await page.getByRole("button", { name: "Enviar cadastro" }).click();
+  await expect(page.getByText("Recebemos seu cadastro.")).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Cadastro concluído" }),
   ).toBeVisible();
