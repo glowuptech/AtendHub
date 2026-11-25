@@ -8,8 +8,13 @@ import {
   type FormVersion,
   type CustomFieldDefinition,
   type FieldValue,
-  validateAnswer,
 } from "@/domain/schemas";
+import {
+  normalizeFormPhone,
+  phoneHint,
+  validateFormAnswer,
+} from "../services/phone";
+import { FormPhoneInput } from "./phone-input";
 import { Button } from "@/components/ui/button";
 import { FieldInput } from "./field-input";
 import { settingsOf } from "../services/settings";
@@ -160,8 +165,7 @@ export function FormWizard({
       if (c.required && !v) throw Error(`Preencha ${c.label}`);
       if (v && k === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))
         throw Error("Informe um e-mail válido");
-      if (v && k === "phone" && !/^\+?[\d ()-]{8,25}$/.test(v))
-        throw Error("Informe um telefone válido");
+      if (v && k === "phone" && !normalizeFormPhone(v)) throw Error(phoneHint);
     }
   };
   return (
@@ -279,7 +283,7 @@ export function FormWizard({
                       try {
                         if (current === "contacts") validateContacts();
                         else if (step && field)
-                          validateAnswer(
+                          validateFormAnswer(
                             field,
                             step.question.required,
                             answers[step.question.id],
@@ -292,7 +296,7 @@ export function FormWizard({
                               (f) => f.id === s.question.fieldDefinitionId,
                             );
                             if (!f) throw Error("Campo indisponível");
-                            validateAnswer(
+                            validateFormAnswer(
                               f,
                               s.question.required,
                               answers[s.question.id],
@@ -369,32 +373,35 @@ export function FormWizard({
                                 {settings.contacts[k].required
                                   ? " *"
                                   : " (opcional)"}
-                                <input
-                                  autoComplete={
-                                    {
-                                      name: "name",
-                                      phone: "tel",
-                                      email: "email",
-                                    }[k]
-                                  }
-                                  type={
-                                    {
-                                      name: "text",
-                                      phone: "tel",
-                                      email: "email",
-                                    }[k]
-                                  }
-                                  maxLength={200}
-                                  value={contacts[k]}
-                                  aria-invalid={Boolean(error)}
-                                  onChange={(e) => {
-                                    setContacts((c) => ({
-                                      ...c,
-                                      [k]: e.target.value,
-                                    }));
-                                    setError("");
-                                  }}
-                                />
+                                {k === "phone" ? (
+                                  <FormPhoneInput
+                                    value={contacts.phone}
+                                    aria-invalid={Boolean(error)}
+                                    aria-describedby={
+                                      error ? "form-error" : undefined
+                                    }
+                                    onChange={(phone) => {
+                                      setContacts((c) => ({ ...c, phone }));
+                                      setError("");
+                                    }}
+                                  />
+                                ) : (
+                                  <input
+                                    type={k === "email" ? "email" : "text"}
+                                    autoComplete={k}
+                                    maxLength={200}
+                                    value={contacts[k]}
+                                    aria-invalid={Boolean(error)}
+                                    onChange={(event) => {
+                                      const value = event.currentTarget.value;
+                                      setContacts((c) => ({
+                                        ...c,
+                                        [k]: value,
+                                      }));
+                                      setError("");
+                                    }}
+                                  />
+                                )}
                               </label>
                             ))}
                           <p className="form-privacy">
@@ -414,6 +421,7 @@ export function FormWizard({
                           </label>
                           <FieldInput
                             choiceCards
+                            nationalPhone
                             id={`answer-${step.question.id}`}
                             field={{ ...field, label: step.question.label }}
                             value={answers[step.question.id]}

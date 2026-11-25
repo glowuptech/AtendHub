@@ -276,9 +276,23 @@ test("formulário público segue a resposta atual e aguarda a gravação antes d
     page.getByRole("heading", { name: b.question.label }),
   ).toBeVisible();
   await page.getByLabel(b.question.label, { exact: true }).fill("+5511987654321");
+  await expect(page.getByLabel(b.question.label, { exact: true })).toHaveValue("(11) 98765-4321");
   await page.getByRole("button", { name: "Continuar" }).click();
   await page.getByLabel("Nome", { exact: false }).fill("Paciente Teste");
-  await page.getByLabel("WhatsApp", { exact: false }).fill("11999990000");
+  const phone = page.getByLabel("WhatsApp", { exact: false });
+  await phone.pressSequentially("163456");
+  await expect(phone).toHaveValue("(16) 3456");
+  await page.getByRole("button", { name: "Enviar cadastro" }).click();
+  await expect(page.getByRole("alert")).toContainText("Informe o DDD");
+  await phone.press("End");
+  await phone.pressSequentially("7890");
+  await expect(phone).toHaveValue("(16) 3456-7890");
+  await phone.pressSequentially("1");
+  await expect(phone).toHaveValue("(16) 34567-8901");
+  await phone.pressSequentially("2A");
+  await expect(phone).toHaveValue("(16) 34567-8901");
+  await phone.fill("+55 (11) 99999-0000");
+  await expect(phone).toHaveValue("(11) 99999-0000");
   await page.getByRole("button", { name: "Enviar cadastro" }).click();
   await expect(page.getByRole("alert")).toHaveText("Tente novamente.");
   await page.getByRole("button", { name: "Enviar cadastro" }).click();

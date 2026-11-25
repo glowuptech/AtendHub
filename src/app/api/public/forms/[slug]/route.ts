@@ -7,7 +7,7 @@ import { persistedForm } from "@/features/forms/services/persisted-form";
 import { FormSchema, type FieldValue } from "@/domain/schemas";
 import { eligibleSteps } from "@/features/forms/services/routing";
 import { settingsOf } from "@/features/forms/services/settings";
-import { validateAnswer } from "@/domain/schemas";
+import { normalizeFormPhone, phoneHint, validateFormAnswer } from "@/features/forms/services/phone";
 
 const payloadSchema = z.object({
   sessionId: z.string().min(1).max(100),
@@ -84,7 +84,11 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
     contacts[key] = value;
     if (config.enabled && config.required && !value) return NextResponse.json({ error: `Preencha ${config.label}` }, { status: 422 });
     if (config.enabled && key === "email" && value && !/^\S+@\S+\.\S+$/.test(value)) return NextResponse.json({ error: "Informe um e-mail válido." }, { status: 422 });
-    if (config.enabled && key === "phone" && value && !/^\+?[\d ()-]{8,25}$/.test(value)) return NextResponse.json({ error: "Informe um telefone válido." }, { status: 422 });
+    if (key === "phone" && value) {
+      const phone = normalizeFormPhone(value);
+      if (!phone) return NextResponse.json({ error: phoneHint }, { status: 422 });
+      contacts.phone = phone;
+    }
   }
   const fields = form.fields ?? [];
   const submittedAnswers = parsed.data.answers as Record<string, FieldValue>;
@@ -95,7 +99,12 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
       if (!parsed.data.complete && answers[step.question.id] === undefined) continue;
       const field = fields.find((item) => item.id === step.question.fieldDefinitionId);
       if (!field) return NextResponse.json({ error: "Campo publicado indisponível." }, { status: 409 });
-      try { validateAnswer(field, step.question.required, answers[step.question.id]); } catch { return NextResponse.json({ error: "Confira as respostas antes de continuar." }, { status: 422 }); }
+      try {
+        const answer = validateFormAnswer(field, step.question.required, answers[step.question.id]);
+        if (answer !== undefined) answers[step.question.id] = answer;
+      } catch {
+        return NextResponse.json({ error: field.type === "phone" ? phoneHint : "Confira as respostas antes de continuar." }, { status: 422 });
+      }
   }
   const supabase = admin();
   const responses = steps.filter((step) => answers[step.question.id] !== undefined).map((step) => ({
