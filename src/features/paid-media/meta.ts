@@ -4,6 +4,7 @@ import {
   identifiers,
   type Ad,
   type CreativeAsset,
+  type CreativePreview,
   type Insight,
   type Account,
   type MetaAccountAnalytics,
@@ -513,8 +514,9 @@ export async function readCreativeAssets(
   const assets = new Map<string, CreativeAsset>();
   const signal = AbortSignal.timeout(50000);
   const allowed = new Set(campaigns);
-  const hashes = new Map<string, CreativeAsset[]>();
-  const videos = new Map<string, CreativeAsset[]>();
+  const adPreviews: Record<string, CreativePreview> = {};
+  const hashes = new Map<string, CreativePreview[]>();
+  const videos = new Map<string, CreativePreview[]>();
   const warnings = new Set<string>();
   for (let offset = 0; offset < campaigns.length; offset += 100) {
     const filtering = JSON.stringify([
@@ -582,6 +584,7 @@ export async function readCreativeAssets(
               campaignId: row.campaign_id,
               name: row.ad_name,
               preview,
+              ...(type === "video" ? { videoId: String(id) } : {}),
               metrics: historical
                 ? null
                 : {
@@ -605,6 +608,92 @@ export async function readCreativeAssets(
         }
       }),
     );
+    try {
+      const catalog = await pages(
+        access,
+        account + "/ads",
+        {
+          filtering,
+          fields:
+            "id,campaign_id,creative{image_hash,image_url,thumbnail_url,video_id,object_story_spec,asset_feed_spec}",
+        },
+        z.object({
+          id: identifiers.entity,
+          campaign_id: identifiers.entity,
+          creative: z
+            .object({
+              image_hash: z.string().nullish(),
+              image_url: z.string().nullish(),
+              thumbnail_url: z.string().nullish(),
+              video_id: z.string().nullish(),
+              object_story_spec: z
+                .object({
+                  video_data: z
+                    .object({
+                      video_id: z.string().optional(),
+                      image_url: z.string().optional(),
+                    })
+                    .nullish(),
+                  link_data: z
+                    .object({
+                      image_hash: z.string().optional(),
+                      picture: z.string().optional(),
+                    })
+                    .nullish(),
+                })
+                .nullish(),
+              asset_feed_spec: z
+                .object({
+                  images: z
+                    .array(z.object({ hash: z.string().optional() }))
+                    .optional(),
+                  videos: z
+                    .array(z.object({ video_id: z.string().optional() }))
+                    .optional(),
+                })
+                .nullish(),
+            })
+            .nullish(),
+        }),
+        signal,
+        Infinity,
+      );
+      for (const ad of catalog) {
+        if (!allowed.has(ad.campaign_id) || !ad.creative) continue;
+        const c = ad.creative;
+        const video = c.object_story_spec?.video_data;
+        const link = c.object_story_spec?.link_data;
+        const videoId =
+          c.video_id ||
+          video?.video_id ||
+          c.asset_feed_spec?.videos?.[0]?.video_id;
+        const hash =
+          c.image_hash ||
+          link?.image_hash ||
+          c.asset_feed_spec?.images?.[0]?.hash;
+        const media: CreativePreview = {
+          preview:
+            c.image_url ||
+            video?.image_url ||
+            link?.picture ||
+            c.thumbnail_url ||
+            null,
+        };
+        adPreviews[ad.id] = media;
+        if (videoId) {
+          media.videoId = videoId;
+          const group = videos.get(videoId) ?? [];
+          group.push(media);
+          videos.set(videoId, group);
+        } else if (hash) {
+          const group = hashes.get(hash) ?? [];
+          group.push(media);
+          hashes.set(hash, group);
+        }
+      }
+    } catch {
+      warnings.add("Algumas prévias de anúncio podem ter resolução reduzida.");
+    }
   }
   const ids = [...hashes.keys()];
   for (let i = 0; i < ids.length; i += 50) {
@@ -631,23 +720,54 @@ export async function readCreativeAssets(
       warnings.add("Algumas imagens originais estão indisponíveis.");
     }
   }
-  for (const [id, group] of videos) {
-    if (group.every((asset) => asset.preview)) continue;
-    try {
-      const covers = await pages(
-        access,
-        id + "/thumbnails",
-        { fields: "uri,width,height" },
-        z.object({ uri: z.string(), width: z.number(), height: z.number() }),
-        signal,
-      );
-      const cover = covers.sort(
-        (a, b) => b.width * b.height - a.width * a.height,
-      )[0]?.uri;
-      if (cover) for (const asset of group) asset.preview ||= cover;
-    } catch {
-      warnings.add("Algumas capas de vídeo estão indisponíveis.");
-    }
+  const videoGroups = [...videos];
+  for (let start = 0; start < videoGroups.length; start += 6) {
+    await Promise.all(
+      videoGroups.slice(start, start + 6).map(async ([id, group]) => {
+        try {
+          const video = await graph(
+            access,
+            id,
+            { fields: "source,format,thumbnails{uri,width,height}" },
+            z.object({
+              source: z.string().nullish(),
+              format: z
+                .array(z.object({ width: z.number(), height: z.number() }))
+                .nullish(),
+              thumbnails: z
+                .object({
+                  data: z.array(
+                    z.object({
+                      uri: z.string(),
+                      width: z.number(),
+                      height: z.number(),
+                    }),
+                  ),
+                })
+                .nullish(),
+            }),
+            signal,
+          );
+          const best = video.thumbnails?.data.sort(
+            (a, b) => b.width * b.height - a.width * a.height,
+          )[0];
+          const size =
+            best ?? video.format?.find((f) => f.width > 0 && f.height > 0);
+          for (const media of group) {
+            if (
+              video.source?.startsWith("https://") &&
+              !new URL(video.source).searchParams.has("access_token")
+            )
+              media.source = video.source;
+            if (best) media.preview = best.uri;
+            if (size && size.width > 0 && size.height > 0)
+              media.ratio = size.width / size.height;
+          }
+        } catch {
+          /* The embedded Meta player can still serve public videos. */
+        }
+      }),
+    );
   }
-  return { assets: [...assets.values()], warnings: [...warnings] };
+  return { assets: [...assets.values()], adPreviews, warnings: [...warnings] };
 }
