@@ -198,6 +198,10 @@ export function FormWizard({
       if (v && k === "phone" && !normalizeFormPhone(v)) throw Error(phoneHint);
     }
   };
+  const headerImage = settings.introduction.logo && (
+    <img src={settings.introduction.logo} alt=""
+      className={settings.introduction.headerLayout === "banner" ? "form-intro-banner" : "form-intro-logo"} />
+  );
   return (
     <section
       className={`form-experience ${compact ? "compact" : ""}`}
@@ -221,13 +225,7 @@ export function FormWizard({
         )}
         {introVisible && (
           <section className="form-intro" aria-labelledby="form-intro-title">
-            {settings.introduction.logo && (
-              <img
-                src={settings.introduction.logo}
-                alt=""
-                className="form-intro-logo"
-              />
-            )}
+            {headerImage}
             <h1 id="form-intro-title">
               {settings.introduction.title || form.name}
             </h1>
@@ -274,6 +272,7 @@ export function FormWizard({
         {!introVisible && (
           <div className="form-content">
             <header>
+              {settings.introduction.mode === "integrated" && index === 0 && !done && headerImage}
               <small>{clinicName}</small>
               <h1>{form.name}</h1>
               {settings.description && <p>{settings.description}</p>}
