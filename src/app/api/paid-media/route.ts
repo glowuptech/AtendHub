@@ -7,6 +7,7 @@ import { sessionOrganizationContext } from "@/lib/supabase/organization-session"
 import { daysBetween, localDay, RangeSchema } from "@/lib/date-range";
 import {
   discoverMetaAccounts,
+  readCreativeAssets,
   getMetaAccount,
   MetaError,
 } from "@/features/paid-media/meta";
@@ -22,6 +23,7 @@ import {
   paidMediaAdmin,
   readPlans,
   readReport,
+  readReportScope,
   reportFailure,
   requireAdmin,
   writePlan,
@@ -91,7 +93,7 @@ export async function GET(request: Request) {
       return json({ error: "Portal indisponível." }, 404);
     if (
       portalClient &&
-      ((kind && kind !== "analytics") ||
+      ((kind && kind !== "analytics" && kind !== "assets") ||
         (query.has("clientId") && query.get("clientId") !== portalClient))
     )
       return json(
@@ -159,6 +161,22 @@ export async function GET(request: Request) {
         { error: range.error.issues[0]?.message ?? "Período inválido." },
         400,
       );
+    if (kind === "assets") {
+      const scope = await readReportScope(auth, client?.data);
+      const account = query.get("account");
+      const campaigns = scope.campaigns.filter((c) => c.account_id === account);
+      if (!account || !campaigns.length)
+        return json({ assets: [], warnings: [] });
+      const access = await getMetaAccess(scope.admin, auth.organizationId);
+      return json(
+        await readCreativeAssets(
+          access,
+          account,
+          campaigns.map((c) => c.campaign_id),
+          range.data,
+        ),
+      );
+    }
     if (kind === "analytics")
       return json(
         await readMetaAnalytics(auth, range.data, client?.data, !!portalClient),
