@@ -505,6 +505,13 @@ const assetRow = deliverySchema.extend({
   video_asset: mediaDescriptor.nullish(),
 });
 
+function publicVideoUrl(value: string | null | undefined) {
+  if (!value || !URL.canParse(value)) return;
+  const url = new URL(value);
+  if (url.protocol === "https:" && !url.username && !url.password &&
+      !url.searchParams.has("access_token")) return url.href;
+}
+
 export async function readCreativeAssets(
   access: MetaAccess,
   account: string,
@@ -728,40 +735,18 @@ export async function readCreativeAssets(
           const video = await graph(
             access,
             id,
-            { fields: "source,format,thumbnails{uri,width,height}" },
+            { fields: "source,picture" },
             z.object({
               source: z.string().nullish(),
-              format: z
-                .array(z.object({ width: z.number(), height: z.number() }))
-                .nullish(),
-              thumbnails: z
-                .object({
-                  data: z.array(
-                    z.object({
-                      uri: z.string(),
-                      width: z.number(),
-                      height: z.number(),
-                    }),
-                  ),
-                })
-                .nullish(),
+              picture: z.string().nullish(),
             }),
             signal,
           );
-          const best = video.thumbnails?.data.sort(
-            (a, b) => b.width * b.height - a.width * a.height,
-          )[0];
-          const size =
-            best ?? video.format?.find((f) => f.width > 0 && f.height > 0);
+          const source = publicVideoUrl(video.source);
+          const poster = publicVideoUrl(video.picture);
           for (const media of group) {
-            if (
-              video.source?.startsWith("https://") &&
-              !new URL(video.source).searchParams.has("access_token")
-            )
-              media.source = video.source;
-            if (best) media.preview = best.uri;
-            if (size && size.width > 0 && size.height > 0)
-              media.ratio = size.width / size.height;
+            if (source) media.source = source;
+            if (poster) media.preview = poster;
           }
         } catch {
           /* The embedded Meta player can still serve public videos. */
