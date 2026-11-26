@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   identifiers,
   type Ad,
+  type CreativeAsset,
   type Insight,
   type Account,
   type MetaAccountAnalytics,
@@ -135,6 +136,7 @@ async function pages<T>(
   query: Record<string, string>,
   row: z.ZodType<T>,
   signal: AbortSignal,
+  maxPages = 20,
 ) {
   const schema = z.object({
     data: z.array(row),
@@ -147,7 +149,7 @@ async function pages<T>(
   });
   const rows: T[] = [];
   let after: string | undefined;
-  for (let page = 0; page < 20; page++) {
+  for (let page = 0; page < maxPages; page++) {
     const result = await graph(
       access,
       path,
@@ -486,4 +488,166 @@ export async function fetchMetaSnapshot(
     ads: [...ads.values()],
     insights,
   };
+}
+
+const mediaDescriptor = z.object({
+  hash: z.string().optional(),
+  video_id: z.string().or(z.number()).optional(),
+  url: z.string().nullish(),
+  thumbnail_url: z.string().nullish(),
+});
+const assetRow = deliverySchema.extend({
+  ad_id: identifiers.entity,
+  campaign_id: identifiers.entity,
+  ad_name: z.string(),
+  image_asset: mediaDescriptor.nullish(),
+  video_asset: mediaDescriptor.nullish(),
+});
+
+export async function readCreativeAssets(
+  access: MetaAccess,
+  account: string,
+  campaigns: string[],
+  range: { from: string; to: string },
+) {
+  const assets = new Map<string, CreativeAsset>();
+  const signal = AbortSignal.timeout(50000);
+  const allowed = new Set(campaigns);
+  const hashes = new Map<string, CreativeAsset[]>();
+  const videos = new Map<string, CreativeAsset[]>();
+  const warnings = new Set<string>();
+  for (let offset = 0; offset < campaigns.length; offset += 100) {
+    const filtering = JSON.stringify([
+      {
+        field: "campaign.id",
+        operator: "IN",
+        value: campaigns.slice(offset, offset + 100),
+      },
+    ]);
+    await Promise.all(
+      (["image", "video"] as const).map(async (type) => {
+        const breakdown = type === "image" ? "image_asset" : "video_asset";
+        for (const historical of [false, true]) {
+          const period: Record<string, string> = historical
+            ? { date_preset: "maximum" }
+            : {
+                time_range: JSON.stringify({
+                  since: range.from,
+                  until: range.to,
+                }),
+              };
+          let rows;
+          try {
+            rows = await pages(
+              access,
+              account + "/insights",
+              {
+                ...period,
+                level: "ad",
+                breakdowns: breakdown,
+                filtering,
+                fields: historical
+                  ? "ad_id,campaign_id,ad_name"
+                  : "ad_id,campaign_id,ad_name,impressions,spend,inline_link_clicks,actions",
+              },
+              assetRow,
+              signal,
+              Infinity,
+            );
+          } catch (error) {
+            warnings.add(
+              `${breakdown} (${historical ? "histórico" : "período"}): ${error instanceof MetaError ? error.message : "consulta indisponível"}`,
+            );
+            // Without the period breakdown, historical rows cannot be called inactive.
+            if (!historical) break;
+            continue;
+          }
+          for (const row of rows) {
+            if (!allowed.has(row.campaign_id)) continue;
+            const descriptor = row[breakdown];
+            const id =
+              type === "image" ? descriptor?.hash : descriptor?.video_id;
+            if (!descriptor || !id) continue;
+            const key = [row.ad_id, type, id].join(":");
+            const preview = descriptor.url || descriptor.thumbnail_url || null;
+            const existing = assets.get(key);
+            if (existing) {
+              existing.preview ||= preview;
+              continue;
+            }
+            const asset: CreativeAsset = {
+              key,
+              type,
+              adId: row.ad_id,
+              campaignId: row.campaign_id,
+              name: row.ad_name,
+              preview,
+              metrics: historical
+                ? null
+                : {
+                    spend: metaNumber(row.spend),
+                    impressions: metaNumber(row.impressions),
+                    clicks: metaNumber(row.inline_link_clicks),
+                    leads: count(row.actions, [
+                      "onsite_conversion.lead_grouped",
+                    ]),
+                    conversations: count(row.actions, [
+                      "onsite_conversion.messaging_conversation_started_7d",
+                    ]),
+                  },
+            };
+            assets.set(key, asset);
+            const index = type === "image" ? hashes : videos;
+            const group = index.get(String(id)) ?? [];
+            group.push(asset);
+            index.set(String(id), group);
+          }
+        }
+      }),
+    );
+  }
+  const ids = [...hashes.keys()];
+  for (let i = 0; i < ids.length; i += 50) {
+    try {
+      const images = await pages(
+        access,
+        account + "/adimages",
+        {
+          hashes: JSON.stringify(ids.slice(i, i + 50)),
+          fields: "hash,url,url_128",
+        },
+        z.object({
+          hash: z.string(),
+          url: z.string().nullish(),
+          url_128: z.string().nullish(),
+        }),
+        signal,
+        Infinity,
+      );
+      for (const image of images)
+        for (const asset of hashes.get(image.hash) ?? [])
+          asset.preview = image.url || asset.preview || image.url_128 || null;
+    } catch {
+      warnings.add("Algumas imagens originais estão indisponíveis.");
+    }
+  }
+  for (const [id, group] of videos) {
+    if (group.every((asset) => asset.preview)) continue;
+    try {
+      const covers = await pages(
+        access,
+        id + "/thumbnails",
+        { fields: "uri,width,height" },
+        z.object({ uri: z.string(), width: z.number(), height: z.number() }),
+        signal,
+      );
+      const cover = covers.sort(
+        (a, b) => b.width * b.height - a.width * a.height,
+      )[0]?.uri;
+      if (cover) for (const asset of group) asset.preview ||= cover;
+    } catch {
+      warnings.add("Algumas capas de vídeo estão indisponíveis.");
+    }
+  }
+  return { assets: [...assets.values()], warnings: [...warnings] };
 }
