@@ -9,6 +9,7 @@ import type {
   Client,
   Insight,
   MediaReport,
+  MediaDay,
   Metrics,
   Plan,
 } from "./model";
@@ -137,11 +138,7 @@ const fromDate = (day: string) =>
 const beforeNextDate = (day: string) =>
   new Date(Date.parse(fromDate(day)) + 86400000).toISOString();
 
-export async function readReport(
-  auth: Auth,
-  range: { from: string; to: string },
-  clientId?: string,
-): Promise<MediaReport> {
+export async function readReportScope(auth: Auth, clientId?: string) {
   const org = auth.organizationId;
   const admin = paidMediaAdmin();
   const clients = await clientScope(auth, clientId);
@@ -183,33 +180,63 @@ export async function readReport(
     (a) => accountIds.has(a.account_id) || (canManage && !clientId),
   );
   const accountById = new Map(accounts.map((a) => [a.account_id, a]));
-  const [allCampaigns, coverage] = await Promise.all([
-    allRows<Campaign>((a, b) => {
-      let q = admin
-        .from("atendhub_meta_campaigns")
-        .select("campaign_id,account_id,name,client_id,stage,manual")
-        .eq("organization_id", org)
-        .order("campaign_id")
-        .range(a, b);
-      if (clientId) q = q.eq("client_id", clientId);
-      return q;
-    }),
-    allRows<{ account_id: string; day: string; imported_at: string }>((a, b) =>
-      admin
-        .from("atendhub_meta_sync_days")
-        .select("account_id,day,imported_at")
-        .eq("organization_id", org)
-        .gte("day", range.from)
-        .lte("day", range.to)
-        .order("account_id")
-        .order("day")
-        .range(a, b),
-    ),
-  ]);
+  const allCampaigns = await allRows<Campaign>((a, b) => {
+    let q = admin
+      .from("atendhub_meta_campaigns")
+      .select("campaign_id,account_id,name,client_id,stage,manual")
+      .eq("organization_id", org)
+      .order("campaign_id")
+      .range(a, b);
+    if (clientId) q = q.eq("client_id", clientId);
+    return q;
+  });
   const campaigns = allCampaigns.filter(
     (c) =>
       accountById.has(c.account_id) &&
       (c.client_id ? allowed.has(c.client_id) : canManage && !clientId),
+  );
+  return {
+    admin,
+    org,
+    canManage,
+    clients,
+    clientCodes,
+    accounts,
+    campaigns,
+    visibleLinks,
+  };
+}
+
+export async function readReport(
+  auth: Auth,
+  range: { from: string; to: string },
+  clientId?: string,
+): Promise<MediaReport> {
+  const {
+    admin,
+    org,
+    canManage,
+    clients,
+    clientCodes,
+    accounts,
+    campaigns,
+    visibleLinks,
+  } = await readReportScope(auth, clientId);
+  const accountById = new Map(accounts.map((a) => [a.account_id, a]));
+  const coverage = await allRows<{
+    account_id: string;
+    day: string;
+    imported_at: string;
+  }>((a, b) =>
+    admin
+      .from("atendhub_meta_sync_days")
+      .select("account_id,day,imported_at")
+      .eq("organization_id", org)
+      .gte("day", range.from)
+      .lte("day", range.to)
+      .order("account_id")
+      .order("day")
+      .range(a, b),
   );
   // Import and report are grouped by Meta account day and currency.
   const ads = (
@@ -227,6 +254,24 @@ export async function readReport(
       ),
     )
   ).flat();
+  const byCampaign = new Map(campaigns.map((c) => [c.campaign_id, c]));
+  const byAd = new Map(
+    ads.map((ad) => [ad.ad_id, byCampaign.get(ad.campaign_id)!]),
+  );
+  const daily = new Map<string, MediaDay>();
+  for (const row of coverage) {
+    const currency = accountById.get(row.account_id)?.currency;
+    if (!currency) continue;
+    const key = currency + row.day;
+    if (!daily.has(key))
+      daily.set(key, {
+        currency,
+        day: row.day,
+        spend: 0,
+        form_leads: null,
+        whatsapp_conversations: null,
+      });
+  }
   const insightChunks = chunks(ads.map((a) => a.ad_id));
   const adMetrics = new Map<string, Metrics>();
   for (const ids of insightChunks) {
@@ -247,9 +292,20 @@ export async function readReport(
     for (const row of insights) {
       const m = adMetrics.get(row.ad_id) ?? emptyMetrics();
       adMetrics.set(row.ad_id, addMetrics(m, row));
+      const currency = accountById.get(
+        byAd.get(row.ad_id)!.account_id,
+      )!.currency;
+      const day = daily.get(currency + row.day);
+      if (!day) continue;
+      day.spend += Number(row.spend);
+      if (row.form_leads != null)
+        day.form_leads = (day.form_leads ?? 0) + Number(row.form_leads);
+      if (row.whatsapp_conversations != null)
+        day.whatsapp_conversations =
+          (day.whatsapp_conversations ?? 0) +
+          Number(row.whatsapp_conversations);
     }
   }
-  const byCampaign = new Map(campaigns.map((c) => [c.campaign_id, c]));
   const campaignMetrics = new Map<string, Metrics>();
   const resultAds = ads.flatMap((ad) => {
     const metrics = adMetrics.get(ad.ad_id);
@@ -404,6 +460,7 @@ export async function readReport(
       currency,
       ...metrics,
     })),
+    daily: [...daily.values()].sort((a, b) => a.day.localeCompare(b.day)),
     pending: [...pending.values()],
   };
 }

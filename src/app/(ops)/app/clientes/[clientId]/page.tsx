@@ -5,5 +5,5 @@ export default async function Page({
   params: Promise<{ clientId: string }>;
 }) {
   const p = await params;
-  return <ClientProfile id={p.clientId} />;
+  return <ClientProfile key={p.clientId} id={p.clientId} />;
 }

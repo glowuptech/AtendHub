@@ -1,6 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 import type { CustomFieldDefinition, FieldValue } from "@/domain/schemas";
+import { FormPhoneInput } from "./phone-input";
 export function FieldInput({
   field,
   value,
@@ -8,6 +9,7 @@ export function FieldInput({
   id = field.id,
   errorId,
   choiceCards = false,
+  nationalPhone = false,
 }: {
   field: CustomFieldDefinition;
   value: FieldValue | undefined;
@@ -15,6 +17,7 @@ export function FieldInput({
   id?: string;
   errorId?: string;
   choiceCards?: boolean;
+  nationalPhone?: boolean;
 }) {
   const common = {
     id,
@@ -22,6 +25,8 @@ export function FieldInput({
     "aria-describedby": errorId,
     "aria-invalid": !!errorId,
   };
+  if (field.type === "phone" && nationalPhone)
+    return <FormPhoneInput {...common} value={typeof value === "string" ? value : ""} onChange={onChange} />;
   if (field.type === "consent")
     return (
       <label className="check-option">
@@ -53,7 +58,7 @@ export function FieldInput({
       <fieldset className={field.type === "image_choice" ? "choice-cards choice-cards-image" : "choice-cards"} aria-label={field.label} aria-describedby={errorId}>
         {field.options.map((o) => (
           <label className={`choice-card ${value === o.id ? "selected" : ""}`} key={o.id}>
-            <input type="radio" name={id} value={o.id} checked={value === o.id} onChange={() => onChange(o.id)} />
+            <input type="radio" name={id} value={o.id} checked={value === o.id} onClick={() => { if (value === o.id) onChange(o.id); }} onChange={() => onChange(o.id)} />
             {field.type === "image_choice" && o.imageUrl && <img src={o.imageUrl} alt={o.alt || o.label} />}
             <span><strong>{o.label}</strong>{o.description && <small>{o.description}</small>}</span>
             {value === o.id && <span className="choice-card-check" aria-hidden="true">✓</span>}

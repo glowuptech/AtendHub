@@ -1,9 +1,11 @@
 import "@/features/paid-media/workspace.css";
 import { PaidMediaWorkspace } from "@/features/paid-media/workspace";
+import { ClientProfile } from "@/features/clients/components/clients";
 import { CampaignPlanning } from "@/features/paid-media/planning";
 // Isolated browser harness: real components, simulated persistence only.
 import { useEffect, useState } from "react";
 import { ExternalScheduling } from "@/features/clients/components/external-scheduling";
+import { Clients } from "@/features/clients/components/directory";
 import { ClientAccesses } from "@/features/clients/components/client-accesses";
 import { WhatsappSettings } from "@/features/whatsapp/settings";
 import { Inbox } from "@/features/inbox/components/inbox";
@@ -20,6 +22,7 @@ import { Queue } from "@/features/queue/queue";
 import { createRoot } from "react-dom/client";
 import { EditorWorkspace } from "@/features/forms/components/editor";
 import { makePersistedPathForm } from "./path-fixture";
+import { PublicForm } from "@/features/forms/components/public-form";
 import { FormsList } from "@/features/forms/components/forms-list";
 import { clients } from "@/lib/mocks/fixtures";
 import "@/app/globals.css";
@@ -124,7 +127,7 @@ window.fetch = async (input, init) => {
   }
   if (url.endsWith("/registration")) {
     if (new URLSearchParams(location.search).has("pending-fields"))
-      return Response.json({}, { status: 404 });
+      return Response.json({}, { status: 501 });
     if (init?.method === "PATCH") {
       const data = JSON.parse(String(init.body));
       localStorage.setItem("test-registration", JSON.stringify(data));
@@ -439,6 +442,16 @@ window.fetch = async (input, init) => {
           ]
         : [queueLead()],
     );
+  if (url === "/api/clients" && new URLSearchParams(location.search).has("veredit")) {
+    const existing = JSON.parse(localStorage.getItem("test-veredit-clients") ?? "[]");
+    if (init?.method === "POST") {
+      const office = JSON.parse(String(init.body));
+      localStorage.setItem("test-veredit-clients", JSON.stringify([...existing, office]));
+      return Response.json(office, { status: 201 });
+    }
+    return Response.json([...clients, ...existing]);
+  }
+  if (url === "/api/clients") return Response.json(clients);
   if (url.startsWith("/api/clients")) return Response.json(clients);
   if (url.startsWith("/api/forms")) {
     const current = JSON.parse(
@@ -453,6 +466,13 @@ window.fetch = async (input, init) => {
     }
     if (init?.body) {
       const body = JSON.parse(String(init.body));
+      if (body.action === "duplicate") return original(input, init);
+      const version = body.form.versions.find((item: { id: string }) => item.id === body.form.activeVersionId);
+      if (body.publish) {
+        version.state = "snapshot";
+        body.form.status = "demo";
+        body.form.publishedSlug = body.form.slug;
+      }
       localStorage.setItem("editor-test-draft", JSON.stringify(body.form));
       return Response.json(body.form);
     }
@@ -481,11 +501,17 @@ function EditorHarness() {
 
 createRoot(document.getElementById("root")!).render(
   <main style={{ padding: 24 }}>
-    {new URLSearchParams(location.search).has("client-access") ? (
+    {new URLSearchParams(location.search).has("public-form") ? (
+      <PublicForm form={JSON.parse(localStorage.getItem("public-test-form")!)} />
+    ) : new URLSearchParams(location.search).has("client-access") ? (
       <>
         <ExternalScheduling clientId={clients[0].id} />
         <ClientAccesses clientId={clients[0].id} />
       </>
+    ) : new URLSearchParams(location.search).has("veredit") ? (
+      <Clients />
+    ) : new URLSearchParams(location.search).has("client-profile") ? (
+      <ClientProfile id={clients[0].id} />
     ) : new URLSearchParams(location.search).has("paid-media") ? (
       <PaidMediaWorkspace />
     ) : new URLSearchParams(location.search).has("campaign-planning") ? (

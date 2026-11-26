@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { localDay, RangeSchema } from "@/lib/date-range";
 import {
   emptyPlan,
+  stageGuide,
   stageLabels,
   stageMetric,
   stages,
@@ -40,7 +41,7 @@ export function CampaignPlanning({
       <Heading
         eyebrow="SISTEMA"
         title="Planejamento de campanhas"
-        description="Planeje as quatro etapas do AIDA e vincule as campanhas que entraram no ar."
+        description="Planeje as quatro etapas do Método VIDA e vincule as campanhas que entraram no ar."
         action={
           <NavButton href="/app/trafego-pago">Ver tráfego pago</NavButton>
         }
@@ -386,6 +387,7 @@ function PlanEditor({
                 {money(value.budgetCents / 100, "BRL")} ·{" "}
                 {value.campaignIds.length} campanha(s)
               </summary>
+              <p>{stageGuide[stage]}</p>
               <fieldset
                 disabled={!canEdit || pending}
                 className="paid-stage-editor"

@@ -549,6 +549,23 @@ nav > a[aria-current="page"] {
   color: var(--text-secondary);
   background: var(--surface-muted);
 }
+.client-operation-badge {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 5px;
+  padding: 4px 8px;
+  color: var(--prescrita);
+  background: var(--prescrita-soft);
+  font-size: 11px;
+  font-weight: 600;
+}
+.client-operation-badge[data-vertical="legal"] {
+  color: var(--veredite);
+  background: var(--veredite-soft);
+}
+.clinic-card-heading .client-operation-badge {
+  margin-inline-start: 4px;
+}
 .badge-success {
   background: var(--success-bg);
   color: var(--success);
@@ -4577,3 +4594,7 @@ input.form-color-picker::-moz-color-swatch { border: 1px solid #cbd5e1; border-r
   cursor: pointer;
   font-weight: 600;
 }
+
+.public-form-link { flex-wrap: wrap; align-items: end; margin-block: 12px; }
+.public-form-link label { flex: 1 1 18rem; min-width: 0; }
+.public-form-link input { width: 100%; }

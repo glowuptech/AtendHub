@@ -1,4 +1,5 @@
 import { z } from "zod";
+export const buttonEventName = z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,39}$|^$/);
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const contact = z.object({
   enabled: z.boolean(),
@@ -76,6 +77,8 @@ export const FormSettingsSchema = z.object({
     .prefault({}),
   tracking: z
     .object({
+      buttonEvents: z.record(z.string(), buttonEventName).optional(),
+      trackStageUrls: z.boolean().optional(),
       pixelId: z
         .string()
         .regex(/^\d{5,30}$|^$/)

@@ -1,3 +1,4 @@
+import { duplicateForm } from "@/features/forms/services/duplicate-form";
 import { MemoryAutomations } from "@/features/automation/engine";
 import { MemorySchedule } from "@/features/appointments/services/schedule";
 import { MemoryInvestments } from "@/features/system-dashboard/service";
@@ -294,32 +295,9 @@ export class MockFormRepository
     this.row(clientId, id).status = "archived";
   }
   duplicate(clientId: string, id: string) {
-    const original = this.get(clientId, id),
-      newId = crypto.randomUUID(),
-      v = structuredClone(
-        original.versions.find((v) => v.id === original.activeVersionId)!,
-      );
-    v.id = crypto.randomUUID();
-    v.formId = newId;
-    v.number = 1;
-    v.state = "draft";
-    v.steps = v.steps.map((s) => ({
-      ...s,
-      id: crypto.randomUUID(),
-      actionId: crypto.randomUUID(),
-      backActionId: crypto.randomUUID(),
-      question: { ...s.question, id: crypto.randomUUID() },
-    }));
-    this.save(clientId, {
-      ...original,
-      id: newId,
-      name: original.name + " — cópia",
-      slug: "demo-" + newId,
-      status: "draft",
-      activeVersionId: v.id,
-      versions: [v],
-    });
-    return newId;
+    const copy = duplicateForm(this.get(clientId, id), crypto.randomUUID(), crypto.randomUUID());
+    this.save(clientId, { ...copy, slug: "demo-" + copy.id });
+    return copy.id;
   }
   snapshot(clientId: string, id: string) {
     const r = this.row(clientId, id),

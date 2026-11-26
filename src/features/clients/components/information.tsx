@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ClinicLogo } from "./directory";
 import { dateLabel } from "./overview";
 import { useClients } from "../hooks";
+import { clientCategories, clientOperations } from "../operation";
 function Field({
   label,
   value,
@@ -52,6 +53,10 @@ export function ClientInformation({ client }: { client: Client }) {
     [message, setMessage] = useState(""),
     [error, setError] = useState("");
   const c = editing ? draft : client;
+  const legal = c.vertical === "legal";
+  const internal = c.category === "organization";
+  const practice = internal || legal ? "Áreas de atuação" : "Especialidades";
+  const registration = legal ? "OAB" : "CRM";
   const list = (s: string) =>
     s
       .split(",")
@@ -97,8 +102,7 @@ export function ClientInformation({ client }: { client: Client }) {
         <div>
           <h2>Informações e cadastro</h2>
           <p className="muted">
-            Identificação, contato, endereço, corpo clínico e controle da
-            parceria.
+            Identificação, contato, endereço, equipe e controle da parceria.
           </p>
         </div>
         {!editing ? (
@@ -120,8 +124,7 @@ export function ClientInformation({ client }: { client: Client }) {
       </div>
       {editing && (
         <div className="profile-edit-notice">
-          Use apenas informações . As alterações ficam em memória; nenhum
-          contrato é assinado, renovado ou enviado por esta tela.
+          As alterações serão gravadas ao salvar o cadastro.
         </div>
       )}
       <div className="profile-info-grid">
@@ -134,7 +137,13 @@ export function ClientInformation({ client }: { client: Client }) {
             </div>
           </div>
           <Field
-            label="Nome da clínica ou profissional"
+            label={
+              internal
+                ? "Nome da organização"
+                : legal
+                  ? "Nome do escritório ou profissional"
+                  : "Nome da clínica ou profissional"
+            }
             value={c.name}
             editing={editing}
             onChange={(name) => patch({ name })}
@@ -151,9 +160,9 @@ export function ClientInformation({ client }: { client: Client }) {
                       patch({ category: e.target.value as Client["category"] })
                     }
                   >
-                    <option value="clinic">Clínica</option>
-                    <option value="doctor_male">Médico</option>
-                    <option value="doctor_female">Médica</option>
+                    {clientOperations[c.vertical].categories.map((category) => (
+                      <option key={category} value={category}>{clientCategories[category]}</option>
+                    ))}
                   </select>
                 </label>
                 <label>
@@ -174,13 +183,7 @@ export function ClientInformation({ client }: { client: Client }) {
                 <div className="profile-info-field">
                   <small>Categoria</small>
                   <strong>
-                    {
-                      {
-                        clinic: "Clínica",
-                        doctor_male: "Médico",
-                        doctor_female: "Médica",
-                      }[c.category]
-                    }
+                    {clientCategories[c.category]}
                   </strong>
                 </div>
                 <div className="profile-info-field">
@@ -207,7 +210,7 @@ export function ClientInformation({ client }: { client: Client }) {
           />
           {editing ? (
             <label>
-              Especialidades, separadas por vírgula
+              {practice}, separadas por vírgula
               <input
                 name="specialties"
                 defaultValue={c.specialties.join(", ")}
@@ -215,14 +218,14 @@ export function ClientInformation({ client }: { client: Client }) {
             </label>
           ) : (
             <div className="profile-info-field">
-              <small>Especialidades</small>
+              <small>{practice}</small>
               <strong>{c.specialties.join(" · ") || "Não informado"}</strong>
             </div>
           )}
         </Card>
         <Card title="Contato administrativo">
           <Field
-            label="Responsável na clínica"
+            label="Responsável pelo cadastro"
             value={c.contactName}
             editing={editing}
             onChange={(contactName) => patch({ contactName })}
@@ -243,12 +246,11 @@ export function ClientInformation({ client }: { client: Client }) {
             type="email"
           />
           <div className="profile-info-field">
-            <small>Operadora</small>
-            <strong>GlowUp · Prescrita</strong>
+            <small>Operação</small>
+            <strong>{clientOperations[c.vertical].name}</strong>
           </div>
           <small>
-            Não incluir senhas de agenda, dados de pacientes ou informações
-            clínicas neste cadastro.
+            Use o cadastro para informações administrativas do cliente.
           </small>
         </Card>
         <Card title="Endereço">
@@ -368,7 +370,11 @@ export function ClientInformation({ client }: { client: Client }) {
         editing={editing}
         onChange={(billing) => patch({ billing })}
       />
-      <Card title="Corpo clínico">
+      <Card
+        title={
+          internal ? "Equipe" : legal ? "Equipe jurídica" : "Corpo clínico"
+        }
+      >
         {c.doctors.map((d, i) => (
           <fieldset key={d.id} className="profile-doctor-fields">
             <legend>Profissional {i + 1}</legend>
@@ -384,50 +390,52 @@ export function ClientInformation({ client }: { client: Client }) {
                 })
               }
             />
-            <div className="form-columns">
-              <Field
-                label={`CRM do profissional ${i + 1}`}
-                value={d.crm ?? ""}
-                editing={editing}
-                onChange={(crm) =>
-                  patch({
-                    doctors: draft.doctors.map((v) =>
-                      v.id === d.id ? { ...v, crm: crm || null } : v,
-                    ),
-                  })
-                }
-                maxLength={8}
-              />
-              {editing ? (
-                <label>
-                  UF do CRM
-                  <select
-                    value={d.uf}
-                    onChange={(e) =>
-                      patch({
-                        doctors: draft.doctors.map((v) =>
-                          v.id === d.id
-                            ? { ...v, uf: e.target.value as typeof d.uf }
-                            : v,
-                        ),
-                      })
-                    }
-                  >
-                    {DoctorSchema.shape.uf.options.map((uf) => (
-                      <option key={uf}>{uf}</option>
-                    ))}
-                  </select>
-                </label>
-              ) : (
-                <div className="profile-info-field">
-                  <small>UF do CRM</small>
-                  <strong>{d.uf}</strong>
-                </div>
-              )}
-            </div>
+            {(!internal || d.crm) && (
+              <div className="form-columns">
+                <Field
+                  label={`${registration} do profissional ${i + 1}`}
+                  value={d.crm ?? ""}
+                  editing={editing}
+                  onChange={(crm) =>
+                    patch({
+                      doctors: draft.doctors.map((v) =>
+                        v.id === d.id ? { ...v, crm: crm || null } : v,
+                      ),
+                    })
+                  }
+                  maxLength={legal ? 10 : 8}
+                />
+                {editing ? (
+                  <label>
+                    {legal ? "UF da OAB" : "UF do CRM"}
+                    <select
+                      value={d.uf}
+                      onChange={(e) =>
+                        patch({
+                          doctors: draft.doctors.map((v) =>
+                            v.id === d.id
+                              ? { ...v, uf: e.target.value as typeof d.uf }
+                              : v,
+                          ),
+                        })
+                      }
+                    >
+                      {DoctorSchema.shape.uf.options.map((uf) => (
+                        <option key={uf}>{uf}</option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <div className="profile-info-field">
+                    <small>{legal ? "UF da OAB" : "UF do CRM"}</small>
+                    <strong>{d.uf}</strong>
+                  </div>
+                )}
+              </div>
+            )}
             {editing ? (
               <label>
-                Especialidades do profissional
+                {practice} do profissional
                 <input
                   name={`doctor-specialties-${d.id}`}
                   defaultValue={d.specialties.join(", ")}
@@ -435,7 +443,7 @@ export function ClientInformation({ client }: { client: Client }) {
               </label>
             ) : (
               <small>
-                {d.specialties.join(" · ") || "Especialidades não informadas"}
+                {d.specialties.join(" · ") || "Áreas não informadas"}
               </small>
             )}
           </fieldset>

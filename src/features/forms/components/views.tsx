@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import useSWR from "swr";
 import { useDemo } from "@/components/layout/demo-context";
 import { useClients } from "@/features/clients/hooks";
 import { useForms } from "../hooks";
@@ -10,8 +9,9 @@ import {
   NavButton,
   Denied,
 } from "@/components/layout/shared";
+import { fieldsForVersion } from "../services/path-diagnostics";
 import { settingsOf } from "../services/settings";
-import { FormWizard, type WizardCapture } from "./wizard";
+import { FormWizard } from "./wizard";
 
 export function FormPreview({
   clientId: id,
@@ -20,72 +20,15 @@ export function FormPreview({
   clientId: string;
   formId: string;
 }) {
-  const { clientId } = useDemo();
   const { data: clients, isLoading: clientsLoading } = useClients();
   const { data: forms, isLoading: formsLoading } = useForms(id);
   if (clientsLoading || formsLoading) return <p role="status">Carregando prévia…</p>;
-  if (id !== clientId) return <Denied />;
   const form = forms?.find((item) => item.id === formId);
   const client = clients?.find((item) => item.id === id);
   if (!form || !client) return <Denied />;
   const version = form.versions.find((item) => item.id === form.activeVersionId) ?? form.versions.at(-1);
   if (!version) return <Denied />;
-  return <><Heading title="Prévia do formulário" description={`${client.name} · persistido no Supabase.`} action={<NavButton href={`/app/clientes/${id}/formularios`}>Voltar</NavButton>} /><div className="preview-center"><FormWizard form={form} version={version} fields={form.fields ?? []} clinicName={client.name} /></div><div className="preview-center"><p>O formulário público ainda não está conectado ao fluxo persistido.</p></div></>;
-}
-const publicFetcher = async (url: string) => {
-  const response = await fetch(url);
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? "Formulário indisponível.");
-  return body;
-};
-
-export function PublicForm({ slug }: { slug: string }) {
-  const { data: form, error, isLoading } = useSWR(`/api/public/forms/${encodeURIComponent(slug)}`, publicFetcher, {
-    revalidateOnFocus: false,
-  });
-  const [sessionId] = useState(() => crypto.randomUUID());
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
-  if (isLoading) return <main className="public-page"><p role="status">Carregando formulário…</p></main>;
-  if (error || !form) return <main className="public-page"><Denied /></main>;
-  const version = form.versions.find((item: { id: string }) => item.id === form.activeVersionId);
-  if (!version) return <main className="public-page"><Denied /></main>;
-  const sendEvent = (eventType: "view" | "action", actionId?: string) => {
-    void fetch(`/api/public/forms/${encodeURIComponent(slug)}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ eventType, actionId, sessionId }),
-      keepalive: true,
-    });
-  };
-  const capture: WizardCapture = {
-    progress: () => null,
-    view: (input) => sendEvent("view", input.sessionId),
-    action: (_input, actionId) => sendEvent("action", actionId),
-    capture: (input) => {
-      const query = new URLSearchParams(window.location.search);
-      const campaign = query.get("meta_campaign_id");
-      const ad = query.get("meta_ad_id");
-      void fetch(`/api/public/forms/${encodeURIComponent(slug)}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...input, sessionId, idempotencyKey, ...(campaign && { campaign, ad }) }),
-        keepalive: true,
-      });
-      return sessionId;
-    },
-  };
-  return (
-    <main className="public-page">
-      <FormWizard
-        live
-        form={form}
-        version={version}
-        fields={form.fields ?? []}
-        clinicName={form.clinicName ?? form.name}
-        captureRepository={capture}
-      />
-    </main>
-  );
+  return <><Heading title="Prévia do formulário" description={`${client.name} · persistido no Supabase.`} action={<NavButton href={`/app/clientes/${id}/formularios`}>Voltar</NavButton>} /><div className="preview-center"><FormWizard form={form} version={version} key={version.id} fields={fieldsForVersion(form, version)} clinicName={client.name} /></div></>;
 }
 export function FormAnalytics({
   clientId: id,
@@ -153,8 +96,8 @@ export function FormAnalytics({
               </p>
             ))}
         </Card>
-        <Card title="Eventos preparados para Meta">
-          <p>Nenhum envio externo nesta fase.</p>
+        <Card title="Eventos da Meta">
+          <p>Confira o recebimento em Testar eventos no Gerenciador de Eventos da Meta.</p>
           {repositories.capture
             .listMarketing(id)
             .filter((e) => e.formId === formId)

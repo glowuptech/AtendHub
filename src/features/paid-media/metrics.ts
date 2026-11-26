@@ -38,6 +38,14 @@ export const cpm = (m: Metrics) =>
   m.impressions > 0 ? (m.spend / m.impressions) * 1000 : null;
 export const cost = (spend: number, count: number | null) =>
   count && count > 0 ? spend / count : null;
+export function combinedMetaLeads(
+  m: Pick<Metrics, "form_leads" | "whatsapp_conversations">,
+) {
+  if (m.form_leads == null && m.whatsapp_conversations == null) return null;
+  return (m.form_leads ?? 0) + (m.whatsapp_conversations ?? 0);
+}
+export const percentage = (total: number | null, base: number | null) =>
+  total !== null && base !== null && base > 0 ? (total / base) * 100 : null;
 export function primaryResult(stage: Stage | null, m: Metrics) {
   if (stage === "ATR") return m.profile_visits;
   if (stage === "INT") return m.thruplays;
