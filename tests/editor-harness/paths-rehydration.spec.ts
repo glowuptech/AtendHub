@@ -295,7 +295,7 @@ test("formulário público segue a resposta atual e aguarda a gravação antes d
   await expect.poll(() => scriptLoads).toBe(1);
   await expect.poll(commands).toEqual([["set", "autoConfig", "false", pixelId], ["init", pixelId]]);
   await page.clock.runFor(10_250);
-  await expect.poll(commands).toContainEqual(["trackSingle", pixelId, "PageView"]);
+  await expect.poll(commands).toContainEqual(["trackSingle", pixelId, "PageView", {}, {eventID: expect.any(String)}]);
   await page.getByRole("button", { name: settings.introduction.buttonLabel }).click();
   await expect(page).toHaveURL(new RegExp(`etapa=pergunta-${router.id}&acao=iniciar`));
   await page.getByRole("radio", { name: "Manhã" }).click();
@@ -336,11 +336,11 @@ test("formulário público segue a resposta atual e aguarda a gravação antes d
   expect(await commands()).toEqual([
     ["set", "autoConfig", "false", pixelId],
     ["init", pixelId],
-    ["trackSingle", pixelId, "PageView"],
+    ["trackSingle", pixelId, "PageView", {}, {eventID: expect.any(String)}],
     ["trackSingle", pixelId, "Contact"],
     ["trackSingleCustom", pixelId, "EscolheuTurno"],
     ["trackSingleCustom", pixelId, "VoltouDaManha"],
-    ["trackSingle", pixelId, "Lead"],
+    ["trackSingle", pixelId, "Lead", {}, { eventID: key }],
     ["trackSingle", pixelId, "CompleteRegistration"],
   ]);
   await expect(page).toHaveURL(/etapa=concluido&acao=avancar-contato/);

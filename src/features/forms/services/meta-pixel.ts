@@ -1,8 +1,8 @@
 // fbevents.js drains this queue when it loads and installs callMethod for later events.
-type PixelCommand = ((...args: string[]) => void) & {
-  queue: string[][];
-  callMethod?: (...args: string[]) => void;
-  push: (...args: string[]) => void;
+type PixelCommand = ((...args: unknown[]) => void) & {
+  queue: unknown[][];
+  callMethod?: (...args: unknown[]) => void;
+  push: (...args: unknown[]) => void;
   disablePushState: boolean;
   loaded: boolean;
   version: string;
@@ -52,12 +52,13 @@ export function initializeFormPixel(id: string) {
   }
 }
 
-export function trackFormPixel(id: string, name: string, custom = false) {
+export function trackFormPixel(id: string, name: string, custom = false, eventId?: string) {
   try {
     initializeFormPixel(id)?.(
       custom ? "trackSingleCustom" : "trackSingle",
       id,
       name,
+      ...(eventId ? [{}, { eventID: eventId }] : []),
     );
   } catch {
     // Marketing is independent from CRM capture.
