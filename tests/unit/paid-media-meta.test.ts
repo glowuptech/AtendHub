@@ -3,6 +3,7 @@ vi.mock("server-only", () => ({}));
 import {
   discoverMetaAccounts,
   readCreativeAssets,
+  readAdPlayer,
   fetchMetaSnapshot,
   fetchMetaAnalytics,
   validateMetaAccess,
@@ -321,4 +322,13 @@ it("separa as peças paginadas, preserva o histórico e isola arquivos reutiliza
     preview: "https://example.org/full.jpg",
     metrics: { impressions: 40, clicks: 3, leads: 1 },
   });
+});
+
+it("usa a prévia autenticada do anúncio e preserva o identificador de prévia da Meta", async () => {
+  vi.stubGlobal("fetch", async (url: URL) => {
+    expect(url.pathname).toBe("/v99.0/432/previews");
+    expect(url.searchParams.get("ad_format")).toBe("MOBILE_FEED_STANDARD");
+    return Response.json({ data: [{body:'<iframe src="https://www.facebook.com/ads/api/preview_iframe.php?d=abc&amp;t=1"></iframe>'}] });
+  });
+  expect(await readAdPlayer(access,"432")).toEqual({src:"https://www.facebook.com/ads/api/preview_iframe.php?d=abc&t=1"});
 });

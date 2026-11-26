@@ -861,8 +861,19 @@ function Classification({
     </details>
   );
 }
-function CreativePlayer({media, name}: {media: CreativePreview; name: string}) {
+function CreativePlayer({media, name, adPreviewPath}: {media: CreativePreview; name: string; adPreviewPath?: string}) {
   const [failedSource, setFailedSource] = useState("");
+  const useAdPlayer = !!adPreviewPath && !!media.videoId && (!media.source || failedSource === media.source);
+  const preview = useSWR<{src: string}>(useAdPlayer ? adPreviewPath : null, requestMedia, {
+    revalidateOnFocus: false, shouldRetryOnError: false,
+  });
+  if (useAdPlayer) {
+    if (preview.error) return <p role="status">{preview.error.message}</p>;
+    if (!preview.data) return <p role="status">Carregando prévia do anúncio…</p>;
+    return <iframe className="paid-creative paid-video-embed" src={preview.data.src} title={name}
+      loading="lazy" allow="fullscreen; encrypted-media; picture-in-picture" allowFullScreen
+      style={{height:"min(620px, 70vh)"}} />;
+  }
   if (media.source && failedSource !== media.source) return <video
     className="paid-creative" controls playsInline preload="none" poster={media.preview ?? undefined}
     src={media.source} aria-label={name} onError={() => setFailedSource(media.source!)}
@@ -1021,7 +1032,7 @@ function Creatives({ data, path }: { data: MediaReport; path: string }) {
           const campaign = campaigns.get(card.campaignId);
           return (
             <Card key={card.key} title={card.name}>
-              <CreativePlayer media={card} name={card.name} />
+              <CreativePlayer media={card} name={card.name} adPreviewPath={card.type === "ad" ? path + "&kind=adPlayer&adId=" + encodeURIComponent(card.adId) : undefined} />
               <p className="muted">
                 {card.type === "image"
                   ? "Imagem"

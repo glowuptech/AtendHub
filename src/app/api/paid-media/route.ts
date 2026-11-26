@@ -8,6 +8,7 @@ import { daysBetween, localDay, RangeSchema } from "@/lib/date-range";
 import {
   discoverMetaAccounts,
   readCreativeAssets,
+  readAdPlayer,
   getMetaAccount,
   MetaError,
 } from "@/features/paid-media/meta";
@@ -93,7 +94,7 @@ export async function GET(request: Request) {
       return json({ error: "Portal indisponível." }, 404);
     if (
       portalClient &&
-      ((kind && kind !== "analytics" && kind !== "assets") ||
+      ((kind && kind !== "analytics" && kind !== "assets" && kind !== "adPlayer") ||
         (query.has("clientId") && query.get("clientId") !== portalClient))
     )
       return json(
@@ -161,6 +162,18 @@ export async function GET(request: Request) {
         { error: range.error.issues[0]?.message ?? "Período inválido." },
         400,
       );
+    if (kind === "adPlayer") {
+      const adId = identifiers.entity.safeParse(query.get("adId"));
+      if (!adId.success) return json({ error: "Anúncio inválido." }, 400);
+      const scope = await readReportScope(auth, client?.data);
+      const { data: ad, error } = await scope.admin.from("atendhub_meta_ads")
+        .select("campaign_id").eq("organization_id", auth.organizationId)
+        .eq("ad_id", adId.data).maybeSingle();
+      if (error) throw error;
+      if (!ad || !scope.campaigns.some(c => c.campaign_id === ad.campaign_id))
+        return json({ error: "Anúncio indisponível." }, 404);
+      return json(await readAdPlayer(await getMetaAccess(scope.admin, auth.organizationId), adId.data));
+    }
     if (kind === "assets") {
       const scope = await readReportScope(auth, client?.data);
       const account = query.get("account");

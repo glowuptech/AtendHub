@@ -756,3 +756,21 @@ export async function readCreativeAssets(
   }
   return { assets: [...assets.values()], adPreviews, warnings: [...warnings] };
 }
+
+export async function readAdPlayer(access: MetaAccess, adId: string) {
+  const result = await graph(access, adId + "/previews",
+    { ad_format: "MOBILE_FEED_STANDARD", fields: "body" },
+    z.object({ data: z.array(z.object({ body: z.string() })) }),
+    AbortSignal.timeout(15000));
+  for (const { body } of result.data) {
+    const tag = body.match(/<iframe\b[^>]*>/i)?.[0];
+    const src = tag?.match(/\ssrc\s*=\s*(["'])(.*?)\1/i)?.[2].replace(/&amp;/gi, "&");
+    if (!src || !URL.canParse(src)) continue;
+    const url = new URL(src);
+    if (url.origin === "https://www.facebook.com" && !url.username && !url.password &&
+        url.pathname === "/ads/api/preview_iframe.php" && !url.searchParams.has("access_token")) {
+      return { src: url.href };
+    }
+  }
+  throw new MetaError("A Meta não disponibilizou a prévia deste anúncio.", 422);
+}
