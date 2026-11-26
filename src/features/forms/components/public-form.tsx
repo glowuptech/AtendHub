@@ -26,19 +26,21 @@ export function PublicForm({
     eventType: "view" | "action",
     sessionId: string,
     actionId?: string,
+    eventId?: string,
   ) => {
     void fetch(endpoint, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ eventType, actionId, sessionId }),
+      body: JSON.stringify({ eventType, actionId, sessionId, eventId, versionId: version.id }),
       keepalive: true,
     });
   };
   const capture: WizardCapture = {
     progress: () => null,
     view: (input) => {
-      sendEvent("view", input.sessionId);
-      if (tracking.pageView) trackFormPixel(tracking.pixelId, "PageView");
+      const eventId = crypto.randomUUID();
+      sendEvent("view", input.sessionId, undefined, eventId);
+      if (tracking.pageView) trackFormPixel(tracking.pixelId, "PageView", false, eventId);
     },
     action: (input, actionId) => sendEvent("action", input.sessionId, actionId),
     navigate: (stage, action, stepEvent) => {
@@ -57,10 +59,20 @@ export function PublicForm({
         return;
       trackedActions.current.add(action);
       if (tracking.trackStageUrls && name === "EtapaFormulario") return;
+      const eventId = (name === "AddToCart" || name === "AddToWishlist") ? crypto.randomUUID() : undefined;
+      if (tracking.pixelId && eventId) {
+        void fetch(endpoint, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ eventType: "buttonConversion", versionId: version.id, action, eventId }),
+          keepalive: true,
+        }).catch(() => {});
+      }
       trackFormPixel(
         tracking.pixelId,
         name,
         !standardButtonEvents.includes(name),
+        eventId,
       );
     },
     capture: async (input) => {

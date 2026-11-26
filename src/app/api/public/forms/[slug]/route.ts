@@ -1,4 +1,4 @@
-import { sendFormLead } from "@/features/forms/services/conversions-api";
+import { sendFormConversion } from "@/features/forms/services/conversions-api";
 import { loadPublicForm } from "@/features/forms/services/public-form-server";
 import { integrationAdmin } from "@/features/whatsapp/server";
 import { NextResponse } from "next/server";
@@ -37,6 +37,18 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   if (!form) return NextResponse.json({ error: "Formulário não encontrado." }, { status: 404 });
   const version = form.versions.find((item) => item.id === form.activeVersionId);
   if (!version) return NextResponse.json({ error: "Versão publicada indisponível." }, { status: 409 });
+  const tracking = settingsOf(version.settings).tracking;
+  if (body?.eventType === "buttonConversion") {
+    const button = z.object({ action: z.string().min(1).max(120), versionId: z.literal(version.id), eventId: z.uuid() }).safeParse(body);
+    if (!button.success) return NextResponse.json({ ok: false }, { status: 400 });
+    const { action, eventId } = button.data;
+    const step = version.steps.find(s => action === `avancar-pergunta-${s.trackingId ?? s.id}`);
+    const name = step?.metaEvent || tracking.buttonEvents?.[action];
+    if (tracking.pixelId && (name === "AddToCart" || name === "AddToWishlist")) {
+      await sendFormConversion(request, form.slug, tracking.pixelId, name, eventId);
+    }
+    return NextResponse.json({ ok: true });
+  }
   const event = eventSchema.safeParse(body);
   if (event.success) {
     const { error } = await integrationAdmin().from("atendhub_public_form_events").upsert({
@@ -47,6 +59,9 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
       action_id: event.data.actionId ?? "",
     }, { onConflict: "form_id,session_id,event_type,action_id" });
     if (error) return NextResponse.json({ error: "Não foi possível registrar o evento." }, { status: 500 });
+    if (event.data.eventType === "view" && tracking.pageView && tracking.pixelId && body.versionId === version.id && z.uuid().safeParse(body.eventId).success) {
+      await sendFormConversion(request, form.slug, tracking.pixelId, "PageView", body.eventId);
+    }
     return NextResponse.json({ ok: true });
   }
   const parsed = payloadSchema.safeParse(body);
@@ -92,7 +107,7 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   });
   if (error || !leadId) return NextResponse.json({ error: "Não foi possível registrar as respostas. Tente novamente." }, { status: 409 });
   if (parsed.data.complete && settings.tracking.lead && settings.tracking.pixelId) {
-    await sendFormLead(request, form.slug, settings.tracking.pixelId, parsed.data.idempotencyKey, contacts);
+    await sendFormConversion(request, form.slug, settings.tracking.pixelId, "Lead", parsed.data.idempotencyKey, contacts);
   }
   const campaignId = z.string().regex(/^\d{1,30}$/).safeParse(parsed.data.campaign);
   const adId = z.string().regex(/^\d{1,30}$/).safeParse(parsed.data.ad);
