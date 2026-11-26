@@ -1,12 +1,14 @@
 import "server-only";
+import { formCapiSecret } from "./form-capi-secret";
 import { isIP } from "node:net";
 import { createHash } from "node:crypto";
 
-export async function sendFormConversion(request: Request, slug: string, pixel: string, eventName: "Lead" | "PageView" | "AddToCart" | "AddToWishlist", eventId: string, contacts?: { email: string; phone: string }) {
-  const token = process.env.ATENDHUB_CAPI_TOKEN;
+export async function sendFormConversion(request: Request, formId: string, slug: string, pixel: string, eventName: "Lead" | "PageView" | "AddToCart" | "AddToWishlist", eventId: string, contacts?: { email: string; phone: string }) {
   const origin = new URL(request.url);
-  if (!token || pixel !== process.env.ATENDHUB_CAPI_PIXEL_ID ||
-      origin.hostname !== process.env.ATENDHUB_CAPI_HOST || origin.protocol !== "https:") return;
+  if (origin.protocol !== "https:") return;
+  const credential = await formCapiSecret(formId, pixel).catch(() => null);
+  if (!credential) return;
+  const { token, testCode } = credential;
 
   const hash = (value: string) => createHash("sha256").update(value).digest("hex");
   const email = contacts?.email.trim().toLowerCase();
@@ -33,7 +35,7 @@ export async function sendFormConversion(request: Request, slug: string, pixel: 
     const result = await fetch(`https://graph.facebook.com/v23.0/${pixel}/events`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ data: [event], test_event_code: process.env.ATENDHUB_CAPI_TEST_CODE || undefined }),
+      body: JSON.stringify({ data: [event], test_event_code: testCode }),
       signal: AbortSignal.timeout(4000),
     });
     if (!result.ok) console.warn("[form-capi] Meta recusou o evento", result.status);

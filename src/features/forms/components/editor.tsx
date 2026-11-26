@@ -1,4 +1,5 @@
 "use client";
+import { FormCapiEditor } from "./form-capi-editor";
 import { defaultCompletionMessage } from "../services/completion";
 import { PublicFormLink } from "./public-form-link";
 import { useClientOrigin } from "@/features/client-domains/settings";
@@ -1122,6 +1123,7 @@ export function EditorWorkspace({
               disabled={frozen || saving}
               section="tracking"
             />
+            <FormCapiEditor key={persistedId} formId={persistedId} pixel={version.settings?.tracking?.pixelId ?? ""} />
             <ButtonEventsEditor
               version={version}
               disabled={frozen || saving}

@@ -1,3 +1,4 @@
+import { formCapiSecret } from "@/features/forms/services/form-capi-secret";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { integrationAdmin } from "@/features/whatsapp/server";
 
@@ -13,17 +14,11 @@ export async function GET(request: Request) {
     !timingSafeEqual(received, expected)
   )
     return new Response(null, { status: 401 });
-  const client = process.env.ATENDHUB_CAPI_PURCHASE_CLIENT_ID;
-  const pixel = process.env.ATENDHUB_CAPI_PIXEL_ID;
-  const token = process.env.ATENDHUB_CAPI_TOKEN;
-  if (!client || !pixel || !token) return Response.json({ enabled: false });
   const db = integrationAdmin();
   const now = new Date().toISOString();
   const queue = db.from("atendhub_confirmed_purchases");
   const { data, error } = await queue
     .select("*")
-    .eq("client_id", client)
-    .eq("pixel_id", pixel)
     .is("sent_at", null)
     .lte("next_attempt", now)
     .gt("occurred_at", new Date(Date.now() - 7 * 86400000).toISOString())
@@ -40,6 +35,10 @@ export async function GET(request: Request) {
         .select("appointment_id")
         .maybeSingle();
       if (!lease.data) return;
+      const { client_id: client, pixel_id: pixel } = row;
+      const credential = await formCapiSecret(row.form_id, pixel);
+      if (!credential) return;
+      const { token, testCode } = credential;
       const [lead, service] = await Promise.all([
         db
           .from("atendhub_leads")
@@ -89,7 +88,7 @@ export async function GET(request: Request) {
           },
           body: JSON.stringify({
             data: [event],
-            test_event_code: process.env.ATENDHUB_CAPI_TEST_CODE || undefined,
+            test_event_code: testCode,
           }),
           signal: AbortSignal.timeout(8000),
         },

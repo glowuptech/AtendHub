@@ -45,7 +45,7 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
     const step = version.steps.find(s => action === `avancar-pergunta-${s.trackingId ?? s.id}`);
     const name = step?.metaEvent || tracking.buttonEvents?.[action];
     if (tracking.pixelId && (name === "AddToCart" || name === "AddToWishlist")) {
-      await sendFormConversion(request, form.slug, tracking.pixelId, name, eventId);
+      await sendFormConversion(request, form.id, form.slug, tracking.pixelId, name, eventId);
     }
     return NextResponse.json({ ok: true });
   }
@@ -60,7 +60,7 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
     }, { onConflict: "form_id,session_id,event_type,action_id" });
     if (error) return NextResponse.json({ error: "Não foi possível registrar o evento." }, { status: 500 });
     if (event.data.eventType === "view" && tracking.pageView && tracking.pixelId && body.versionId === version.id && z.uuid().safeParse(body.eventId).success) {
-      await sendFormConversion(request, form.slug, tracking.pixelId, "PageView", body.eventId);
+      await sendFormConversion(request, form.id, form.slug, tracking.pixelId, "PageView", body.eventId);
     }
     return NextResponse.json({ ok: true });
   }
@@ -107,7 +107,7 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   });
   if (error || !leadId) return NextResponse.json({ error: "Não foi possível registrar as respostas. Tente novamente." }, { status: 409 });
   if (parsed.data.complete && settings.tracking.lead && settings.tracking.pixelId) {
-    await sendFormConversion(request, form.slug, settings.tracking.pixelId, "Lead", parsed.data.idempotencyKey, contacts);
+    await sendFormConversion(request, form.id, form.slug, settings.tracking.pixelId, "Lead", parsed.data.idempotencyKey, contacts);
   }
   const campaignId = z.string().regex(/^\d{1,30}$/).safeParse(parsed.data.campaign);
   const adId = z.string().regex(/^\d{1,30}$/).safeParse(parsed.data.ad);
