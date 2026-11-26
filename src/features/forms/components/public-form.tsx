@@ -47,7 +47,7 @@ export function PublicForm({
       if (tracking.trackStageUrls)
         trackFormPixel(tracking.pixelId, "EtapaFormulario", true);
       if (stage === "concluido" && tracking.lead)
-        trackFormPixel(tracking.pixelId, "Lead");
+        trackFormPixel(tracking.pixelId, "Lead", false, idempotencyKey.current ?? undefined);
       const name = stepEvent || tracking.buttonEvents?.[action];
       if (
         !name ||

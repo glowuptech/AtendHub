@@ -1,3 +1,4 @@
+import { sendFormLead } from "@/features/forms/services/conversions-api";
 import { loadPublicForm } from "@/features/forms/services/public-form-server";
 import { integrationAdmin } from "@/features/whatsapp/server";
 import { NextResponse } from "next/server";
@@ -90,6 +91,9 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
     p_contacts: contacts, p_responses: responses, p_complete: parsed.data.complete,
   });
   if (error || !leadId) return NextResponse.json({ error: "Não foi possível registrar as respostas. Tente novamente." }, { status: 409 });
+  if (parsed.data.complete && settings.tracking.lead && settings.tracking.pixelId) {
+    await sendFormLead(request, form.slug, settings.tracking.pixelId, parsed.data.idempotencyKey, contacts);
+  }
   const campaignId = z.string().regex(/^\d{1,30}$/).safeParse(parsed.data.campaign);
   const adId = z.string().regex(/^\d{1,30}$/).safeParse(parsed.data.ad);
   if (campaignId.success) {

@@ -340,7 +340,7 @@ test("formulário público segue a resposta atual e aguarda a gravação antes d
     ["trackSingle", pixelId, "Contact"],
     ["trackSingleCustom", pixelId, "EscolheuTurno"],
     ["trackSingleCustom", pixelId, "VoltouDaManha"],
-    ["trackSingle", pixelId, "Lead"],
+    ["trackSingle", pixelId, "Lead", {}, { eventID: key }],
     ["trackSingle", pixelId, "CompleteRegistration"],
   ]);
   await expect(page).toHaveURL(/etapa=concluido&acao=avancar-contato/);
