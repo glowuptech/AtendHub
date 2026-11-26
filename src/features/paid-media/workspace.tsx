@@ -21,6 +21,8 @@ import {
   primaryResult,
 } from "./metrics";
 import {
+  stagePrefixes,
+  stageGuide,
   stageLabels,
   stageMetric,
   stages,
@@ -41,7 +43,7 @@ const readDate = (value: string) =>
   }).format(new Date(value));
 const views = [
   "Resumo",
-  "Funil AIDA",
+  "Funil VIDA",
   "Campanhas",
   "Criativos",
   "Contas vinculadas",
@@ -127,7 +129,7 @@ export function PaidMediaWorkspace({
         <Heading
           eyebrow={portal ? "PORTAL" : "SISTEMA"}
           title="Tráfego pago"
-          description="Investimento, campanhas, criativos e resultados por etapa do AIDA."
+          description="Investimento, campanhas, criativos e resultados por etapa do Método VIDA."
           action={
             !portal && (
               <NavButton
@@ -248,7 +250,7 @@ export function PaidMediaWorkspace({
               portal={portal}
             />
           )}
-          {activeView === "Funil AIDA" && <Funnel data={data} />}
+          {activeView === "Funil VIDA" && <Funnel data={data} />}
           {activeView === "Campanhas" && (
             <Campaigns
               key={filter}
@@ -617,7 +619,7 @@ function Funnel({ data }: { data: MediaReport }) {
     <div className="paid-grid">
       {stages.map((stage) => (
         <Card key={stage} title={stageLabels[stage]}>
-          <p>{stageMetric[stage]}</p>
+          <p>{stageGuide[stage]}</p>
           {[
             ...byMoney(
               data.campaigns.filter((c) => c.stage === stage && c.client_id),
@@ -1015,7 +1017,7 @@ function Accounts({
   } | null>(null);
   const metaConfigured = credential.data?.configured ?? false;
   const code = data.clients.find((c) => c.id === client)?.code;
-  const prefix = code ? `[${code}][${stage}]` : "";
+  const prefix = code ? `[${code}][${stagePrefixes[stage]}]` : "";
   const rangeFits = daysBetween(range.from, range.to) < 31;
   const attempts = new Map(
     autoSync?.accounts.map((item) => [item.accountId, item]),

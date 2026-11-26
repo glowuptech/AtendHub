@@ -136,7 +136,13 @@ export function FormWizard({
         : "contato";
   const forwardAction = `avancar-${stage}`;
   const backAction = `voltar-${stage}`;
-  const introAction = `apresentar-${stage}`;
+  const formElement = useRef<HTMLFormElement>(null);
+  const advanceFrom = useRef<string | null>(null);
+  useEffect(() => {
+    const chosenStep = advanceFrom.current;
+    advanceFrom.current = null;
+    if (chosenStep && chosenStep === current && !isLast) formElement.current?.requestSubmit();
+  }, [answers, current, isLast]);
   const transition = useRef<{ action: string; eventName?: string } | null>(
     null,
   );
@@ -305,6 +311,7 @@ export function FormWizard({
                   <p>Adicione perguntas para visualizar o formulário.</p>
                 ) : (
                   <form
+                    ref={formElement}
                     noValidate
                     onSubmit={async (e) => {
                       e.preventDefault();
@@ -462,6 +469,9 @@ export function FormWizard({
                             value={answers[step.question.id]}
                             errorId={error ? "form-error" : undefined}
                             onChange={(v) => {
+                              if (v != null && ["single_select", "image_choice", "boolean"].includes(field.type)) {
+                                advanceFrom.current = step.id;
+                              }
                               setAnswers((a) => {
                                 const next = { ...a, [step.question.id]: v };
                                 const eligible = new Set(
@@ -490,20 +500,6 @@ export function FormWizard({
                         </p>
                       )}
                       <div className="form-navigation">
-                        {settings.introduction.mode === "separate" &&
-                          index > 0 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              data-action-id={introAction}
-                              onClick={() => {
-                                transition.current = { action: introAction };
-                                setIntroSeen(false);
-                              }}
-                            >
-                              Apresentação
-                            </Button>
-                          )}
                         <Button
                           type="button"
                           variant="ghost"

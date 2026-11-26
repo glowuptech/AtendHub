@@ -1,4 +1,4 @@
-# Ativação conjunta do tráfego pago e planejamento AIDA
+# Ativação conjunta do tráfego pago e planejamento VIDA
 
 ## Publicação e Supabase
 
@@ -22,7 +22,7 @@ As instalações com `ATENDHUB_META_ACCESS_TOKEN` e `ATENDHUB_META_ORGANIZATION_
 
 Abra **Tráfego pago → Contas vinculadas** como superadministrador. Consulte a Meta, escolha um cliente e vincule a conta como exclusiva ou compartilhada. Para mudar uma conta exclusiva para compartilhada, atualize a modalidade pelo cliente já vinculado e depois adicione o outro cliente. Use **Sincronizar período** para uma conta por vez, em blocos de até 31 dias. O painel de cobertura mostra quantos dias foram importados. Uma falha antes da publicação preserva o recorte anterior.
 
-Para contas compartilhadas, use o prefixo gerado pelo Atend&Hub no início do nome da campanha, por exemplo `[C12E34F56AB][ACA] WhatsApp | Remarketing`. Em uma conta exclusiva, `[ACA] WhatsApp | Remarketing` é suficiente. Os códigos de etapa são `ATR`, `INT`, `DES` e `ACA`. Use **Campanhas → Revisar classificação** para casos legados ou sem padrão. A associação salva pelo ID da campanha resiste a renomeações. Mudanças explícitas feitas no painel prevalecem na próxima importação. O gasto pendente aparece apenas para a administração no consolidado, sem aparecer em relatórios de clínicas.
+Para contas compartilhadas, use o prefixo gerado pelo Atend&Hub no início do nome da campanha, por exemplo `[C12E34F56AB][AGE] WhatsApp | Remarketing`. Em uma conta exclusiva, `[AGE] WhatsApp | Remarketing` é suficiente. Os códigos de etapa são `ATR`, `INT`, `DES` e `ACA`. Use **Campanhas → Revisar classificação** para casos legados ou sem padrão. A associação salva pelo ID da campanha resiste a renomeações. Mudanças explícitas feitas no painel prevalecem na próxima importação. O gasto pendente aparece apenas para a administração no consolidado, sem aparecer em relatórios de clínicas.
 
 ### Conferência do primeiro dia fechado
 
@@ -83,3 +83,5 @@ O Respond to Webhook deve responder HTTP 200 com objeto JSON da forma:
 ```
 
 `suggestions` é opcional. As chaves aceitas são `ATR`, `INT`, `DES`, `ACA`. Cada etapa pode sugerir `hypothesis`, `creative`, `destination`, `target` e `budgetCents`. O operador revisa antes de aplicar ao seu rascunho. O resultado só entra no plano persistido ao salvar. A biblioteca de aprendizados entre clientes e a publicação automática de campanhas ficam para uma etapa futura.
+
+O Método VIDA usa VIS, INT, DES e AGE. Os prefixos históricos do AIDA (ATR, INT, DES e ACA) continuam válidos após aplicar a migration 20261125020000_atendhub_vida.sql.

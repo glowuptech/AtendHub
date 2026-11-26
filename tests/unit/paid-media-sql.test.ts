@@ -38,6 +38,7 @@ beforeAll(async () => {
     "20261123020000_atendhub_paid_media_assistant",
     "20261123030000_atendhub_meta_auto_sync",
     "20261123040000_atendhub_meta_credentials",
+    "20261125020000_atendhub_vida",
   ])
     await db.exec(await readFile(`supabase/migrations/${file}.sql`, "utf8"));
 });
@@ -199,6 +200,9 @@ it("impede conta exclusiva em dois clientes e concilia a conta compartilhada pre
     { client_id: clientB, stage: "INT" },
     { client_id: null, stage: "ACA" },
   ]);
+  await db.query("update atendhub_meta_campaigns set stage=null,name=replace(replace(name,'[ATR]','[VIS]'),'[ACA]','[AGE]') where campaign_id in ('100','300')");
+  await db.query("select public.atendhub_meta_classify($1,account_id) from atendhub_meta_accounts where organization_id=$1", [org]);
+  expect((await db.query("select client_id,stage from atendhub_meta_campaigns order by campaign_id")).rows).toEqual(mapped.rows);
   await db.query(
     "update atendhub_meta_campaigns set client_id=$1,stage='DES',manual=true where campaign_id='300'",
     [clientA],

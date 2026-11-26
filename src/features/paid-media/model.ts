@@ -4,10 +4,17 @@ import { RangeSchema } from "@/lib/date-range";
 export const stages = ["ATR", "INT", "DES", "ACA"] as const;
 export type Stage = (typeof stages)[number];
 export const stageLabels: Record<Stage, string> = {
-  ATR: "Atração",
+  ATR: "Visibilidade",
   INT: "Interesse",
   DES: "Desejo",
-  ACA: "Ação",
+  ACA: "Agendamento",
+};
+export const stagePrefixes: Record<Stage, string> = { ATR: "VIS", INT: "INT", DES: "DES", ACA: "AGE" };
+export const stageGuide: Record<Stage, string> = {
+  ATR: "Apresente o profissional ao público que ele quer atender. Use anúncios de posicionamento para gerar visitas ao perfil.",
+  INT: "Mostre os serviços e como funciona o atendimento, partindo das dúvidas e necessidades de quem já demonstrou curiosidade.",
+  DES: "Use principalmente remarketing, com provas sociais e resultados relevantes para quem demonstrou interesse. Convide a pessoa a agendar já nesta etapa.",
+  ACA: "Use exclusivamente remarketing para quem avançou pelo Desejo e ainda não agendou. Retome o benefício para quem abandonou o formulário. No WhatsApp, esclareça dúvidas e combine um horário. Exclua quem já agendou.",
 };
 export const identifiers = {
   account: z.string().regex(/^act_[0-9]{1,30}$/),

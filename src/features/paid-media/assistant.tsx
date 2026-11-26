@@ -48,7 +48,7 @@ export function MediaAssistant({
     const prompt =
       question.trim() ||
       (mode === "generate"
-        ? "Monte um plano AIDA a partir do briefing."
+        ? "Monte um plano pelo Método VIDA a partir do briefing."
         : mode === "improve"
           ? "Sugira como aprimorar a ideia desta etapa."
           : "");

@@ -105,7 +105,6 @@ export function ButtonEventsEditor({
               step,
             )}
             {i > 0 && input(`voltar-${stage}`, "Voltar")}
-            {hasIntro && i > 0 && input(`apresentar-${stage}`, "Apresentação")}
           </fieldset>
         ))}
         <label>

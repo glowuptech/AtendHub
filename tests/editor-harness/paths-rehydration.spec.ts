@@ -298,17 +298,13 @@ test("formulário público segue a resposta atual e aguarda a gravação antes d
   await expect.poll(commands).toContainEqual(["trackSingle", pixelId, "PageView"]);
   await page.getByRole("button", { name: settings.introduction.buttonLabel }).click();
   await expect(page).toHaveURL(new RegExp(`etapa=pergunta-${router.id}&acao=iniciar`));
-  await page.getByRole("radio", { name: "Manhã" }).check();
-  await page.getByRole("button", { name: "Continuar" }).click();
+  await page.getByRole("radio", { name: "Manhã" }).click();
   await expect(
     page.getByRole("heading", { name: a.question.label }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Apresentação", exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`etapa=apresentacao&acao=apresentar-pergunta-${a.id}`));
-  await page.getByRole("button", { name: settings.introduction.buttonLabel }).click();
+  await expect(page.getByRole("button", { name: "Apresentação", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Voltar" }).click();
-  await page.getByRole("radio", { name: "Tarde" }).check();
-  await page.getByRole("button", { name: "Continuar" }).click();
+  await page.getByRole("radio", { name: "Tarde" }).click();
   await expect(
     page.getByRole("heading", { name: b.question.label }),
   ).toBeVisible();
@@ -343,7 +339,6 @@ test("formulário público segue a resposta atual e aguarda a gravação antes d
     ["trackSingle", pixelId, "PageView"],
     ["trackSingle", pixelId, "Contact"],
     ["trackSingleCustom", pixelId, "EscolheuTurno"],
-    ["trackSingleCustom", pixelId, "ReverInicio"],
     ["trackSingleCustom", pixelId, "VoltouDaManha"],
     ["trackSingle", pixelId, "Lead"],
     ["trackSingle", pixelId, "CompleteRegistration"],
