@@ -247,19 +247,14 @@ it("separa as peças paginadas, preserva o histórico e isola arquivos reutiliza
           { id: "25", campaign_id: "1", creative: { video_id: "123" } },
         ],
       });
-    if (url.pathname.endsWith("/123"))
+    if (url.pathname.endsWith("/123") || url.pathname.endsWith("/456")) {
+      expect(q.get("fields")).toBe("source,picture");
+      const id = url.pathname.split("/").pop();
       return Response.json({
-        source: "https://example.org/video.mp4",
-        thumbnails: {
-          data: [
-            {
-              uri: "https://example.org/vertical.jpg",
-              width: 1080,
-              height: 1920,
-            },
-          ],
-        },
+        source: `https://example.org/${id}.mp4`,
+        picture: `https://example.org/${id}.jpg`,
       });
+    }
     if (url.pathname.endsWith("/adimages"))
       return Response.json({
         data: [{ hash: "hash-a", url: "https://example.org/full.jpg" }],
@@ -285,6 +280,7 @@ it("separa as peças paginadas, preserva o histórico e isola arquivos reutiliza
             spend: "2",
             impressions: "10",
           },
+          { ...base, video_asset: { video_id: "456" }, spend: "5" },
         ],
       });
     if (q.has("after"))
@@ -304,16 +300,20 @@ it("separa as peças paginadas, preserva o histórico e isola arquivos reutiliza
   );
   expect(adPreviews["24"].preview).toBe("https://example.org/full.jpg");
   expect(adPreviews["25"]).toMatchObject({
-    source: "https://example.org/video.mp4",
-    ratio: 1080 / 1920,
+    source: "https://example.org/123.mp4",
+    preview: "https://example.org/123.jpg",
   });
   expect(assets.find((a) => a.type === "video")?.source).toBe(
     adPreviews["25"].source,
   );
+  expect(assets.find(a => a.key === "21:video:456")).toMatchObject({
+    source: "https://example.org/456.mp4",
+    preview: "https://example.org/456.jpg",
+  });
   expect(warnings).toEqual([]);
-  expect(assets).toHaveLength(4);
+  expect(assets).toHaveLength(5);
   const first = assets.filter((a) => a.adId === "21");
-  expect(first).toHaveLength(3);
+  expect(first).toHaveLength(4);
   expect(first.map((a) => a.metrics?.spend ?? null)).toEqual(
     expect.arrayContaining([8, 2, null]),
   );
