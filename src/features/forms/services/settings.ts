@@ -24,6 +24,7 @@ export const FormSettingsSchema = z.object({
       align: z.enum(["left", "center", "right"]).default("center"),
       maxWidth: z.number().min(280).max(1000).default(620),
       vertical: z.enum(["top", "center", "bottom"]).default("center"),
+      headerLayout: z.enum(["logo", "banner"]).optional(),
       logo: z.string().max(1500000).default(""),
       inheritAppearance: z.boolean().default(true),
     })

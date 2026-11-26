@@ -20,17 +20,18 @@ export function SettingsEditor({
     latest.current = s;
   }, [s]);
   const [error, setError] = useState("");
-  const [uploading, setUploading] = useState<"cover" | "backgroundImage" | "">(
+  const [uploading, setUploading] = useState<"logo" | "cover" | "backgroundImage" | "">(
     "",
   );
-  const uploadGeneration = useRef<Record<"cover" | "backgroundImage", number>>({
+  const uploadGeneration = useRef<Record<"logo" | "cover" | "backgroundImage", number>>({
+    logo: 0,
     cover: 0,
     backgroundImage: 0,
   });
   const patch = (v: Partial<FormSettings>) => onChange({ ...s, ...v });
   async function upload(
     file: File | undefined,
-    key: "cover" | "backgroundImage",
+    key: "logo" | "cover" | "backgroundImage",
   ) {
     const generation = ++uploadGeneration.current[key];
     if (!file) return;
@@ -42,7 +43,9 @@ export function SettingsEditor({
       const current = latest.current;
       onChange({
         ...current,
-        appearance: { ...current.appearance, [key]: result },
+        ...(key === "logo"
+          ? { introduction: { ...current.introduction, logo: result } }
+          : { appearance: { ...current.appearance, [key]: result } }),
       });
     } catch (cause) {
       if (uploadGeneration.current[key] !== generation) return;
@@ -82,6 +85,36 @@ export function SettingsEditor({
                 <option value="none">Sem apresentação</option>
               </select>
             </label>
+            {s.introduction.mode !== "none" && (
+              <fieldset>
+                <legend>Imagem do cabeçalho</legend>
+                <label>
+                  Imagem (PNG, JPEG ou WebP)
+                  <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void upload(file, "logo");
+                    e.target.value = "";
+                  }} />
+                </label>
+                {uploading === "logo" && <p role="status">Preparando imagem…</p>}
+                {error && <p role="alert">{error}</p>}
+                {s.introduction.logo && <>
+                  <label>Exibição da imagem
+                    <select value={s.introduction.headerLayout ?? "logo"} onChange={(e) => patch({
+                      introduction: { ...s.introduction, headerLayout: e.target.value as "logo" | "banner" },
+                    })}>
+                      <option value="logo">Logotipo pequeno centralizado</option>
+                      <option value="banner">Banner em toda a largura do cabeçalho</option>
+                    </select>
+                  </label>
+                  <button type="button" onClick={() => {
+                    uploadGeneration.current.logo++;
+                    setUploading("");
+                    patch({ introduction: { ...s.introduction, logo: "" } });
+                  }}>Remover imagem</button>
+                </>}
+              </fieldset>
+            )}
             <label>
               Título
               <input
