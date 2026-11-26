@@ -184,7 +184,14 @@ export function emptyPlan(clientId: string, day: string): Plan {
   };
 }
 
-export type CreativeAsset = {
+export type CreativePreview = {
+  preview: string | null;
+  videoId?: string;
+  source?: string;
+  ratio?: number;
+};
+
+export type CreativeAsset = CreativePreview & {
   key: string;
   adId: string;
   campaignId: string;
