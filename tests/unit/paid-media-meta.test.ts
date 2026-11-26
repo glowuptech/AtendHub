@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 import {
   discoverMetaAccounts,
+  readCreativeAssets,
   fetchMetaSnapshot,
   fetchMetaAnalytics,
   validateMetaAccess,
@@ -224,5 +225,72 @@ it("busca os recortes da Meta com o mesmo filtro de campanhas e calcula o limite
     genders: null,
     placements: null,
     billing: null,
+  });
+});
+
+it("separa as peças paginadas, preserva o histórico e isola arquivos reutilizados por anúncio", async () => {
+  const base = { campaign_id: "1", ad_id: "21", ad_name: "Anúncio A" };
+  const photo = {
+    ...base,
+    image_asset: { hash: "hash-a" },
+    spend: "8",
+    impressions: "40",
+    inline_link_clicks: "3",
+    actions: [{ action_type: "onsite_conversion.lead_grouped", value: "1" }],
+  };
+  vi.stubGlobal("fetch", async (url: URL) => {
+    const q = url.searchParams;
+    if (url.pathname.endsWith("/adimages"))
+      return Response.json({
+        data: [{ hash: "hash-a", url: "https://example.org/full.jpg" }],
+      });
+    const video = q.get("breakdowns") === "video_asset";
+    if (q.has("date_preset"))
+      return Response.json({
+        data: video ? [] : [photo, { ...base, image_asset: { hash: "old" } }],
+      });
+    expect(JSON.parse(q.get("time_range")!)).toEqual({
+      since: "2026-11-01",
+      until: "2026-11-10",
+    });
+    if (video)
+      return Response.json({
+        data: [
+          {
+            ...base,
+            video_asset: {
+              video_id: "123",
+              thumbnail_url: "https://example.org/cover.jpg",
+            },
+            spend: "2",
+            impressions: "10",
+          },
+        ],
+      });
+    if (q.has("after"))
+      return Response.json({
+        data: [{ ...photo, ad_id: "22", ad_name: "Anúncio B", spend: "4" }],
+      });
+    return Response.json({
+      data: [photo],
+      paging: { next: "https://graph.facebook.com/?after=2" },
+    });
+  });
+  const { assets, warnings } = await readCreativeAssets(
+    access,
+    "act_11",
+    ["1"],
+    { from: "2026-11-01", to: "2026-11-10" },
+  );
+  expect(warnings).toEqual([]);
+  expect(assets).toHaveLength(4);
+  const first = assets.filter((a) => a.adId === "21");
+  expect(first).toHaveLength(3);
+  expect(first.map((a) => a.metrics?.spend ?? null)).toEqual(
+    expect.arrayContaining([8, 2, null]),
+  );
+  expect(first.find((a) => a.key === "21:image:hash-a")).toMatchObject({
+    preview: "https://example.org/full.jpg",
+    metrics: { impressions: 40, clicks: 3, leads: 1 },
   });
 });

@@ -27,6 +27,7 @@ import {
   stageMetric,
   stages,
   type MediaReport,
+  type CreativeAsset,
   type MetaCredentialStatus,
   type MetaAutoSyncStatus,
   type Stage,
@@ -260,7 +261,7 @@ export function PaidMediaWorkspace({
               pending={pending}
             />
           )}
-          {activeView === "Criativos" && <Creatives data={data} />}
+          {activeView === "Criativos" && <Creatives key={reportPath(range, filter)} path={reportPath(range, filter)} data={data} />}
           {activeView === "Contas vinculadas" && (
             <Accounts
               key={filter}
@@ -859,14 +860,115 @@ function Classification({
     </details>
   );
 }
-function Creatives({ data }: { data: MediaReport }) {
+function Creatives({ data, path }: { data: MediaReport; path: string }) {
   const [stage, setStage] = useState("");
-  const campaigns = new Map(data.campaigns.map((c) => [c.campaign_id, c]));
-  const ads = data.ads.filter((ad) => !stage || ad.stage === stage);
+  const [search, setSearch] = useState("");
+  const [order, setOrder] = useState("spend");
   const [count, setCount] = useState(24);
+  const accounts = [...new Set(data.campaigns.map((c) => c.account_id))];
+  const detail = useSWR(
+    [path, "assets", accounts],
+    async () => {
+      const results = await Promise.all(
+        accounts.map(async (account) => {
+          try {
+            return await requestMedia<{
+              assets: CreativeAsset[];
+              warnings: string[];
+            }>(path + "&kind=assets&account=" + encodeURIComponent(account));
+          } catch (error) {
+            return {
+              assets: [],
+              warnings: [
+                error instanceof Error
+                  ? error.message
+                  : "Detalhamento indisponível.",
+              ],
+            };
+          }
+        }),
+      );
+      return {
+        assets: results.flatMap((r) => r.assets),
+        warnings: [...new Set(results.flatMap((r) => r.warnings))],
+      };
+    },
+    { revalidateOnFocus: false },
+  );
+  const campaigns = new Map(data.campaigns.map((c) => [c.campaign_id, c]));
+  const adsById = new Map(data.ads.map((ad) => [ad.ad_id, ad]));
+  const pieces = detail.data?.assets ?? [];
+  const detailed = new Set(pieces.filter((a) => a.metrics).map((a) => a.adId));
+  const cards = [
+    ...pieces.map((asset) => ({
+      ...asset,
+      copy: adsById.get(asset.adId)?.copy,
+    })),
+    ...data.ads
+      .filter((ad) => !detailed.has(ad.ad_id))
+      .map((ad) => ({
+        key: ad.ad_id,
+        adId: ad.ad_id,
+        campaignId: ad.campaign_id,
+        name: ad.name,
+        copy: ad.copy,
+        preview: ad.thumbnail,
+        type: "ad",
+        metrics: {
+          spend: ad.metrics.spend,
+          impressions: ad.metrics.impressions,
+          clicks: null,
+          leads: ad.metrics.form_leads,
+          conversations: ad.metrics.whatsapp_conversations,
+        },
+      })),
+  ]
+    .filter((card) => {
+      const campaign = campaigns.get(card.campaignId);
+      return (
+        (!stage || campaign?.stage === stage) &&
+        [card.name, campaign?.name, card.key]
+          .join(" ")
+          .toLocaleLowerCase()
+          .includes(search.trim().toLocaleLowerCase())
+      );
+    })
+    .sort(
+      (a, b) =>
+        (order === "name"
+          ? a.name.localeCompare(b.name)
+          : (b.metrics?.[order as "spend" | "impressions"] ?? -1) -
+            (a.metrics?.[order as "spend" | "impressions"] ?? -1)) ||
+        a.key.localeCompare(b.key),
+    );
   return (
     <>
       <Card>
+        <label>
+          Buscar criativo
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setCount(24);
+            }}
+          />
+        </label>
+        <label>
+          Ordenar por
+          <select
+            value={order}
+            onChange={(e) => {
+              setOrder(e.target.value);
+              setCount(24);
+            }}
+          >
+            <option value="spend">Maior investimento</option>
+            <option value="impressions">Mais impressões</option>
+            <option value="name">Nome do anúncio</option>
+          </select>
+        </label>
         <label>
           Etapa
           <select
@@ -885,73 +987,77 @@ function Creatives({ data }: { data: MediaReport }) {
           </select>
         </label>
       </Card>
-      {!ads.length && (
-        <Card>
-          <p>Nenhum criativo com dados no período.</p>
-        </Card>
-      )}
+      {detail.isLoading && <p role="status">Buscando peças na Meta…</p>}
+      {detail.data?.warnings.map((w) => (
+        <p role="status" key={w}>
+          {w}
+        </p>
+      ))}
+      {!cards.length && !detail.isLoading && <p>Nenhum criativo encontrado.</p>}
       <div className="paid-grid">
-        {ads.slice(0, count).map((ad) => (
-          <Card key={ad.ad_id} title={ad.name}>
-            {ad.thumbnail /* eslint-disable-next-line @next/next/no-img-element -- Meta CDN URLs can be signed and change by creative. */ && (
-              <img
-                className="paid-creative"
-                src={ad.thumbnail}
-                alt=""
-                loading="lazy"
-                referrerPolicy="no-referrer"
-              />
-            )}
-            <p className="muted">
-              {campaigns.get(ad.campaign_id)?.name} ·{" "}
-              {ad.stage ? stageLabels[ad.stage] : "Sem etapa"}
-            </p>
-            {ad.copy && (
-              <details>
-                <summary>Texto do anúncio</summary>
-                <p className="preserve-lines">{ad.copy}</p>
-              </details>
-            )}
-            <dl className="paid-values">
-              <Value title="Investimento">
-                {money(ad.metrics.spend, ad.currency)}
-              </Value>
-              <Value title="Impressões">
-                {displayNumber(ad.metrics.impressions)}
-              </Value>
-              <Value title="CPM">{money(cpm(ad.metrics), ad.currency)}</Value>
-              <Value title="Conversão em agendamento">
-                {percent(
-                  data.attributionAvailable
-                    ? percentage(ad.metrics.appointments, ad.metrics.crmLeads)
-                    : null,
-                )}
-              </Value>
-              {ad.stage === "ATR" ||
-              ad.stage === "INT" ||
-              ad.stage === "ACA" ? (
-                <Value title={stageMetric[ad.stage]}>
-                  {displayNumber(
-                    ad.stage === "ACA" && !data.attributionAvailable
-                      ? null
-                      : primaryResult(ad.stage, ad.metrics),
-                  )}
-                </Value>
-              ) : (
-                <>
-                  <Value title="Formulários Meta">
-                    {displayNumber(ad.metrics.form_leads)}
-                  </Value>
-                  <Value title="Conversas WhatsApp">
-                    {displayNumber(ad.metrics.whatsapp_conversations)}
-                  </Value>
-                </>
+        {cards.slice(0, count).map((card) => {
+          const campaign = campaigns.get(card.campaignId);
+          return (
+            <Card key={card.key} title={card.name}>
+              {card.preview && (
+                <img
+                  className="paid-creative"
+                  src={card.preview}
+                  alt=""
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                />
               )}
-            </dl>
-          </Card>
-        ))}
+              <p className="muted">
+                {card.type === "image"
+                  ? "Imagem"
+                  : card.type === "video"
+                    ? "Vídeo"
+                    : "Anúncio"}{" "}
+                · {campaign?.name} ·{" "}
+                {campaign?.stage ? stageLabels[campaign.stage] : "Sem etapa"}
+              </p>
+              {card.copy && (
+                <details>
+                  <summary>Texto do anúncio</summary>
+                  <p className="preserve-lines">{card.copy}</p>
+                </details>
+              )}
+              {card.metrics ? (
+                <dl className="paid-values">
+                  <Value title="Investimento">
+                    {money(card.metrics.spend, campaign?.currency ?? "BRL")}
+                  </Value>
+                  <Value title="Impressões">
+                    {displayNumber(card.metrics.impressions)}
+                  </Value>
+                  <Value title="Cliques no link">
+                    {displayNumber(card.metrics.clicks)}
+                  </Value>
+                  <Value title="Cadastros">
+                    {displayNumber(card.metrics.leads)}
+                  </Value>
+                  <Value title="Conversas">
+                    {displayNumber(card.metrics.conversations)}
+                  </Value>
+                  {card.type === "ad" && (() => {
+                    const ad = adsById.get(card.adId);
+                    if (!ad) return null;
+                    return <>
+                      <Value title="CPM">{money(cpm(ad.metrics), ad.currency)}</Value>
+                      <Value title="Conversão em agendamento">{percent(data.attributionAvailable ? percentage(ad.metrics.appointments, ad.metrics.crmLeads) : null)}</Value>
+                      {ad.stage && ad.stage !== "DES" && <Value title={stageMetric[ad.stage]}>{displayNumber(ad.stage === "ACA" && !data.attributionAvailable ? null : primaryResult(ad.stage, ad.metrics))}</Value>}
+                    </>;
+                  })()}
+                </dl>
+              ) : (
+                <p>Sem métricas no período</p>
+              )}
+            </Card>
+          );
+        })}
       </div>
-      {ads.length > count && (
+      {cards.length > count && (
         <Button variant="outline" onClick={() => setCount(count + 24)}>
           Carregar mais criativos
         </Button>

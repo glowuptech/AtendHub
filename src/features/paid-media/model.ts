@@ -183,3 +183,19 @@ export function emptyPlan(clientId: string, day: string): Plan {
     stages: { ATR: stage(), INT: stage(), DES: stage(), ACA: stage() },
   };
 }
+
+export type CreativeAsset = {
+  key: string;
+  adId: string;
+  campaignId: string;
+  name: string;
+  type: "image" | "video";
+  preview: string | null;
+  metrics: {
+    spend: number | null;
+    impressions: number | null;
+    clicks: number | null;
+    leads: number | null;
+    conversations: number | null;
+  } | null;
+};
