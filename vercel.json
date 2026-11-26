@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/meta-purchases",
-      "schedule": "* * * * *"
+      "schedule": "15 8 * * *"
     }
   ]
 }
