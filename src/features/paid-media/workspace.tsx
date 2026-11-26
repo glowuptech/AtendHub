@@ -1349,7 +1349,7 @@ function Accounts({
         {autoSync && (
           <p>
             {autoSync.configured
-              ? "Sincronização automática diária. Atualiza os últimos 7 dias fechados e a parcial de hoje."
+              ? "Sincronização automática. Atualiza os últimos 7 dias fechados e a parcial de hoje."
               : "Sincronização automática aguarda configuração no servidor."}
           </p>
         )}
