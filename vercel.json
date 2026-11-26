@@ -1,12 +1,16 @@
 {
-  "crons": [
-    {
+  "schedules": {
+    "meta-sync": {
       "path": "/api/cron/meta-sync",
-      "schedule": "0 8 * * *"
+      "requestMethod": "GET",
+      "schedule": "*/30 * * * *",
+      "jitter": 15
     },
-    {
+    "meta-purchases": {
       "path": "/api/cron/meta-purchases",
-      "schedule": "15 8 * * *"
+      "requestMethod": "GET",
+      "schedule": "*/30 * * * *",
+      "jitter": 15
     }
-  ]
+  }
 }
