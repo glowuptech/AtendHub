@@ -67,8 +67,12 @@
   font-variant-numeric: tabular-nums;
 }
 .paid-creative {
-  width: 100%;
-  max-height: 280px;
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 75vh;
+  margin-inline: auto;
   object-fit: contain;
   background: var(--surface, #f4f5f8);
   border-radius: 8px;
@@ -384,3 +388,5 @@
 .branded-portal:has(.paid-workspace) {
   max-width: 1320px;
 }
+
+video.paid-creative, .paid-video-embed { width: 100%; border: 0; }

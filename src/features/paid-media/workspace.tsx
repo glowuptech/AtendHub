@@ -28,6 +28,7 @@ import {
   stages,
   type MediaReport,
   type CreativeAsset,
+  type CreativePreview,
   type MetaCredentialStatus,
   type MetaAutoSyncStatus,
   type Stage,
@@ -860,6 +861,23 @@ function Classification({
     </details>
   );
 }
+function CreativePlayer({media, name}: {media: CreativePreview; name: string}) {
+  const [failedSource, setFailedSource] = useState("");
+  if (media.source && failedSource !== media.source) return <video
+    className="paid-creative" controls playsInline preload="none" poster={media.preview ?? undefined}
+    src={media.source} aria-label={name} onError={() => setFailedSource(media.source!)}
+    style={{aspectRatio: media.ratio}} />;
+  if (media.videoId) {
+    const url = new URL("https://www.facebook.com/plugins/video.php");
+    url.searchParams.set("href", "https://www.facebook.com/watch/?v=" + media.videoId);
+    url.searchParams.set("show_text","false");
+    return <iframe className="paid-creative paid-video-embed" title={name} src={url.href}
+      loading="lazy" allow="fullscreen; encrypted-media; picture-in-picture" allowFullScreen
+      style={{aspectRatio: media.ratio ?? 16/9}} />;
+  }
+  return media.preview ? <img className="paid-creative" src={media.preview} alt={name} loading="lazy" referrerPolicy="no-referrer" /> : null;
+}
+
 function Creatives({ data, path }: { data: MediaReport; path: string }) {
   const [stage, setStage] = useState("");
   const [search, setSearch] = useState("");
@@ -874,10 +892,12 @@ function Creatives({ data, path }: { data: MediaReport; path: string }) {
           try {
             return await requestMedia<{
               assets: CreativeAsset[];
+              adPreviews?: Record<string, CreativePreview>;
               warnings: string[];
             }>(path + "&kind=assets&account=" + encodeURIComponent(account));
           } catch (error) {
             return {
+              adPreviews: {},
               assets: [],
               warnings: [
                 error instanceof Error
@@ -889,6 +909,7 @@ function Creatives({ data, path }: { data: MediaReport; path: string }) {
         }),
       );
       return {
+        adPreviews: Object.assign({} as Record<string, CreativePreview>, ...results.map(r => r.adPreviews)),
         assets: results.flatMap((r) => r.assets),
         warnings: [...new Set(results.flatMap((r) => r.warnings))],
       };
@@ -912,7 +933,8 @@ function Creatives({ data, path }: { data: MediaReport; path: string }) {
         campaignId: ad.campaign_id,
         name: ad.name,
         copy: ad.copy,
-        preview: ad.thumbnail,
+        ...(detail.data?.adPreviews[ad.ad_id] as CreativePreview | undefined),
+        preview: detail.data?.adPreviews[ad.ad_id]?.preview || ad.thumbnail,
         type: "ad",
         metrics: {
           spend: ad.metrics.spend,
@@ -999,15 +1021,7 @@ function Creatives({ data, path }: { data: MediaReport; path: string }) {
           const campaign = campaigns.get(card.campaignId);
           return (
             <Card key={card.key} title={card.name}>
-              {card.preview && (
-                <img
-                  className="paid-creative"
-                  src={card.preview}
-                  alt=""
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                />
-              )}
+              <CreativePlayer media={card} name={card.name} />
               <p className="muted">
                 {card.type === "image"
                   ? "Imagem"

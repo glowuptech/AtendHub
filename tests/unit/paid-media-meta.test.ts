@@ -240,6 +240,26 @@ it("separa as peças paginadas, preserva o histórico e isola arquivos reutiliza
   };
   vi.stubGlobal("fetch", async (url: URL) => {
     const q = url.searchParams;
+    if (url.pathname.endsWith("/ads"))
+      return Response.json({
+        data: [
+          { id: "24", campaign_id: "1", creative: { image_hash: "hash-a" } },
+          { id: "25", campaign_id: "1", creative: { video_id: "123" } },
+        ],
+      });
+    if (url.pathname.endsWith("/123"))
+      return Response.json({
+        source: "https://example.org/video.mp4",
+        thumbnails: {
+          data: [
+            {
+              uri: "https://example.org/vertical.jpg",
+              width: 1080,
+              height: 1920,
+            },
+          ],
+        },
+      });
     if (url.pathname.endsWith("/adimages"))
       return Response.json({
         data: [{ hash: "hash-a", url: "https://example.org/full.jpg" }],
@@ -276,11 +296,19 @@ it("separa as peças paginadas, preserva o histórico e isola arquivos reutiliza
       paging: { next: "https://graph.facebook.com/?after=2" },
     });
   });
-  const { assets, warnings } = await readCreativeAssets(
+  const { assets, warnings, adPreviews } = await readCreativeAssets(
     access,
     "act_11",
     ["1"],
     { from: "2026-11-01", to: "2026-11-10" },
+  );
+  expect(adPreviews["24"].preview).toBe("https://example.org/full.jpg");
+  expect(adPreviews["25"]).toMatchObject({
+    source: "https://example.org/video.mp4",
+    ratio: 1080 / 1920,
+  });
+  expect(assets.find((a) => a.type === "video")?.source).toBe(
+    adPreviews["25"].source,
   );
   expect(warnings).toEqual([]);
   expect(assets).toHaveLength(4);
