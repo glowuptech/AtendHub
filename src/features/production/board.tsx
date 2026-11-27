@@ -1,5 +1,5 @@
 "use client";
-import { ProductionFiles } from "./files";
+import { ProductionFiles, uploadReference } from "./files";
 import { useState, type FormEvent } from "react";
 import useSWR from "swr";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,13 @@ export function Production({
   const { data, error, mutate } = useSWR<Board>(path, request, {
     refreshInterval: 30000,
   });
+  const [opened, setOpened] = useState("");
+  const [dropTarget, setDropTarget] = useState("");
+  const [dragging, setDragging] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [saved, setSaved] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState("");
+  const detail = data?.tasks.find((t) => t.id === opened);
   const plan = data?.plans.find((p) => p.id === planId);
   const suggested = [
     plan?.objective,
@@ -69,11 +76,24 @@ export function Production({
     setBusy(true);
     setProblem("");
     try {
-      await request(path, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      if (!saved || method !== "POST")
+        await request(path, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      if (method === "POST") {
+        setSaved(true);
+        let left = files;
+        for (const file of files) {
+          await uploadReference(draftId, client, file, (n) =>
+            setUploadStatus(file.name + " · " + n + "%"),
+          );
+          left = left.slice(1);
+          setFiles(left);
+        }
+        setSaved(false);
+      }
       if (method === "POST" || editing) {
         setCreating(false);
         setEditing(null);
@@ -81,6 +101,7 @@ export function Production({
     } catch (err) {
       setProblem(err instanceof Error ? err.message : "Falha ao salvar.");
     } finally {
+      setUploadStatus("");
       await mutate();
       setBusy(false);
     }
@@ -97,6 +118,10 @@ export function Production({
       vida: vida || null,
       title: f.get("title"),
       brief: f.get("brief"),
+      reference_links: String(f.get("links") || "")
+        .split(/\r?\n/)
+        .map((v) => v.trim())
+        .filter(Boolean),
       priority: f.get("priority"),
       review_on: f.get("review") || null,
       launch_on: f.get("launch") || null,
@@ -146,6 +171,8 @@ export function Production({
         {data?.canCreate && (
           <Button
             onClick={() => {
+              setFiles([]);
+              setSaved(false);
               setDraftId(crypto.randomUUID());
               setEditing(null);
               setPlan("");
@@ -168,12 +195,22 @@ export function Production({
             return (
               <section
                 key={step}
-                className="production-column"
+                data-stage={step}
+                className={
+                  "production-column" +
+                  (dropTarget === step ? " drop-target" : "")
+                }
                 onDragOver={(e) => {
-                  if (data.canEdit) e.preventDefault();
+                  if (data.canEdit && dragging) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    setDropTarget(step);
+                  }
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
+                  setDropTarget("");
+                  setDragging("");
                   const task = tasks.find(
                     (t) => t.id === e.dataTransfer.getData("text/plain"),
                   );
@@ -189,109 +226,179 @@ export function Production({
                 <h3>
                   {labels[step]} <small>{items.length}</small>
                 </h3>
-                {items.map((t) => (
-                  <article
-                    key={t.id}
-                    draggable={data.canEdit && !busy}
-                    onDragStart={(e) =>
-                      e.dataTransfer.setData("text/plain", t.id)
-                    }
-                  >
-                    <small>
-                      {data.clients.find((c) => c.id === t.client_id)?.name} ·{" "}
-                      {
-                        { normal: "Normal", high: "Alta", urgent: "Urgente" }[
-                          t.priority
-                        ]
-                      }
-                    </small>
-                    <h4>{t.title}</h4>
-                    <ProductionFiles task={t.id} client={t.client_id} edit={data.canEdit} review={t.stage === "review" || t.stage === "approval"} onReview={() => mutate()} />
-                    {t.plan && <p>{t.plan.name}</p>}
-                    {t.owner && <small>Responsável: {t.owner.display_name}</small>}
-                    {t.vida && <p>{stageLabels[t.vida]}</p>}
-                    {t.review_on && (
-                      <p>
-                        Revisão · {t.review_on.split("-").reverse().join("/")}
-                      </p>
-                    )}
-                    {t.launch_on && (
-                      <p>
-                        Implementação ·{" "}
-                        {t.launch_on.split("-").reverse().join("/")}
-                      </p>
-                    )}
-                    {data.canEdit && (
-                      <Button
-                        variant="ghost"
-                        onClick={() => {
-                          setEditing(t);
-                          setClient(t.client_id);
-                          setPlan(t.plan_id ?? "");
-                          setVida(t.vida ?? "");
-                          setProblem("");
-                          setCreating(true);
-                        }}
-                      >
-                        Editar demanda
-                      </Button>
-                    )}
-                    {t.brief && (
-                      <details>
-                        <summary>Briefing</summary>
-                        <p className="preserve-lines">{t.brief}</p>
-                      </details>
-                    )}
-                    {data.canEdit && (
-                      <label>
-                        Etapa
-                        <select
-                          disabled={busy}
-                          value={t.stage}
-                          onChange={(e) =>
-                            void write("PATCH", {
-                              id: t.id,
-                              revision: t.revision,
-                              action: "move",
-                              stage: e.target.value,
-                            })
-                          }
-                        >
-                          {workflow[kind].map((s) => (
-                            <option key={s} value={s}>
-                              {labels[s]}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                    {data.canEdit &&
-                    (!t.owner_id || t.owner_id === data.userId) ? (
-                      <Button
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() =>
-                          void write("PATCH", {
-                            id: t.id,
-                            revision: t.revision,
-                            action: t.owner_id ? "release" : "claim",
-                          })
+                {!items.length && (
+                  <p className="drop-hint">Arraste demandas aqui</p>
+                )}
+                {items.map((t) => {
+                  const owner = t.owner?.display_name?.trim();
+                  return (
+                    <button
+                      type="button"
+                      className="production-card"
+                      key={t.id}
+                      draggable={data.canEdit && !busy}
+                      onClick={() => {
+                        setProblem("");
+                        setOpened(t.id);
+                      }}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("text/plain", t.id);
+                        e.dataTransfer.effectAllowed = "move";
+                        setDragging(t.id);
+                      }}
+                      onDragEnd={() => {
+                        setDragging("");
+                        setDropTarget("");
+                      }}
+                    >
+                      <span className={"priority " + t.priority}>
+                        {
+                          { normal: "Normal", high: "Alta", urgent: "Urgente" }[
+                            t.priority
+                          ]
                         }
-                      >
-                        {t.owner_id ? "Liberar demanda" : "Assumir demanda"}
-                      </Button>
-                    ) : (
+                      </span>
+                      <strong>{t.title}</strong>
                       <small>
-                        {t.owner_id ? "Atribuída" : "Sem responsável"}
+                        {data.clients.find((c) => c.id === t.client_id)?.name}
                       </small>
-                    )}
-                  </article>
-                ))}
+                      <span className={"kind " + kind}>
+                        {kind === "art" ? "Arte gráfica" : "Edição de vídeo"}
+                      </span>
+                      {t.review_on && (
+                        <small>
+                          Entrega · {t.review_on.split("-").reverse().join("/")}
+                        </small>
+                      )}
+                      {t.launch_on && (
+                        <small>
+                          Implementação ·{" "}
+                          {t.launch_on.split("-").reverse().join("/")}
+                        </small>
+                      )}
+                      {owner && (
+                        <span
+                          className="initials"
+                          title={owner}
+                          aria-label={"Responsável: " + owner}
+                        >
+                          {owner
+                            .split(/\s+/)
+                            .filter((_, i, a) => i === 0 || i === a.length - 1)
+                            .map((n) => n[0])
+                            .join("")
+                            .toUpperCase()}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </section>
             );
           })}
         </div>
       )}
+      {detail &&
+        data &&
+        !creating &&
+        (() => {
+          const t = detail;
+          return (
+            <ScheduleDialog title={t.title} onClose={() => setOpened("")}>
+              <div className="production-detail">
+                <p>
+                  {data.clients.find((c) => c.id === t.client_id)?.name} ·{" "}
+                  {labels[t.stage]} ·{" "}
+                  {t.owner?.display_name || "Sem responsável"}
+                </p>
+                {t.plan && <p>{t.plan.name}</p>}
+                {t.vida && <p>{stageLabels[t.vida]}</p>}
+                {t.reference_links?.length ? (
+                  <section>
+                    <h4>Links de referência</h4>
+                    {t.reference_links.map((url, i) => (
+                      <p key={i}>
+                        <a href={url} target="_blank" rel="noopener noreferrer">
+                          {url}
+                        </a>
+                      </p>
+                    ))}
+                  </section>
+                ) : null}
+                <ProductionFiles
+                  task={t.id}
+                  client={t.client_id}
+                  edit={data.canEdit}
+                  review={t.stage === "review" || t.stage === "approval"}
+                  onReview={() => mutate()}
+                />
+                {data.canEdit && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setOpened("");
+                      setEditing(t);
+                      setClient(t.client_id);
+                      setPlan(t.plan_id ?? "");
+                      setVida(t.vida ?? "");
+                      setProblem("");
+                      setCreating(true);
+                    }}
+                  >
+                    Editar demanda
+                  </Button>
+                )}
+                {t.brief && (
+                  <section>
+                    <h4>Briefing</h4>
+                    <p className="preserve-lines">{t.brief}</p>
+                  </section>
+                )}
+                {data.canEdit && (
+                  <label>
+                    Etapa
+                    <select
+                      disabled={busy}
+                      value={t.stage}
+                      onChange={(e) =>
+                        void write("PATCH", {
+                          id: t.id,
+                          revision: t.revision,
+                          action: "move",
+                          stage: e.target.value,
+                        })
+                      }
+                    >
+                      {workflow[kind].map((s) => (
+                        <option key={s} value={s}>
+                          {labels[s]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {data.canEdit && (!t.owner_id || t.owner_id === data.userId) ? (
+                  <Button
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() =>
+                      void write("PATCH", {
+                        id: t.id,
+                        revision: t.revision,
+                        action: t.owner_id ? "release" : "claim",
+                      })
+                    }
+                  >
+                    {t.owner_id ? "Liberar demanda" : "Assumir demanda"}
+                  </Button>
+                ) : (
+                  <small>{t.owner_id ? "Atribuída" : "Sem responsável"}</small>
+                )}
+                {problem && <p role="alert">{problem}</p>}
+              </div>
+            </ScheduleDialog>
+          );
+        })()}
       {creating && ((editing ? data?.canEdit : data?.canCreate) || !data) && (
         <ScheduleDialog
           title={editing ? "Editar demanda" : "Nova demanda"}
@@ -303,7 +410,7 @@ export function Production({
           }}
         >
           <form onSubmit={create}>
-            <fieldset disabled={busy}>
+            <fieldset disabled={busy || saved}>
               <label>
                 Cliente
                 <select
@@ -381,6 +488,28 @@ export function Production({
                 />
               </label>
               <label>
+                Links de referência (um por linha)
+                <textarea
+                  name="links"
+                  defaultValue={editing?.reference_links?.join("\n")}
+                  placeholder="https://"
+                />
+              </label>
+              {!editing && (
+                <label>
+                  Arquivos de referência
+                  <input
+                    type="file"
+                    multiple
+                    disabled={saved}
+                    onChange={(e) => setFiles(Array.from(e.target.files || []))}
+                  />
+                  {files.map((f, i) => (
+                    <small key={i}>{f.name}</small>
+                  ))}
+                </label>
+              )}
+              <label>
                 Prioridade
                 <select name="priority" defaultValue={editing?.priority}>
                   <option value="normal">Normal</option>
@@ -404,14 +533,22 @@ export function Production({
                   defaultValue={editing?.launch_on ?? ""}
                 />
               </label>
-              {problem && <p role="alert">{problem}</p>}
-              <Button
-                type="submit"
-                disabled={editing ? !data?.canEdit : !data?.canCreate}
-              >
-                {editing ? "Salvar alterações" : "Criar demanda"}
-              </Button>
             </fieldset>
+            {uploadStatus && <p role="status">{uploadStatus}</p>}
+            {saved && (
+              <p>Demanda criada. Os anexos restantes podem ser reenviados.</p>
+            )}
+            {problem && <p role="alert">{problem}</p>}
+            <Button
+              type="submit"
+              disabled={busy || (editing ? !data?.canEdit : !data?.canCreate)}
+            >
+              {editing
+                ? "Salvar alterações"
+                : saved
+                  ? "Reenviar anexos"
+                  : "Criar demanda"}
+            </Button>
           </form>
         </ScheduleDialog>
       )}

@@ -73,7 +73,7 @@ async function handle(request: Request) {
   if (taskId !== null) {
     if (!client || !z.string().uuid().safeParse(taskId).success)
       return message("Demanda inválida.", 400);
-    const task = await table.select("id").eq("id", taskId)
+    const task = await table.select("id,created_by").eq("id", taskId)
       .eq("organization_id", org).eq("client_id", client).maybeSingle();
     if (task.error) throw task.error;
     if (!task.data) return message("Demanda indisponível.", 404);
@@ -96,11 +96,13 @@ async function handle(request: Request) {
     if (request.method === "POST" && body.action === "read") {
       if (typeof body.name !== "string" || !/^[\w.-]+$/.test(body.name) || body.name.startsWith("."))
         return message("Arquivo inválido.", 400);
-      const signed = await bucket.createSignedUrl(folder + "/" + body.name, 3600);
+      const signed = await bucket.createSignedUrl(folder + "/" + body.name, 3600, { download: body.name.startsWith("ref-") });
       if (signed.error) throw signed.error;
       return Response.json({ url: signed.data.signedUrl });
     }
-    if (request.method !== "POST" || !can("edit")) return message("Sem acesso para enviar arquivos.", 403);
+    const reference = body.action === "reference";
+    const ownReference = reference && can("create") && task.data.created_by === auth.userId;
+    if (request.method !== "POST" || (!can("edit") && !ownReference)) return message("Sem acesso para enviar arquivos.", 403);
     if (body.action === "review") {
       const { error } = await admin.rpc("atendhub_production_approval", {
         p_task: taskId, p_client: client, p_org: org, p_actor: auth.userId,
@@ -110,10 +112,12 @@ async function handle(request: Request) {
       after(async () => { await deliverApprovalNotifications(taskId); });
       return Response.json({ ok: true });
     }
-    if (body.action !== "upload" || typeof body.name !== "string" || !/\.(png|jpe?g|webp|mp4|mov|webm)$/i.test(body.name))
+    if (reference && (typeof body.name !== "string" || !body.name.trim() || body.name.length > 255))
+      return message("Nome de arquivo inválido.", 400);
+    if (!reference && (body.action !== "upload" || typeof body.name !== "string" || !/\.(png|jpe?g|webp|mp4|mov|webm)$/i.test(body.name)))
       return message("Selecione uma imagem ou um vídeo compatível.", 400);
     const name = body.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-140);
-    const path = folder + "/" + Date.now() + "-" + crypto.randomUUID() + "-" + name;
+    const path = folder + "/" + (reference ? "ref-" : "") + Date.now() + "-" + crypto.randomUUID() + "-" + name;
     const signed = await bucket.createSignedUploadUrl(path);
     if (signed.error) throw signed.error;
     return Response.json({ path, signature: signed.data.token });

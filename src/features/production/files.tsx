@@ -66,6 +66,26 @@ async function upload(
   }
 }
 
+export async function uploadReference(
+  task: string,
+  client: string,
+  file: File,
+  progress: (value: number) => void,
+) {
+  const response = await fetch(
+    "/api/production?clientId=" + client + "&files=" + task,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reference", name: file.name }),
+    },
+  );
+  const signed = await response.json();
+  if (!response.ok)
+    throw new Error(signed.error || "Falha ao anexar referência.");
+  await upload(file, signed.path, signed.signature, progress);
+}
+
 export function ProductionFiles({
   task,
   client,
@@ -139,9 +159,11 @@ export function ProductionFiles({
               }
             }}
           >
-            {name.slice(51)}
+            {name.startsWith("ref-")
+              ? "Referência · " + name.slice(55)
+              : name.slice(51)}
           </button>
-          {edit && review && (
+          {edit && review && !name.startsWith("ref-") && (
             <button
               type="button"
               disabled={
@@ -209,6 +231,31 @@ export function ProductionFiles({
                 report(err);
               } finally {
                 setPercent(null);
+              }
+            }}
+          />
+        </label>
+      )}
+      {edit && (
+        <label>
+          Anexar arquivo de referência
+          <input
+            type="file"
+            multiple
+            disabled={percent !== null}
+            onChange={async (e) => {
+              const files = Array.from(e.target.files || []);
+              e.target.value = "";
+              setError("");
+              setPercent(0);
+              try {
+                for (const file of files)
+                  await uploadReference(task, client, file, setPercent);
+              } catch (err) {
+                report(err);
+              } finally {
+                setPercent(null);
+                await refresh().catch(report);
               }
             }}
           />
