@@ -388,6 +388,7 @@ function PlanEditor({
                 {value.campaignIds.length} campanha(s)
               </summary>
               <p>{stageGuide[stage]}</p>
+              {plan.id && <NavButton href={`/app/producao?clientId=${plan.clientId}&planId=${plan.id}&vida=${stage}`}>Criar demanda</NavButton>}
               <fieldset
                 disabled={!canEdit || pending}
                 className="paid-stage-editor"
