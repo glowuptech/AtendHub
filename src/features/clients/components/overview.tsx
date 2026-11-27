@@ -1,4 +1,5 @@
 "use client";
+import { OpenLead } from "@/features/leads/components/open-lead";
 import { useState } from "react";
 import useSWR from "swr";
 import {
@@ -523,7 +524,7 @@ function OverviewDetails({
                 {l.name}
                 <small>Primeira resposta humana não registrada</small>
               </span>
-              <NavButton href={`/app/leads/${l.id}`}>Atender</NavButton>
+              <OpenLead id={l.id}>Atender</OpenLead>
             </div>
           ))}
           {data.recentAppointments.map((a) => (

@@ -1,4 +1,5 @@
 "use client";
+import { OpenLead } from "@/features/leads/components/open-lead";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useClients } from "@/features/clients/hooks";
@@ -288,12 +289,7 @@ export function Queue() {
                       </>
                     )}
                     <div className="queue-card-actions">
-                      <Button
-                        variant="ghost"
-                        onClick={() => router.push(`/app/leads/${l.id}`)}
-                      >
-                        Abrir lead
-                      </Button>
+                      <OpenLead id={l.id}>Abrir lead</OpenLead>
                       <Button
                         variant="outline"
                         onClick={() => router.push(`/app/inbox?leadId=${l.id}`)}

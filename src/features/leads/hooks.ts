@@ -54,6 +54,8 @@ const fetcher = async <T>(url: string): Promise<T> => {
 export function useLead(leadId: string) {
   return useSWR<
     PersistedLead & {
+      warnings?: string[];
+      conversations?: Array<{ id: string }>;
       events?: Array<{
         id: string;
         event_type: string;

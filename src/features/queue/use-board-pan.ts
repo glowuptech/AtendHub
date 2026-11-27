@@ -48,6 +48,7 @@ export function useBoardPan() {
   function onPointerDown(e: PointerEvent<HTMLDivElement>) {
     suppressClick.current = false;
     if (
+      !e.currentTarget.contains(e.target as Node) ||
       e.pointerType !== "mouse" ||
       e.button !== 0 ||
       e.ctrlKey ||
