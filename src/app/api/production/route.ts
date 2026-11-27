@@ -67,6 +67,43 @@ async function handle(request: Request) {
     .map((c) => c.id);
   if (client && !allowed.length) return message("Cliente indisponível.", 403);
   const table = admin.from("atendhub_production_tasks");
+  const taskId = new URL(request.url).searchParams.get("files");
+  if (taskId !== null) {
+    if (!client || !z.string().uuid().safeParse(taskId).success)
+      return message("Demanda inválida.", 400);
+    const task = await table.select("id").eq("id", taskId)
+      .eq("organization_id", org).eq("client_id", client).maybeSingle();
+    if (task.error) throw task.error;
+    if (!task.data) return message("Demanda indisponível.", 404);
+    const folder = [org, client, taskId].join("/");
+    const bucket = admin.storage.from("production-files");
+    if (request.method === "GET") {
+      const names: string[] = [];
+      for (let offset = 0; ; offset += 100) {
+        const page = await bucket.list(folder, { limit: 100, offset, sortBy: { column: "name", order: "desc" } });
+        if (page.error) throw page.error;
+        names.push(...page.data.map(file => file.name));
+        if (page.data.length < 100) break;
+      }
+      return Response.json({ names });
+    }
+    const body = await request.json();
+    if (request.method === "POST" && body.action === "read") {
+      if (typeof body.name !== "string" || !/^[\w.-]+$/.test(body.name) || body.name.startsWith("."))
+        return message("Arquivo inválido.", 400);
+      const signed = await bucket.createSignedUrl(folder + "/" + body.name, 3600);
+      if (signed.error) throw signed.error;
+      return Response.json({ url: signed.data.signedUrl });
+    }
+    if (request.method !== "POST" || !can("edit")) return message("Sem acesso para enviar arquivos.", 403);
+    if (body.action !== "upload" || typeof body.name !== "string" || !/\.(png|jpe?g|webp|mp4|mov|webm)$/i.test(body.name))
+      return message("Selecione uma imagem ou um vídeo compatível.", 400);
+    const name = body.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-140);
+    const path = folder + "/" + Date.now() + "-" + crypto.randomUUID() + "-" + name;
+    const signed = await bucket.createSignedUploadUrl(path);
+    if (signed.error) throw signed.error;
+    return Response.json({ path, signature: signed.data.token });
+  }
   if (request.method === "GET") {
     const tasks = allowed.length
       ? await allRows<Task>((a, b) =>

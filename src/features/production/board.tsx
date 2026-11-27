@@ -1,4 +1,5 @@
 "use client";
+import { ProductionFiles } from "./files";
 import { useState, type FormEvent } from "react";
 import useSWR from "swr";
 import { Button } from "@/components/ui/button";
@@ -205,6 +206,7 @@ export function Production({
                       }
                     </small>
                     <h4>{t.title}</h4>
+                    <ProductionFiles task={t.id} client={t.client_id} edit={data.canEdit} />
                     {t.plan && <p>{t.plan.name}</p>}
                     {t.owner && <small>Responsável: {t.owner.display_name}</small>}
                     {t.vida && <p>{stageLabels[t.vida]}</p>}
