@@ -101,7 +101,7 @@ export const stageLabels = {
   scheduled: "Agendado",
   confirmed: "Agendamento confirmado",
   rescheduling: "Reagendamento",
-  recovery: "Recuperação",
+  recovery: "Follow-up",
   lost: "Perdido",
 };
 export function dateTime(value: string) {

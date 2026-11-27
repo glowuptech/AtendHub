@@ -1,5 +1,6 @@
 "use client";
-import Link from "next/link";
+import { OpenLead } from "@/features/leads/components/open-lead";
+
 import type { Lead } from "@/domain/schemas";
 import type { PersistedLead } from "@/features/leads/hooks";
 import { Badge, Empty, stageLabels } from "@/components/layout/shared";
@@ -27,7 +28,7 @@ export function LeadTable({ leads }: { leads: TableLead[] }) {
             return (
             <tr key={l.id}>
               <td>
-                <Link className="person-link" href={`/app/leads/${l.id}`}>
+                <OpenLead className="person-link" id={l.id}>
                   <span className="avatar soft">
                     {l.name.split(" ").at(-1)?.slice(0, 2)}
                   </span>
@@ -42,7 +43,7 @@ export function LeadTable({ leads }: { leads: TableLead[] }) {
                       </small>
                     )}
                   </span>
-                </Link>
+                </OpenLead>
               </td>
               <td>
                 <Badge

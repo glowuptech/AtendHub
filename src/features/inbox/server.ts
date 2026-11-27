@@ -201,11 +201,9 @@ export async function listConversations(
         lastInboundAt: row.last_inbound_at,
         lastOutboundAt: row.last_outbound_at,
         createdAt: row.created_at,
-        canSend: mine && connected && row.status === "open",
+        canSend: mine && connected,
         sendBlockedReason:
-          row.status === "closed"
-            ? "Atendimento encerrado."
-            : !mine
+          !mine
               ? "Somente o responsável pelo lead pode responder."
               : connected
                 ? null

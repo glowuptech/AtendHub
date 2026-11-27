@@ -166,7 +166,7 @@ export function ChatShortcuts({
               </p>
             )
           ) : open === "lead" ? (
-            <PersistedLeadDetail id={conversation.leadId} embedded />
+            <PersistedLeadDetail id={conversation.leadId} conversationId={conversation.id} embedded />
           ) : open === "registration" ? (
             <RegistrationForm
               leadId={conversation.leadId}
