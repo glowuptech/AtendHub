@@ -38,6 +38,21 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   const version = form.versions.find((item) => item.id === form.activeVersionId);
   if (!version) return NextResponse.json({ error: "Versão publicada indisponível." }, { status: 409 });
   const tracking = settingsOf(version.settings).tracking;
+  if (body?.eventType === "contactCheckpoint") {
+    const settings = settingsOf(version.settings);
+    const parsed = z.object({ versionId: z.literal(version.id), idempotencyKey: z.uuid(),
+      name: z.string().trim().min(1).max(200), phone: z.string().max(40),
+      sequence: z.number().int().positive().max(2147483647) }).safeParse(body);
+    const phone = parsed.success && normalizeFormPhone(parsed.data.phone);
+    if (!parsed.success || !phone || settings.contactPosition !== "start" ||
+        !settings.contacts.name.enabled || !settings.contacts.phone.enabled)
+      return NextResponse.json({ ok: false }, { status: 422 });
+    const { error } = await integrationAdmin().rpc("atendhub_checkpoint_form_contact", {
+      p_form: form.id, p_version: version.id, p_key: parsed.data.idempotencyKey,
+      p_name: parsed.data.name, p_phone: phone, p_sequence: parsed.data.sequence,
+    });
+    return NextResponse.json({ ok: !error }, { status: error ? 503 : 200 });
+  }
   if (body?.eventType === "buttonConversion") {
     const button = z.object({ action: z.string().min(1).max(120), versionId: z.literal(version.id), eventId: z.uuid() }).safeParse(body);
     if (!button.success) return NextResponse.json({ ok: false }, { status: 400 });

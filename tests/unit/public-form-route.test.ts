@@ -155,3 +155,25 @@ it.each([
   expect((await POST(request(body), ctx)).status).toBe(422);
   expect(mocks.rpc).not.toHaveBeenCalled();
 });
+
+it("registra o contato inicial na fila de recuperação somente com WhatsApp válido", async () => {
+  versions.limit.mockResolvedValueOnce({ data: [{
+    id: version.id, form_id: form.id, organization_id: form.organizationId, client_id: form.clientId,
+    number: 1, state: "snapshot", definition: { fields: form.fields, version: {
+      ...version, settings: { ...version.settings, contactPosition: "start", contacts: {
+        name: {enabled: true, required: true, label: "Nome"},
+        phone: {enabled: true, required: true, label: "WhatsApp"},
+        email: {enabled: false, required: false, label: "E-mail"},
+      }},
+    }},
+  }] });
+  mocks.rpc.mockResolvedValue({error:null});
+  const body = { eventType:"contactCheckpoint", name:"Contato", phone:"(11) 98765-4321", sequence:1,
+    versionId: version.id, idempotencyKey:crypto.randomUUID() };
+  expect((await POST(request(body),ctx)).status).toBe(200);
+  expect(mocks.rpc).toHaveBeenCalledWith("atendhub_checkpoint_form_contact", expect.objectContaining({
+    p_form: form.id, p_key: body.idempotencyKey, p_phone:"+5511987654321",
+  }));
+  expect((await POST(request({...body,phone:"11"}),ctx)).status).toBe(422);
+  expect(mocks.rpc).toHaveBeenCalledTimes(1);
+});
