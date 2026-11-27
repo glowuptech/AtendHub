@@ -392,18 +392,20 @@ end;
 $$;
 
 -- Track arrival in the current column independently of the queue SLA.
-alter table public.atendhub_leads add column stage_entered_at timestamptz;
+alter table public.atendhub_leads add column if not exists stage_entered_at timestamptz;
 update public.atendhub_leads l set stage_entered_at = coalesce((
   select max(e.created_at) from public.atendhub_lead_events e
   where e.lead_id=l.id and e.to_stage=l.stage
-),l.queue_entered_at,l.created_at);
+),l.queue_entered_at,l.created_at)
+where l.stage_entered_at is null;
 alter table public.atendhub_leads alter column stage_entered_at set default now();
-create function public.atendhub_stamp_stage_entry() returns trigger
+create or replace function public.atendhub_stamp_stage_entry() returns trigger
 language plpgsql set search_path='' as $$
 begin
   new.stage_entered_at=now();
   return new;
 end $$;
+drop trigger if exists atendhub_stamp_stage_entry on public.atendhub_leads;
 create trigger atendhub_stamp_stage_entry before update of stage on public.atendhub_leads
 for each row when (old.stage is distinct from new.stage) execute function public.atendhub_stamp_stage_entry();
 
