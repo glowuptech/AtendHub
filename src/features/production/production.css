@@ -1,0 +1,46 @@
+.production-board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(250px, 1fr);
+  gap: 14px;
+  overflow-x: auto;
+  padding-block: 12px;
+  align-items: start;
+}
+.production-column {
+  background: var(--surface-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 12px;
+  min-height: 240px;
+}
+.production-column h3 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.production-column article {
+  background: var(--surface, white);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+.production-column article p,
+.production-column article h4 {
+  margin: 0;
+}
+.production-column article[draggable="true"] {
+  cursor: grab;
+}
+.production label,
+.production fieldset {
+  display: grid;
+  gap: 6px;
+}
+.production fieldset {
+  gap: 12px;
+}
