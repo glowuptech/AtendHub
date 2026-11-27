@@ -76,7 +76,7 @@ export default async function Page({
           3600,
         );
       return (
-        <article key={row.id}>
+        <article key={row.id} id={`versao-${row.id}`}>
           <h3>{row.task.title}</h3>
           <p>{row.file_name.slice(51)}</p>
           {data &&

@@ -1,3 +1,5 @@
+import { after } from "next/server";
+import { deliverApprovalNotifications } from "@/features/production/approval-notifications";
 import { z } from "zod";
 import { sessionOrganizationContext } from "@/lib/supabase/organization-session";
 import { paidMediaAdmin, allRows } from "@/features/paid-media/server";
@@ -104,7 +106,9 @@ async function handle(request: Request) {
         p_task: taskId, p_client: client, p_org: org, p_actor: auth.userId,
         p_action: "request", p_file: body.name
       });
-      return error ? message("Confira o arquivo e a etapa de revisão da demanda.", 409) : Response.json({ ok: true });
+      if (error) return message("Confira o arquivo e a etapa de revisão da demanda.", 409);
+      after(async () => { await deliverApprovalNotifications(taskId); });
+      return Response.json({ ok: true });
     }
     if (body.action !== "upload" || typeof body.name !== "string" || !/\.(png|jpe?g|webp|mp4|mov|webm)$/i.test(body.name))
       return message("Selecione uma imagem ou um vídeo compatível.", 400);
