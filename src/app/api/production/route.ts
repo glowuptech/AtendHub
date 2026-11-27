@@ -85,7 +85,10 @@ async function handle(request: Request) {
         names.push(...page.data.map(file => file.name));
         if (page.data.length < 100) break;
       }
-      return Response.json({ names });
+      const reviews = await admin.from("atendhub_production_approvals")
+        .select("file_name,status,feedback").eq("task_id", taskId).order("requested_at", { ascending: false });
+      if (reviews.error) throw reviews.error;
+      return Response.json({ names, reviews: reviews.data });
     }
     const body = await request.json();
     if (request.method === "POST" && body.action === "read") {
@@ -96,6 +99,13 @@ async function handle(request: Request) {
       return Response.json({ url: signed.data.signedUrl });
     }
     if (request.method !== "POST" || !can("edit")) return message("Sem acesso para enviar arquivos.", 403);
+    if (body.action === "review") {
+      const { error } = await admin.rpc("atendhub_production_approval", {
+        p_task: taskId, p_client: client, p_org: org, p_actor: auth.userId,
+        p_action: "request", p_file: body.name
+      });
+      return error ? message("Confira o arquivo e a etapa de revisão da demanda.", 409) : Response.json({ ok: true });
+    }
     if (body.action !== "upload" || typeof body.name !== "string" || !/\.(png|jpe?g|webp|mp4|mov|webm)$/i.test(body.name))
       return message("Selecione uma imagem ou um vídeo compatível.", 400);
     const name = body.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-140);

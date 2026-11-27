@@ -206,7 +206,7 @@ export function Production({
                       }
                     </small>
                     <h4>{t.title}</h4>
-                    <ProductionFiles task={t.id} client={t.client_id} edit={data.canEdit} />
+                    <ProductionFiles task={t.id} client={t.client_id} edit={data.canEdit} review={t.stage === "review" || t.stage === "approval"} onReview={() => mutate()} />
                     {t.plan && <p>{t.plan.name}</p>}
                     {t.owner && <small>Responsável: {t.owner.display_name}</small>}
                     {t.vida && <p>{stageLabels[t.vida]}</p>}
