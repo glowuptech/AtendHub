@@ -9,7 +9,7 @@ const command = z.discriminatedUnion("action", [
     lead: z.string().uuid(),
   }),
   z.object({
-    action: z.enum(["close", "resume", "new"]),
+    action: z.enum(["close", "new"]),
     id: z.string().uuid(),
     request: z.string().uuid(),
   }),

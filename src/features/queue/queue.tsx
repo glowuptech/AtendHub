@@ -79,8 +79,8 @@ export function Queue() {
           .includes(search.toLowerCase()),
     )
     .sort((a, b) =>
-      (a.queue_entered_at ?? a.created_at).localeCompare(
-        b.queue_entered_at ?? b.created_at,
+      (b.stage_entered_at ?? b.queue_entered_at ?? b.created_at).localeCompare(
+        a.stage_entered_at ?? a.queue_entered_at ?? a.created_at,
       ),
     );
   return (
@@ -88,7 +88,7 @@ export function Queue() {
       <Heading
         eyebrow="SISTEMA"
         title="Fila de atendimento"
-        description="Todos os clientes autorizados · prioridade para quem está aguardando"
+        description="Todos os clientes autorizados · mais recentes primeiro"
       />
       {(clientsError || leadsError) && (
         <p role="alert">

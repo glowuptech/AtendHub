@@ -30,6 +30,7 @@ export type PersistedLead = {
   notes: string;
   original_captured_at: string | null;
   queue_entered_at: string;
+  stage_entered_at?: string | null;
   created_by_id: string | null;
   next_action: string;
   created_at: string;
