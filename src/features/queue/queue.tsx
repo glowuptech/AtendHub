@@ -1,4 +1,5 @@
 "use client";
+import { OpenLead } from "@/features/leads/components/open-lead";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useClients } from "@/features/clients/hooks";
@@ -79,8 +80,8 @@ export function Queue() {
           .includes(search.toLowerCase()),
     )
     .sort((a, b) =>
-      (a.queue_entered_at ?? a.created_at).localeCompare(
-        b.queue_entered_at ?? b.created_at,
+      (b.stage_entered_at ?? b.queue_entered_at ?? b.created_at).localeCompare(
+        a.stage_entered_at ?? a.queue_entered_at ?? a.created_at,
       ),
     );
   return (
@@ -88,7 +89,7 @@ export function Queue() {
       <Heading
         eyebrow="SISTEMA"
         title="Fila de atendimento"
-        description="Todos os clientes autorizados · prioridade para quem está aguardando"
+        description="Todos os clientes autorizados · mais recentes primeiro"
       />
       {(clientsError || leadsError) && (
         <p role="alert">
@@ -288,12 +289,7 @@ export function Queue() {
                       </>
                     )}
                     <div className="queue-card-actions">
-                      <Button
-                        variant="ghost"
-                        onClick={() => router.push(`/app/leads/${l.id}`)}
-                      >
-                        Abrir lead
-                      </Button>
+                      <OpenLead id={l.id}>Abrir lead</OpenLead>
                       <Button
                         variant="outline"
                         onClick={() => router.push(`/app/inbox?leadId=${l.id}`)}

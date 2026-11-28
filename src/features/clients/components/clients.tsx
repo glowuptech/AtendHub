@@ -1,4 +1,5 @@
 "use client";
+import { Production } from "@/features/production/board";
 import { useState } from "react";
 import { useClients } from "../hooks";
 
@@ -57,6 +58,7 @@ export function ClientProfile({ id }: { id: string }) {
           "Agendamento externo",
           "Acessos",
           "Domínio público",
+          "Produção",
           "Tráfego pago",
         ].map((t) => (
           <Button
@@ -91,6 +93,8 @@ export function ClientProfile({ id }: { id: string }) {
         <ClientAccesses key={id} clientId={id} />
       ) : tab === "Domínio público" ? (
         <ClientDomainSettings key={id} clientId={id} />
+      ) : tab === "Produção" ? (
+        <Production key={id} fixedClient={id} />
       ) : tab === "Tráfego pago" ? (
         <section aria-label="Dashboard de tráfego pago do cliente">
           <PaidMediaWorkspace

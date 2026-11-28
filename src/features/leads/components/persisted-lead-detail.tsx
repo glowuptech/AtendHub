@@ -1,26 +1,39 @@
 "use client";
+import { useState } from "react";
+import { useInboxMessages } from "@/features/inbox/hooks";
+import { BookingConversationPreview } from "@/features/inbox/components/booking-conversation-preview";
 import { RegistrationForm } from "@/features/leads/registration/form";
 import { useLead } from "@/features/leads/hooks";
 import {
   Badge,
   Card,
-  Denied,
+
   Heading,
   NavButton,
   dateTime,
   stageLabels,
 } from "@/components/layout/shared";
 
+function LeadConversation({ id, name }: { id: string; name: string }) {
+  const history = useInboxMessages(id);
+  return <BookingConversationPreview contactName={name} history={history} />;
+}
+
 export function PersistedLeadDetail({
   id,
   embedded = false,
+  conversationId,
 }: {
   id: string;
   embedded?: boolean;
+  conversationId?: string;
 }) {
   const { data: lead, error, isLoading } = useLead(id);
+  const [selected, setSelected] = useState("");
+  const conversations = lead?.conversations ?? [];
+  const active = conversationId ?? (conversations.find(c => c.id === selected)?.id || conversations[0]?.id);
   if (isLoading) return <p role="status">Carregando Lead…</p>;
-  if (error || !lead) return <Denied />;
+  if (error || !lead) return <p role="alert">{error?.message || "Lead indisponível para esta sessão."}</p>;
   return (
     <>
       {!embedded && (
@@ -31,6 +44,8 @@ export function PersistedLeadDetail({
           action={<NavButton href="/app/inbox">Abrir Inbox</NavButton>}
         />
       )}
+      {embedded && <h3>{lead.name}</h3>}
+      {lead.warnings?.map(message => <p role="alert" key={message}>{message}</p>)}
       <div className="cards-grid">
         <Card title="Resumo">
           <Badge>{stageLabels[lead.stage]}</Badge>
@@ -64,7 +79,7 @@ export function PersistedLeadDetail({
               : "Não informada"}
           </p>
           <p>Inserido no sistema: {dateTime(lead.created_at)}</p>
-          <p>Entrada na fila: {dateTime(lead.queue_entered_at)}</p>
+          <p>Entrada na fila: {lead.queue_entered_at ? dateTime(lead.queue_entered_at) : "Não informada"}</p>
         </Card>
       </div>
       <Card title="Perguntas e respostas">
@@ -73,7 +88,7 @@ export function PersistedLeadDetail({
         </p>
         {lead.responses?.length ? (
           lead.responses.map((response) => {
-            const snapshot = response.question_snapshot;
+            const snapshot = response.question_snapshot ?? {};
             const value = Array.isArray(response.value)
               ? response.value
                   .map(
@@ -95,21 +110,30 @@ export function PersistedLeadDetail({
               <div className="field-row" key={response.id}>
                 <div>
                   <strong>{snapshot.label ?? response.question_id}</strong>
-                  <small>{dateTime(response.captured_at)}</small>
+                  {response.captured_at && <small>{dateTime(response.captured_at)}</small>}
                 </div>
                 <span>{value}</span>
               </div>
             );
           })
-        ) : (
+        ) : lead.responses ? (
           <p>Nenhuma resposta personalizada registrada.</p>
-        )}
+        ) : null}
       </Card>
       <Card title="Dados pessoais">
         <RegistrationForm key={id} leadId={id} name={lead.name} />
       </Card>
-      <Card title="Histórico">
-        {!lead.events?.length && <p>Nenhuma movimentação registrada.</p>}
+      <Card title="Histórico de mensagens">
+        {!conversationId && conversations.length > 1 && <label>Conversa
+          <select value={active} onChange={e => setSelected(e.target.value)}>
+            {conversations.map((c, index) => <option key={c.id} value={c.id}>Conversa {index + 1}</option>)}
+          </select>
+        </label>}
+        {active ? <LeadConversation key={active} id={active} name={lead.name} /> :
+          <p>Nenhuma conversa disponível para esta sessão.</p>}
+      </Card>
+      <Card title="Histórico de movimentações">
+        {lead.events && !lead.events.length && <p>Nenhuma movimentação registrada.</p>}
         {lead.events?.map((event) => (
           <div className="timeline" key={event.id}>
             <span />

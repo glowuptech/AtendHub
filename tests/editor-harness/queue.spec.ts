@@ -113,3 +113,14 @@ test("arraste termina fora do quadro e rolagem por teclado continua disponível"
     .poll(() => board.evaluate((el) => el.scrollLeft))
     .toBeGreaterThan(0);
 });
+
+test("abre a ficha e volta ao mesmo cartão sem sair da fila", async ({ page }) => {
+  await page.goto("/tests/editor-harness/index.html?queue");
+  const open = page.getByRole("button", { name: "Abrir lead", exact: true });
+  await open.click();
+  const dialog = page.getByRole("dialog", { name: "Ficha do lead" });
+  await expect(dialog.getByText("Histórico de mensagens", {exact:true})).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(open).toBeFocused();
+});

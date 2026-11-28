@@ -15,6 +15,7 @@ export const actions = {
   supervise: "Supervisionar",
 } as const;
 export const areas = [
+  { id: "production", label: "Produção", actions: ["view", "create", "edit"] },
   {
     id: "automations",
     label: "Automações",

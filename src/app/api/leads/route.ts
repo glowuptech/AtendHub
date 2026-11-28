@@ -56,7 +56,7 @@ const createLeadSchema = z
   });
 
 const select =
-  "id, organization_id, client_id, professional_id, contact_id, name, phone, email, source, capture_status, stage, owner_id, form_id, form_version_id, origin_submission_id, field_values, notes, next_action, idempotency_key, original_captured_at, queue_entered_at, created_by_id, created_at, updated_at, assigned_at, claimed_at, first_response_at, client:atendhub_clients!atendhub_leads_client_id_fkey(id,name,operation_id), professional:atendhub_professionals!atendhub_leads_professional_id_fkey(id,name)";
+  "id, organization_id, client_id, professional_id, contact_id, name, phone, email, source, capture_status, stage, owner_id, form_id, form_version_id, origin_submission_id, field_values, notes, next_action, idempotency_key, original_captured_at, queue_entered_at, stage_entered_at, created_by_id, created_at, updated_at, assigned_at, claimed_at, first_response_at, client:atendhub_clients!atendhub_leads_client_id_fkey(id,name,operation_id), professional:atendhub_professionals!atendhub_leads_professional_id_fkey(id,name)";
 
 export async function GET(request: Request) {
   const auth = await sessionOrganizationContext();

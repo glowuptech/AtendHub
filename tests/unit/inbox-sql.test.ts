@@ -836,3 +836,35 @@ it("registra o texto real e enfileira cada resposta por link uma única vez", as
     await db.query("update atendhub_appointments set status='cancelled' where id=$1",[id(n)]);
   }
 });
+
+it("encerra após 48h, mantém agendamentos e devolve novas mensagens à fila sem responsável", async () => {
+  await admin();
+  await db.exec(await readFile("supabase/migrations/20261127010000_atendhub_inbox_lifecycle.sql", "utf8"));
+  for (const fromMe of [false, true]) {
+    const jid = fromMe ? "5516987654901@s.whatsapp.net" : "5516987654902@s.whatsapp.net";
+    const entry = await ingest({ jid, pmid: "idle-" + fromMe, fromMe });
+    await db.query("update atendhub_leads set owner_id=$1,stage=$2 where id=$3",
+      [USER_OWNER, fromMe ? "scheduled" : "in_progress",entry.leadId]);
+    await db.query("update atendhub_inbox_episode_events set occurred_at=now()-interval '49 hours' where conversation_id=$1",[entry.conversationId]);
+    await db.query("select atendhub_close_idle_conversations()");
+    const state = async () => (await db.query<{status:string;stage:string;owner_id:string|null}>("select c.status,l.stage,l.owner_id from atendhub_inbox_conversations c join atendhub_leads l on l.id=c.lead_id where c.id=$1",[entry.conversationId])).rows[0];
+    expect(await state()).toMatchObject({status:"closed",stage:fromMe ? "scheduled" : "recovery"});
+    await ingest({jid,pmid:"late-"+fromMe,fromMe});
+    expect((await state()).status).toBe("closed");
+    await ingest({jid,pmid:"return-"+fromMe,fromMe,ts:new Date().toISOString()});
+    expect(await state()).toMatchObject({status:"open",stage:"new",owner_id:null});
+  }
+});
+
+it("mantém o encerramento manual até o provedor aceitar a mensagem enviada pelo Inbox", async () => {
+  const entry = await ingest({jid:"5516987654903@s.whatsapp.net",pmid:"manual-closed"});
+  await db.query("update atendhub_leads set owner_id=$1,stage='in_progress' where id=$2",[USER_OWNER,entry.leadId]);
+  await as(USER_OWNER);
+  await db.query("select atendhub_inbox_change_episode($1,'close')",[entry.conversationId]);
+  const req=await db.query<{r:Json}>("select atendhub_inbox_request_send($1,$2,'Olá novamente') r",[entry.conversationId,id(9988)]);
+  await admin();
+  const state=async () => (await db.query("select c.status,l.stage,l.owner_id,l.first_response_at from atendhub_inbox_conversations c join atendhub_leads l on l.id=c.lead_id where c.id=$1",[entry.conversationId])).rows[0];
+  expect(await state()).toMatchObject({status:"closed",stage:"recovery"});
+  await db.query("select atendhub_inbox_apply_send_result($1,'sent','manual-return')",[req.rows[0].r.eventId]);
+  expect(await state()).toMatchObject({status:"open",stage:"new",owner_id:null,first_response_at:null});
+});

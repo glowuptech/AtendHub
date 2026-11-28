@@ -1,4 +1,5 @@
 "use client";
+import { OpenLead } from "@/features/leads/components/open-lead";
 import { WeeklyAppointments } from "./weekly";
 import { useDemo } from "@/components/layout/demo-context";
 import {
@@ -94,9 +95,7 @@ function AppointmentRecords({ portal = false }: { portal?: boolean }) {
                 Confirmar depois
               </Button>
               {!portal && (
-                <NavButton href={`/app/leads/${a.leadId}`}>
-                  Lead de origem
-                </NavButton>
+                <OpenLead id={a.leadId}>Lead de origem</OpenLead>
               )}
             </div>
           </div>

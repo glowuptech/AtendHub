@@ -10,6 +10,14 @@ import {
 const controls =
   "a, button, input, select, textarea, label, summary, [role='button'], [contenteditable]:not([contenteditable='false']), [draggable='true']";
 
+function verticalScrollContainer(board: HTMLElement) {
+  for (let el: HTMLElement | null = board; el; el = el.parentElement) {
+    if (el.scrollHeight > el.clientHeight &&
+        /^(auto|scroll|overlay)$/.test(getComputedStyle(el).overflowY)) return el;
+  }
+  return document.scrollingElement ?? document.documentElement;
+}
+
 /** Mouse panning only: touch, wheel, keyboard and card actions keep their native behavior. */
 export function useBoardPan() {
   const ref = useRef<HTMLDivElement>(null);
@@ -18,6 +26,8 @@ export function useBoardPan() {
     x: number;
     y: number;
     scrollLeft: number;
+    vertical: Element;
+    scrollTop: number;
     moved: boolean;
   } | null>(null);
   const suppressClick = useRef(false);
@@ -38,6 +48,7 @@ export function useBoardPan() {
   function onPointerDown(e: PointerEvent<HTMLDivElement>) {
     suppressClick.current = false;
     if (
+      !e.currentTarget.contains(e.target as Node) ||
       e.pointerType !== "mouse" ||
       e.button !== 0 ||
       e.ctrlKey ||
@@ -48,7 +59,8 @@ export function useBoardPan() {
     )
       return;
     const board = e.currentTarget;
-    if (board.scrollWidth <= board.clientWidth) return;
+    const vertical = verticalScrollContainer(board);
+    if (board.scrollWidth <= board.clientWidth && vertical.scrollHeight <= vertical.clientHeight) return;
     // Leave the native scrollbar/thumb available to the mouse too.
     const bounds = board.getBoundingClientRect();
     if (
@@ -61,6 +73,8 @@ export function useBoardPan() {
       x: e.clientX,
       y: e.clientY,
       scrollLeft: board.scrollLeft,
+      vertical,
+      scrollTop: vertical.scrollTop,
       moved: false,
     };
     board.setPointerCapture(e.pointerId);
@@ -71,10 +85,9 @@ export function useBoardPan() {
     if (!pending || pending.pointerId !== e.pointerId) return;
     if (!(e.buttons & 1)) return stop();
     const dx = e.clientX - pending.x;
+    const dy = e.clientY - pending.y;
     if (!pending.moved) {
-      const dy = e.clientY - pending.y;
-      if (Math.abs(dy) > 6 && Math.abs(dy) > Math.abs(dx)) return stop();
-      if (Math.abs(dx) < 6) return;
+      if (Math.hypot(dx, dy) < 6) return;
       pending.moved = true;
       suppressClick.current = true;
       setIsPanning(true);
@@ -87,6 +100,7 @@ export function useBoardPan() {
     }
     e.preventDefault();
     e.currentTarget.scrollLeft = pending.scrollLeft - dx;
+    pending.vertical.scrollTop = pending.scrollTop - dy;
   }
 
   return {

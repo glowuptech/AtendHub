@@ -27,6 +27,8 @@ export function BrandedPortalHeader({ name }: { name: string }) {
         {" · "}
         <a href="/portal/agendamentos">Agendamentos</a>
         {" · "}
+        <a href="/portal/aprovacoes">Aprovações</a>
+        {" · "}
         <a href="/portal/trafego-pago">Tráfego pago</a>
       </nav>
     </header>

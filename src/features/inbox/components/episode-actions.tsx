@@ -28,7 +28,7 @@ export function EpisodeActions({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const request = useRef("");
-  async function change(action: "new" | "resume" | "close") {
+  async function change(action: "new" | "close") {
     setBusy(true);
     setError("");
     request.current ||= crypto.randomUUID();
@@ -50,18 +50,11 @@ export function EpisodeActions({
   return (
     <details>
       <summary>Atendimento</summary>
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={busy}
-        onClick={() =>
-          change(conversation.status === "closed" ? "resume" : "close")
-        }
-      >
-        {conversation.status === "closed"
-          ? "Retomar atendimento"
-          : "Encerrar atendimento"}
-      </Button>
+      {conversation.status === "open" && (
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => change("close")}>
+          Encerrar atendimento
+        </Button>
+      )}
       <Button
         size="sm"
         variant="outline"

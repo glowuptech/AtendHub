@@ -43,7 +43,26 @@ export async function GET(_request: Request, context: { params: Promise<{ leadId
   const auth = await sessionOrganizationContext();
   if ("error" in auth) return auth.error;
   const { leadId } = await context.params;
-  const { data, error } = await auth.supabase.from("atendhub_leads").select("id,organization_id,client_id,professional_id,contact_id,name,phone,email,source,capture_status,stage,owner_id,form_id,form_version_id,origin_submission_id,field_values,notes,next_action,original_captured_at,queue_entered_at,created_by_id,created_at,updated_at,assigned_at,claimed_at,first_response_at,client:atendhub_clients!atendhub_leads_client_id_fkey(id,name,operation_id),professional:atendhub_professionals!atendhub_leads_professional_id_fkey(id,name),events:atendhub_lead_events(*),responses:atendhub_lead_responses(*)").eq("id", leadId).eq("organization_id", auth.organizationId).single();
-  if (error || !data) return apiError(error ?? new Error("Lead não encontrado."), 404);
-  return NextResponse.json(data);
+  if (!z.string().uuid().safeParse(leadId).success)
+    return NextResponse.json({ error: "Identificador de lead inválido." }, { status: 400 });
+  const { data: lead, error } = await auth.supabase.from("atendhub_leads")
+    .select("id,organization_id,client_id,name,phone,email,source,capture_status,stage,owner_id,form_id,form_version_id,notes,next_action,original_captured_at,created_at,queue_entered_at")
+    .eq("organization_id", auth.organizationId).eq("id", leadId).maybeSingle();
+  if (error) return apiError(error, error.code === "42501" ? 403 : 500);
+  if (!lead) return NextResponse.json({ error: "Lead indisponível para esta sessão." }, { status: 404 });
+
+  const scoped = (table: string, fields: string) => auth.supabase.from(table).select(fields)
+    .eq("organization_id", auth.organizationId).eq("lead_id", leadId);
+  const [events, responses, conversations, client] = await Promise.all([
+    scoped("atendhub_lead_events", "id,event_type,from_stage,to_stage,created_at").order("created_at", { ascending: false }),
+    scoped("atendhub_lead_responses", "*"),
+    scoped("atendhub_inbox_conversations", "id").order("last_message_at", { ascending: false, nullsFirst: false }),
+    auth.supabase.from("atendhub_clients").select("id,name").eq("id", lead.client_id).eq("organization_id", auth.organizationId).maybeSingle(),
+  ]);
+  return NextResponse.json({ ...lead, client: client.data, events: events.data, responses: responses.data,
+    conversations: conversations.data, warnings: [
+      ...(events.error ? ["Não foi possível carregar o histórico de movimentações."] : []),
+      ...(responses.error ? ["Não foi possível carregar as respostas do formulário."] : []),
+      ...(conversations.error ? ["Não foi possível consultar as conversas."] : []),
+    ] });
 }

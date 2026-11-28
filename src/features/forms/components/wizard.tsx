@@ -26,6 +26,7 @@ export type WizardCapture = Pick<
   CaptureRepository,
   "progress" | "view" | "action"
 > & {
+  checkpoint?: (name: string, phone: string, sequence: number) => Promise<boolean>;
   navigate?: (stage: string, action?: string, eventName?: string) => void;
   capture: (
     input: Parameters<Capture>[0],
@@ -81,6 +82,37 @@ export function FormWizard({
     ...(hasContacts && settings.contactPosition === "end" ? ["contacts"] : []),
   ];
   const current = sequence[index];
+  const serial = useRef(0);
+  const lastCheckpoint = useRef("");
+  const checkpoint = capture?.checkpoint;
+  const canCheckpoint = settings.contactPosition === "start" && settings.contacts.name.enabled && settings.contacts.phone.enabled;
+  useEffect(() => {
+    const phone = normalizeFormPhone(contacts.phone);
+    const name = contacts.name.trim();
+    if (!checkpoint || !canCheckpoint || current !== "contacts" || !name || !phone || done) return;
+    const signature = JSON.stringify([name, phone]);
+    let active = true;
+    let pending = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const send = async () => {
+      if (pending || lastCheckpoint.current === signature) return;
+      pending = true;
+      const ok = await checkpoint(name, phone, ++serial.current).catch(() => false);
+      pending = false;
+      if (!active) return;
+      if (ok) lastCheckpoint.current = signature;
+      else timer = setTimeout(send, 5000);
+    };
+    const hide = () => { if (document.visibilityState === "hidden") void send(); };
+    timer = setTimeout(send, 900);
+    document.addEventListener("visibilitychange", hide);
+    window.addEventListener("pagehide", send);
+    return () => {
+      active = false; clearTimeout(timer);
+      document.removeEventListener("visibilitychange", hide);
+      window.removeEventListener("pagehide", send);
+    };
+  }, [checkpoint, canCheckpoint, contacts.name, contacts.phone, current, done]);
   const step = version.steps.find((s) => s.id === current);
   const field = fields.find((f) => f.id === step?.question.fieldDefinitionId);
   const isLast = index === sequence.length - 1;
@@ -446,9 +478,9 @@ export function FormWizard({
                               </label>
                             ))}
                           <p className="form-privacy">
-                            Ao avançar, seus contatos e respostas serão
-                            registrados para atendimento, mesmo se você não
-                            concluir as próximas etapas.
+                            {canCheckpoint && checkpoint
+                              ? "Usamos o nome e o WhatsApp preenchidos aqui para atendimento, mesmo se você sair sem avançar."
+                              : "Ao avançar, seus contatos e respostas serão registrados para atendimento, mesmo se você não concluir as próximas etapas."}
                           </p>
                         </>
                       ) : step && field ? (

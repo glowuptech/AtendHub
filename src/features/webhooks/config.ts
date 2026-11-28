@@ -1,6 +1,12 @@
 import { z } from "zod";
 export const webhookDestinations = [
   {
+    id: "productionApprovals",
+    title: "Aprovações de produção",
+    description: "Envia ao n8n o cliente, a demanda e o link da versão para aprovação no portal.",
+    events: ["production.approval.requested"],
+  },
+  {
     id: "forms",
     title: "Notificações de formulários",
     description:
@@ -93,6 +99,7 @@ const url = z
     }
   }, "Informe uma URL HTTPS válida, sem usuário, senha ou fragmento.");
 export const WebhookConfigSchema = z.object({
+  productionApprovals: url.default(""),
   forms: url,
   whatsappConnection: url,
   inboxMessages: url,
@@ -105,6 +112,7 @@ export const WebhookConfigSchema = z.object({
 });
 export type WebhookConfig = z.infer<typeof WebhookConfigSchema>;
 export const emptyWebhookConfig = (): WebhookConfig => ({
+  productionApprovals: "",
   forms: "",
   whatsappConnection: "",
   inboxMessages: "",

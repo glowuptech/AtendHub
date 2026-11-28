@@ -37,6 +37,15 @@ export function PublicForm({
   };
   const capture: WizardCapture = {
     progress: () => null,
+    checkpoint: async (name, phone, sequence) => {
+      idempotencyKey.current ??= crypto.randomUUID();
+      const response = await fetch(endpoint, {method: "POST", keepalive: true,
+        headers: {"Content-Type":"application/json"}, body: JSON.stringify({
+          eventType: "contactCheckpoint", idempotencyKey: idempotencyKey.current,
+          versionId: version.id, name, phone, sequence,
+        })});
+      return response.ok;
+    },
     view: (input) => {
       const eventId = crypto.randomUUID();
       sendEvent("view", input.sessionId, undefined, eventId);
